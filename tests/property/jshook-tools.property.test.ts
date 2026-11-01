@@ -13,11 +13,9 @@ import {collectCode} from '../../src/tools/collector/collectCode.js';
 import {queryDom} from '../../src/tools/dom/queryDom.js';
 import {createHook} from '../../src/tools/hook/CreateHook.js';
 import {click} from '../../src/tools/input/click.js';
-import {injectStealth} from '../../src/tools/stealth/stealth.js';
 
 const collectSchema = zod.object(collectCode.schema);
 const hookSchema = zod.object(createHook.schema);
-const stealthSchema = zod.object(injectStealth.schema);
 const domSchema = zod.object(queryDom.schema);
 const pageSchema = zod.object(click.schema);
 
@@ -62,24 +60,6 @@ describe('JSHook tool properties', () => {
         type => {
           const parsed = hookSchema.parse({type});
           assert.strictEqual(parsed.type, type);
-        },
-      ),
-    );
-  });
-
-  it('Property 15: stealth preset support', () => {
-    fc.assert(
-      fc.property(
-        fc.constantFrom(
-          'windows-chrome',
-          'mac-chrome',
-          'mac-safari',
-          'linux-chrome',
-          'windows-edge',
-        ),
-        preset => {
-          const parsed = stealthSchema.parse({preset});
-          assert.strictEqual(parsed.preset, preset);
         },
       ),
     );

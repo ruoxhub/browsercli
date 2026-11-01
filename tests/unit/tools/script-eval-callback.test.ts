@@ -10,7 +10,6 @@ import {getRuntime} from '../../../src/runtime.js';
 import {
   evaluateScript as evaluateScriptTool,
   evaluateScriptFn,
-  injectPreloadScript as injectPreloadScriptTool,
 } from '../../../src/tools/script/script.js';
 import {ToolError} from '../../../src/utils/errors.js';
 
@@ -40,28 +39,7 @@ async function evaluateScript(runtime: any, params: any): Promise<any> {
   return result;
 }
 
-async function injectPreloadScript(runtime: any, params: any): Promise<any> {
-  let result: any = null;
-  const response = {
-    appendResponseLine: (line: string) => {
-      if (line.startsWith('```json')) return;
-      if (line.startsWith('```')) return;
-      try {
-        result = JSON.parse(line);
-      } catch {
-        /* intentionally empty */
-      }
-    },
-    setStructuredContent: (content: unknown) => {
-      result = content;
-    },
-  } as any;
-  await injectPreloadScriptTool.handler({params} as any, response, runtime);
-  return result;
-}
-
 type EvaluateScriptRuntime = any;
-type InjectPreloadRuntime = any;
 type EvaluateScriptDebuggerContext = any;
 
 interface HandleLike {
@@ -76,7 +54,18 @@ interface PageLike {
   ): Promise<string | undefined>;
 }
 
-type FrameLike = PageLike;
+interface FrameLike extends PageLike {
+  _id?: string;
+  page?: () => {
+    frames: () => unknown[];
+    context: () => {
+      newCDPSession: () => Promise<{
+        send: (method: string) => Promise<Record<string, unknown>>;
+        detach: () => Promise<void>;
+      }>;
+    };
+  };
+}
 
 interface _ExecutionContextLike {
   id: number;
@@ -166,52 +155,6 @@ describe('evaluate_script callback path', () => {
 
     assert.equal(result.success, true);
     assert.equal(result.result, '{"ok":true}');
-  });
-
-  it('registers a preload script on future documents', async () => {
-    let registration: any;
-    const browserContext = {isClosed: () => false};
-
-    const result = await injectPreloadScript(
-      {
-        getBrowserContext: () => browserContext,
-        getPersistentHookRegistry: () => ({
-          register: async (request: any) => {
-            registration = request;
-            return {
-              entry: {
-                hookId: request.hookId,
-                scriptHash: request.hookId.slice(8),
-                scriptSize: 21,
-                scriptPreview: request.script,
-                registeredAt: 1,
-                source: request.source,
-                requestedWorld: request.requestedWorld,
-                effectiveWorld: 'main',
-                applyMode: request.applyMode,
-              },
-              registered: true,
-              idempotent: false,
-              appliedFrames: 0,
-              failedFrames: [],
-              partial: false,
-              warnings: [],
-            };
-          },
-        }),
-      } as InjectPreloadRuntime,
-      {script: 'window.__preload = 1;'},
-    );
-
-    assert.equal(result.success, true);
-    assert.equal(registration.context, browserContext);
-    assert.equal(registration.script, 'window.__preload = 1;');
-    assert.equal(registration.source, 'inject_preload_script');
-    assert.equal(registration.requestedWorld, 'main');
-    assert.equal(registration.applyMode, 'future-only');
-    assert.match(result.data.registrationId, /^preload-[a-f0-9]{64}$/);
-    assert.equal(result.data.registered, true);
-    assert.match(result.message, /registered/);
   });
 
   it('runs evaluate_script in the selected frame execution context', async () => {
@@ -357,15 +300,35 @@ describe('evaluate_script callback path', () => {
 
   it('selects the execution context bound to the current frame', async () => {
     const calls: Array<{method: string; params?: Record<string, unknown>}> = [];
-    const selectedFrame = {
+    const pageMock = {
+      frames: () => [{}, selectedFrame],
+      context: () => ({
+        newCDPSession: async () => ({
+          send: async (method: string) => {
+            if (method === 'Page.getFrameTree') {
+              return {
+                frameTree: {
+                  frame: {id: 'frame-1'},
+                  childFrames: [{frame: {id: 'frame-2'}}],
+                },
+              };
+            }
+            return {};
+          },
+          detach: async () => undefined,
+        }),
+      }),
+    };
+    const selectedFrame: FrameLike = {
       _id: 'frame-2',
+      page: () => pageMock,
       evaluateHandle: async () => {
         throw new Error('frame fallback should not be used');
       },
       evaluate: async () => {
         throw new Error('frame fallback should not be used');
       },
-    } as unknown as FrameLike;
+    };
 
     const debuggerContext = {
       getExecutionContexts: () => [
@@ -495,7 +458,8 @@ describe('evaluate_script callback path', () => {
         evaluateScript(
           {
             getSelectedFrame: () => ({
-              evaluateHandle: async () => await new Promise<never>(() => undefined),
+              evaluateHandle: async () =>
+                await new Promise<never>(() => undefined),
             }),
             getSelectedPage: () => null,
           } as unknown as EvaluateScriptRuntime,
@@ -549,30 +513,5 @@ describe('evaluate_script callback path', () => {
       (error: unknown) =>
         error instanceof ToolError && /content script/i.test(error.message),
     );
-  });
-
-  it('registers runtime preload script on the page context', async () => {
-    let pageAddInitCalls = 0;
-
-    await assert.rejects(
-      () =>
-        injectPreloadScript(
-          {
-            getSelectedFrame: () => null,
-            getSelectedPage: () => ({
-              addInitScript: async () => {
-                pageAddInitCalls += 1;
-              },
-            }),
-            getBrowserContext: () => null,
-            getPersistentHookRegistry: () => ({register: async () => undefined}),
-          } as InjectPreloadRuntime,
-          {script: 'window.__preload = 1;'},
-        ),
-      (error: unknown) =>
-        error instanceof ToolError && error.code === 'BROWSER_REQUIRED',
-    );
-
-    assert.equal(pageAddInitCalls, 0);
   });
 });

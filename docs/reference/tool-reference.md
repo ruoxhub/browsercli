@@ -32,13 +32,12 @@
   - [`list_websocket_connections`](#list_websocket_connections)
   - [`replay_network_request`](#replay_network_request)
   - [`replay_network_request_batch`](#replay_network_request_batch)
-- **[Debugging](#debugging)** (20 tools)
+- **[Debugging](#debugging)** (19 tools)
   - [`evaluate_on_callframe`](#evaluate_on_callframe)
   - [`evaluate_script`](#evaluate_script)
   - [`get_console_message`](#get_console_message)
   - [`get_css_styles`](#get_css_styles)
   - [`get_paused_info`](#get_paused_info)
-  - [`inject_preload_script`](#inject_preload_script)
   - [`inspect_locals`](#inspect_locals)
   - [`list_breakpoints`](#list_breakpoints)
   - [`list_console_messages`](#list_console_messages)
@@ -53,7 +52,7 @@
   - [`step_out`](#step_out)
   - [`step_over`](#step_over)
   - [`take_screenshot`](#take_screenshot)
-- **[JS Reverse Engineering](#js-reverse-engineering)** (37 tools)
+- **[JS Reverse Engineering](#js-reverse-engineering)** (33 tools)
   - [`anti_anti_debug`](#anti_anti_debug)
   - [`break_on_xhr`](#break_on_xhr)
   - [`bypass_debugger`](#bypass_debugger)
@@ -69,14 +68,11 @@
   - [`get_storage`](#get_storage)
   - [`hook_function`](#hook_function)
   - [`inject_hook`](#inject_hook)
-  - [`inject_stealth`](#inject_stealth)
   - [`inspect_object`](#inspect_object)
   - [`list_created_hooks`](#list_created_hooks)
   - [`list_hooks`](#list_hooks)
   - [`list_persistent_hooks`](#list_persistent_hooks)
   - [`list_scripts`](#list_scripts)
-  - [`list_stealth_features`](#list_stealth_features)
-  - [`list_stealth_presets`](#list_stealth_presets)
   - [`list_targets`](#list_targets)
   - [`monitor_events`](#monitor_events)
   - [`remove_hook`](#remove_hook)
@@ -84,7 +80,6 @@
   - [`search_in_scripts`](#search_in_scripts)
   - [`search_in_sources`](#search_in_sources)
   - [`set_breakpoint_on_text`](#set_breakpoint_on_text)
-  - [`set_user_agent`](#set_user_agent)
   - [`stop_monitor`](#stop_monitor)
   - [`trace_function`](#trace_function)
   - [`unhook_function`](#unhook_function)
@@ -432,15 +427,6 @@
 
 - `includeScopes`
 
-### `inject_preload_script` — inject_preload_script
-
-**Description:** 为当前页面/上下文的后续文档注册预加载脚本
-
-**Parameters:**
-
-- `script`
-- `preset`
-
 ### `inspect_locals` — 检查局部变量
 
 **Description:** 检查当前暂停栈所有帧的局部变量摘要。
@@ -716,14 +702,6 @@
 - `persistent`
 - `world`
 
-### `inject_stealth` — inject_stealth
-
-**Description:** 注入反检测隐身脚本（隐藏 webdriver、伪装 chrome、canvas 噪点等）
-
-**Parameters:**
-
-- `preset`
-
 ### `inspect_object` — 检查对象
 
 **Description:** 深度检查一个 JavaScript 对象，展示其属性、原型链与方法，便于理解对象结构。
@@ -763,14 +741,6 @@
 **Parameters:**
 
 - `filter`
-
-### `list_stealth_features` — list_stealth_features
-
-**Description:** 列出可用的隐身特性开关
-
-### `list_stealth_presets` — list_stealth_presets
-
-**Description:** 列出可用的隐身预设
 
 ### `list_targets` — list_targets
 
@@ -838,14 +808,6 @@
 - `urlFilter`
 - `occurrence`
 - `condition`
-
-### `set_user_agent` — set_user_agent
-
-**Description:** 通过 CDP 为当前页面设置自定义 User-Agent
-
-**Parameters:**
-
-- `userAgent`
 
 ### `stop_monitor` — 停止监控
 

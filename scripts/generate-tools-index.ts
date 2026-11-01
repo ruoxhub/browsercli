@@ -30,8 +30,7 @@ const DOMAIN_DESCRIPTIONS: Record<string, string> = {
   page: 'Page interaction and state tools.',
   pipeline: 'Analysis pipeline example tools.',
   screenshot: 'Page screenshot capture tool.',
-  script: 'Page script evaluation and preload tools.',
-  stealth: 'Browser stealth and fingerprint tools.',
+  script: 'Page script evaluation tools.',
   wasm: 'WebAssembly reverse engineering tools.',
 };
 

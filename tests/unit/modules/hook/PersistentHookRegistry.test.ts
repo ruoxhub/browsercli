@@ -8,10 +8,7 @@ import {describe, it} from 'node:test';
 
 import type {BrowserContext, Disposable, Frame, Page} from 'patchright';
 
-import {
-  createPreloadHookId,
-  PersistentHookRegistry,
-} from '../../../../src/modules/hook/PersistentHookRegistry.js';
+import {PersistentHookRegistry} from '../../../../src/modules/hook/PersistentHookRegistry.js';
 
 interface Deferred<T> {
   promise: Promise<T>;
@@ -339,12 +336,6 @@ describe('PersistentHookRegistry', () => {
       registry.list(context as unknown as BrowserContext)[0]?.hookId,
       'hook-1',
     );
-  });
-
-  it('creates stable content-addressed preload ids', () => {
-    assert.equal(createPreloadHookId('one'), createPreloadHookId('one'));
-    assert.notEqual(createPreloadHookId('one'), createPreloadHookId('two'));
-    assert.match(createPreloadHookId('one'), /^preload-[a-f0-9]{64}$/);
   });
 
   it('coalesces concurrent same-script registration', async () => {

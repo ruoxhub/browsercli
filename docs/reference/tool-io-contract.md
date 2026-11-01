@@ -82,11 +82,6 @@
 | `export_rebuild_bundle`      | 请求参数 + 当前上下文                                              | task artifact 文件                       | `artifacts/tasks/*`                                  |
 | `take_screenshot`            | 页面/元素渲染                                                      | 截图文件或响应附件                       | filesystem(optional)                                 |
 | `evaluate_script`            | 当前 frame runtime                                                 | 页面注入脚本                             | PreloadScript Registry                               |
-| `inject_preload_script`      | 当前 frame runtime                                                 | 页面注入脚本                             | PreloadScript Registry                               |
-| `inject_stealth`             | Stealth 配置                                                       | 页面 stealth 注入 / UA                   | Stealth Runtime                                      |
-| `list_stealth_features`      | Stealth 配置                                                       | 页面 stealth 注入 / UA                   | Stealth Runtime                                      |
-| `list_stealth_presets`       | Stealth 配置                                                       | 页面 stealth 注入 / UA                   | Stealth Runtime                                      |
-| `set_user_agent`             | Stealth 配置                                                       | 页面 stealth 注入 / UA                   | Stealth Runtime                                      |
 | `analyze_websocket_messages` | WebSocket 帧缓存                                                   | Response attach only                     | CDP WebSocket                                        |
 | `get_websocket_message`      | WebSocket 帧缓存                                                   | Response attach only                     | CDP WebSocket                                        |
 | `get_websocket_messages`     | WebSocket 帧缓存                                                   | Response attach only                     | CDP WebSocket                                        |

@@ -27,7 +27,6 @@ import {
   restoreSessionState,
   saveSessionState,
 } from '../../../src/tools/page/index.js';
-import {injectStealth} from '../../../src/tools/stealth/index.js';
 
 describe('jshook tools schema', () => {
   it('validates collect_code schema', () => {
@@ -54,12 +53,11 @@ describe('jshook tools schema', () => {
     assert.strictEqual(result.includeUnchanged, true);
   });
 
-  it('validates hook and stealth schemas', () => {
+  it('validates hook schemas', () => {
     const hookSchema = zod.object(createHook.schema);
     const hookDataSchema = zod.object(getHookData.schema);
     const listHooksSchema = zod.object(listCreatedHooks.schema);
     const removeHookSchema = zod.object(removeHook.schema);
-    const stealthSchema = zod.object(injectStealth.schema);
 
     const hook = hookSchema.parse({type: 'fetch'});
     const hookData = hookDataSchema.parse({
@@ -69,13 +67,11 @@ describe('jshook tools schema', () => {
     });
     const listHooks = listHooksSchema.parse({});
     const removeHookResult = removeHookSchema.parse({hookId: 'fetch-123'});
-    const stealth = stealthSchema.parse({preset: 'windows-chrome'});
 
     assert.strictEqual(hook.type, 'fetch');
     assert.strictEqual(hookData.view, 'summary');
     assert.strictEqual(listHooks.verbose, false);
     assert.strictEqual(removeHookResult.hookId, 'fetch-123');
-    assert.strictEqual(stealth.preset, 'windows-chrome');
   });
 
   it('validates dom and page schemas', () => {

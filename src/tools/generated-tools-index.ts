@@ -23,7 +23,6 @@ import {manifest as networkManifest} from './network/manifest.js';
 import {manifest as pageManifest} from './page/manifest.js';
 import {manifest as screenshotManifest} from './screenshot/manifest.js';
 import {manifest as scriptManifest} from './script/manifest.js';
-import {manifest as stealthManifest} from './stealth/manifest.js';
 import {manifest as wasmManifest} from './wasm/manifest.js';
 
 export const GENERATED_DOMAIN_MANIFESTS = [
@@ -44,7 +43,6 @@ export const GENERATED_DOMAIN_MANIFESTS = [
   pageManifest,
   screenshotManifest,
   scriptManifest,
-  stealthManifest,
   wasmManifest,
 ] as const;
 
@@ -405,26 +403,6 @@ export const GENERATED_TOOL_REGISTRY = [
   {
     modulePath: './script/script.js',
     handlerName: 'evaluateScript',
-  },
-  {
-    modulePath: './script/script.js',
-    handlerName: 'injectPreloadScript',
-  },
-  {
-    modulePath: './stealth/stealth.js',
-    handlerName: 'setUserAgent',
-  },
-  {
-    modulePath: './stealth/stealth.js',
-    handlerName: 'injectStealth',
-  },
-  {
-    modulePath: './stealth/stealth.js',
-    handlerName: 'listStealthFeatures',
-  },
-  {
-    modulePath: './stealth/stealth.js',
-    handlerName: 'listStealthPresets',
   },
   {
     modulePath: './wasm/index.js',

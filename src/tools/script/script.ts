@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {createPreloadHookId} from '../../modules/hook/index.js';
 import {getRuntime} from '../../runtime.js';
 import type {
   CDPSession,
@@ -23,7 +22,6 @@ import {
 } from '../shared/browserRuntime.js';
 import {defineTool, type Context, type Response} from '../ToolDefinition.js';
 
-import {type PreloadPreset, getPreloadPreset} from './preload-presets.js';
 import {checkScriptSyntaxBalance} from './validate-script-syntax.js';
 
 const DEFAULT_SCRIPT_TIMEOUT = 30000;
@@ -579,86 +577,5 @@ export const evaluateScript = defineTool({
       }
       await runOnFrame(ctx, evalRequest, response);
     });
-  },
-});
-
-export const injectPreloadScript = defineTool({
-  name: 'inject_preload_script',
-  description: '为当前页面/上下文的后续文档注册预加载脚本',
-  annotations: {category: ToolCategory.DEBUGGING, readOnlyHint: false},
-  schema: {
-    script: zod
-      .string()
-      .optional()
-      .describe('要作为预加载脚本注入的 JavaScript 代码'),
-    preset: zod
-      .enum([
-        'capture-all-fetch',
-        'capture-all-xhr',
-        'capture-all-requests',
-        'log-cookies',
-      ])
-      .optional()
-      .describe('预设 hook 模板，与 script 参数互斥'),
-  },
-  handler: async (request, response, toolContext) => {
-    const tooltype = 'inject_preload_script';
-    const {preset} = request.params;
-    const script = preset
-      ? getPreloadPreset(preset as PreloadPreset)
-      : (request.params.script ?? '');
-
-    if (!script || script.trim().length === 0) {
-      throw createToolError(ErrorCodes.VALIDATION, '脚本内容不能为空', {
-        toolName: tooltype,
-      });
-    }
-
-    const browserContext = toolContext.getBrowserContext();
-    if (!browserContext || browserContext.isClosed()) {
-      throw createToolError(
-        ErrorCodes.BROWSER_REQUIRED,
-        '当前 BrowserContext 不可用或已关闭，无法注入预加载脚本',
-        {toolName: tooltype},
-      );
-    }
-
-    try {
-      const registrationId = createPreloadHookId(script);
-      const result = await toolContext.getPersistentHookRegistry().register({
-        context: browserContext,
-        hookId: registrationId,
-        script,
-        source: 'inject_preload_script',
-        requestedWorld: 'main',
-        applyMode: 'future-only',
-      });
-      response.setStructuredContent({
-        success: true,
-        message:
-          'Preload script registered for future documents in the current BrowserContext',
-        tooltype,
-        data: {
-          registrationId,
-          scriptHash: result.entry.scriptHash,
-          scriptSize: result.entry.scriptSize,
-          scriptPreview: result.entry.scriptPreview,
-          registeredAt: new Date(result.entry.registeredAt).toISOString(),
-          registered: result.registered,
-          idempotent: result.idempotent,
-          requestedWorld: result.entry.requestedWorld,
-          effectiveWorld: result.entry.effectiveWorld,
-          applyMode: result.entry.applyMode,
-          warnings: result.warnings,
-        },
-      });
-    } catch (error) {
-      if (error && typeof error === 'object' && 'code' in error) throw error;
-      throw createToolError(
-        ErrorCodes.RUNTIME,
-        `注入预加载脚本失败：${getUnknownErrorMessage(error)}`,
-        {toolName: tooltype},
-      );
-    }
   },
 });

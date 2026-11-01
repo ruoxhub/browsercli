@@ -16,7 +16,7 @@ export interface PersistentHookEntry {
   scriptSize: number;
   scriptPreview: string;
   registeredAt: number;
-  source: 'inject_hook' | 'inject_preload_script';
+  source: 'inject_hook';
   requestedWorld: 'main' | 'isolated';
   effectiveWorld: 'main';
   applyMode: 'existing-and-future' | 'future-only';
@@ -48,10 +48,6 @@ interface InFlightRegistration {
 
 export function hashPersistentHookScript(script: string): string {
   return createHash('sha256').update(script).digest('hex');
-}
-
-export function createPreloadHookId(script: string): string {
-  return `preload-${hashPersistentHookScript(script)}`;
 }
 
 function createScriptPreview(script: string): string {

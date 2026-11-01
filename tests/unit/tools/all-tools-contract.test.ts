@@ -133,11 +133,11 @@ describe('all-tools contract (Layer 1)', () => {
     }
   });
 
-  it('full profile exposes exactly 98 tools', () => {
+  it('full profile exposes exactly 93 tools', () => {
     assert.equal(
       fullEntries.length,
-      98,
-      `expected exactly 98 tools in full profile, got ${fullEntries.length}`,
+      93,
+      `expected exactly 93 tools in full profile, got ${fullEntries.length}`,
     );
   });
 

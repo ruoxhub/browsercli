@@ -40,11 +40,11 @@
 
 **现象**：同为 CLI，至少存在三种输出形态：
 
-| 命令 | 输出形态 |
-|------|---------|
-| `status` | 表格（`headers` / `rows`） |
+| 命令                 | 输出形态                                         |
+| -------------------- | ------------------------------------------------ |
+| `status`             | 表格（`headers` / `rows`）                       |
 | `call list_pages` 等 | 嵌套 YAML：`result.structuredContent.data.value` |
-| `config` | 扁平 `command/action/resolved/file/status` |
+| `config`             | 扁平 `command/action/resolved/file/status`       |
 
 `evaluate_script` 的返回值官方文档自己都写了「JSON 值在 `data.value`，兼容字符串在 `result`」这种双路径。
 
@@ -88,7 +88,7 @@
 - **JSVMP**：`hook_jsvmp_interpreter`、`analyze_jsvmp_vm`、`analyze_pipeline`
 - **性能**：`start_performance_trace` / `stop_performance_trace` / `get_performance_metrics` / `performance_analyze_insight`
 - **模拟**：`emulate_mobile` / `emulate_network` / `emulate_cpu` / `resize_page`
-- **其他**：`list_console_messages` / `get_console_message`、`inject_preload_script`、`trace_function`、`observe_flow`、`diagnose_environment`、`compare_env`、`update_extensions`
+- **其他**：`list_console_messages` / `get_console_message`、`trace_function`、`observe_flow`、`diagnose_environment`、`compare_env`、`update_extensions`
 
 且文档里的 `create_hook --type/--params/...` 签名已是旧形态。
 
@@ -168,16 +168,16 @@
 
 ## 五、优化建议优先级总览
 
-| 优先级 | 建议 | 对应问题 |
-|--------|------|---------|
-| 1 | 统一 `--format json` 输出契约 | 2.1 |
-| 2 | job 失败携带错误原因 / `jobs log` | 2.2 |
-| 3 | SKILL.md 由 `list-tools` 自动生成 | 3.1 |
-| 4 | 多行 JS 标准姿势改为 `--file` / `--stdin` | 3.2 |
-| 5 | 页面寻址单一化（pageId，消除 off-by-one） | 3.3 |
-| 6 | `evaluate_script` 失败回填异常信息 | 2.2 |
-| 7 | 暴露 Worker lane 排队深度 / 独占选项 | 3.4 |
-| 8 | 去硬编码（`verify_platforms_browsercli.py`） | P2 |
+| 优先级 | 建议                                         | 对应问题 |
+| ------ | -------------------------------------------- | -------- |
+| 1      | 统一 `--format json` 输出契约                | 2.1      |
+| 2      | job 失败携带错误原因 / `jobs log`            | 2.2      |
+| 3      | SKILL.md 由 `list-tools` 自动生成            | 3.1      |
+| 4      | 多行 JS 标准姿势改为 `--file` / `--stdin`    | 3.2      |
+| 5      | 页面寻址单一化（pageId，消除 off-by-one）    | 3.3      |
+| 6      | `evaluate_script` 失败回填异常信息           | 2.2      |
+| 7      | 暴露 Worker lane 排队深度 / 独占选项         | 3.4      |
+| 8      | 去硬编码（`verify_platforms_browsercli.py`） | P2       |
 
 ---
 

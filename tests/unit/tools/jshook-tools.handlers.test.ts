@@ -9,7 +9,6 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {describe, it} from 'node:test';
 
-import {StealthScripts2025} from '../../../src/modules/stealth/StealthScripts2025.js';
 import {getRuntime} from '../../../src/runtime.js';
 import {
   collectCode,
@@ -38,12 +37,6 @@ import {
   saveSessionState,
   waitForElement,
 } from '../../../src/tools/page/index.js';
-import {
-  injectStealth,
-  listStealthFeatures,
-  listStealthPresets,
-  setUserAgent,
-} from '../../../src/tools/stealth/index.js';
 import {ToolError} from '../../../src/utils/errors.js';
 
 type RuntimeMethod = (...args: unknown[]) => unknown;
@@ -119,11 +112,6 @@ interface RuntimeHarness {
   browserManager: {
     getBrowser: RuntimeMethod;
   };
-}
-
-interface StealthStaticHarness {
-  injectAll: RuntimeMethod;
-  getPresets: RuntimeMethod;
 }
 
 const createMockLocator = () => ({
@@ -247,9 +235,8 @@ function makeResponse(): ToolResponseHarness {
 }
 
 describe('jshook tools handlers', () => {
-  it('covers collector/dom/hook/page/stealth handlers', async () => {
+  it('covers collector/dom/hook/page handlers', async () => {
     const runtime = getRuntime() as unknown as RuntimeHarness;
-    const stealth = StealthScripts2025 as unknown as StealthStaticHarness;
 
     const originals = {
       collect: runtime.collector.collect,
@@ -289,8 +276,6 @@ describe('jshook tools handlers', () => {
       getActivePage: runtime.collector.getActivePage,
       getStatus: runtime.collector.getStatus,
       getBrowser: runtime.browserManager.getBrowser,
-      injectAll: stealth.injectAll,
-      getPresets: stealth.getPresets,
     };
 
     runtime.collector.collect = async () => ({
@@ -492,9 +477,6 @@ describe('jshook tools handlers', () => {
     };
     runtime.pageController.getPage = async () => activePage;
     runtime.collector.getActivePage = async () => activePage;
-
-    stealth.injectAll = async () => undefined;
-    stealth.getPresets = () => ({'windows-chrome': {preset: 'windows-chrome'}});
 
     try {
       const res = makeResponse();
@@ -905,31 +887,6 @@ describe('jshook tools handlers', () => {
       );
       runtime.pageController.getPage = async () => activePage;
 
-      await invokeTool(
-        injectStealth as unknown as ToolDefinitionHarness,
-        {preset: 'windows-chrome'},
-        res,
-        runtime,
-      );
-      await invokeTool(
-        listStealthPresets as unknown as ToolDefinitionHarness,
-        {},
-        res,
-        runtime,
-      );
-      await invokeTool(
-        listStealthFeatures as unknown as ToolDefinitionHarness,
-        {},
-        res,
-        runtime,
-      );
-      await invokeTool(
-        setUserAgent as unknown as ToolDefinitionHarness,
-        {userAgent: 'ua-test'},
-        res,
-        runtime,
-      );
-
       await assert.rejects(
         () =>
           invokeTool(
@@ -947,7 +904,6 @@ describe('jshook tools handlers', () => {
           line.includes('Successfully clicked on element'),
         ),
       );
-      assert.ok(res.lines.some(line => line.includes('User-Agent updated.')));
       assert.ok(res.lines.some(line => line.includes('"healthy"')));
       assert.ok(res.lines.some(line => line.includes('BROWSER_DISCONNECTED')));
       assert.ok(res.lines.some(line => line.includes('"unique"')));
@@ -1002,8 +958,6 @@ describe('jshook tools handlers', () => {
       runtime.collector.getActivePage = originals.getActivePage;
       runtime.collector.getStatus = originals.getStatus;
       runtime.browserManager.getBrowser = originals.getBrowser;
-      stealth.injectAll = originals.injectAll;
-      stealth.getPresets = originals.getPresets;
     }
   });
 });
