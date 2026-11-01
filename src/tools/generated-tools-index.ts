@@ -23,7 +23,6 @@ import {manifest as inputManifest} from './input/manifest.js';
 import {manifest as navigationManifest} from './navigation/manifest.js';
 import {manifest as networkManifest} from './network/manifest.js';
 import {manifest as pageManifest} from './page/manifest.js';
-import {manifest as performanceManifest} from './performance/manifest.js';
 import {manifest as screenshotManifest} from './screenshot/manifest.js';
 import {manifest as scriptManifest} from './script/manifest.js';
 import {manifest as stealthManifest} from './stealth/manifest.js';
@@ -47,7 +46,6 @@ export const GENERATED_DOMAIN_MANIFESTS = [
   navigationManifest,
   networkManifest,
   pageManifest,
-  performanceManifest,
   screenshotManifest,
   scriptManifest,
   stealthManifest,
@@ -438,22 +436,6 @@ export const GENERATED_TOOL_REGISTRY = [
   {
     modulePath: './page/detectCaptcha.js',
     handlerName: 'detectCaptcha',
-  },
-  {
-    modulePath: './performance/startPerformanceTrace.js',
-    handlerName: 'startPerformanceTrace',
-  },
-  {
-    modulePath: './performance/stopPerformanceTrace.js',
-    handlerName: 'stopPerformanceTrace',
-  },
-  {
-    modulePath: './performance/getPerformanceMetrics.js',
-    handlerName: 'getPerformanceMetrics',
-  },
-  {
-    modulePath: './performance/performanceAnalyzeInsight.js',
-    handlerName: 'performanceAnalyzeInsight',
   },
   {
     modulePath: './screenshot/takeScreenshot.js',

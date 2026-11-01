@@ -39,7 +39,6 @@ import {
   typeText,
   waitForElement,
 } from '../../../src/tools/page/index.js';
-import {getPerformanceMetrics} from '../../../src/tools/performance/index.js';
 import {
   injectStealth,
   listStealthFeatures,
@@ -673,12 +672,6 @@ describe('jshook tools handlers', () => {
       await invokeTool(
         waitForElement as unknown as ToolDefinitionHarness,
         {selector: '#x', timeout: 100},
-        res,
-        runtime,
-      );
-      await invokeTool(
-        getPerformanceMetrics as unknown as ToolDefinitionHarness,
-        {},
         res,
         runtime,
       );
