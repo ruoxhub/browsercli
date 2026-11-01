@@ -721,7 +721,7 @@ describe('browser.ts mocked', () => {
   });
   it('does NOT fall back to a stale DevToolsActivePort when the configured port differs', async () => {
     // 回归：配置了 browserURL=127.0.0.1:19222，但本机 DevToolsActivePort 里残留着
-    // 一个早已关闭的端口（例如 ego 桥接上一次运行留下的 53687）。旧实现在
+    // 一个早已关闭的端口（例如上一次运行留下的 53687）。旧实现在
     // fetch 抛错时无条件回退到该文件，把连接导向死端点，表现为
     // "connect ECONNREFUSED 127.0.0.1:53687" —— 用户配置的端口完全没被使用。
     // 正确行为：端口不一致时不得回退，应回到配置的 browserURL。

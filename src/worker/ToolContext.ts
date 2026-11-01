@@ -29,7 +29,6 @@ import type {
 } from '../modules/network/NetworkTypes.js';
 import type {Runtime} from '../runtime.js';
 import type {HTTPRequest} from '../third_party/index.js';
-import type {TraceResult} from '../trace-processing/parse.js';
 import {createAppEventBusOptions, type AppEventMap} from '../types/events.js';
 import {EventBus} from '../utils/EventBus.js';
 
@@ -53,8 +52,6 @@ export class ToolContextProvider {
   private readonly _collectorContext = new CollectorContextProvider();
   private readonly _serviceLocator: ServiceLocator;
 
-  private _isRunningPerformanceTrace = false;
-  private _traceRecordings: TraceResult[] = [];
   private _isDisposed = false;
   private _browserTargetInspector?: BrowserTargetInspector;
   private activeSessionId?: string;
@@ -168,12 +165,21 @@ export class ToolContextProvider {
     return this.hookManager.getPersistentHookRegistry();
   }
 
+  private _browserConnector?: () => Promise<Browser | null>;
+
+  setBrowserConnector(connector: () => Promise<Browser | null>): void {
+    this._browserConnector = connector;
+  }
+
   isBrowserConnected(): boolean {
     return this._browserContext.isBrowserConnected();
   }
 
   async ensureConnectedBrowser(): Promise<Browser | null> {
-    const browser = await this._browserContext.ensureConnectedBrowser();
+    let browser = await this._browserContext.ensureConnectedBrowser();
+    if (!browser && this._browserConnector) {
+      browser = await this._browserConnector().catch(() => null);
+    }
     if (browser) {
       this.syncBrowserState();
     }
@@ -476,21 +482,5 @@ export class ToolContextProvider {
       this._browserContext.getCandidatePages(),
       ws,
     );
-  }
-
-  isRunningPerformanceTrace(): boolean {
-    return this._isRunningPerformanceTrace;
-  }
-
-  setIsRunningPerformanceTrace(running: boolean): void {
-    this._isRunningPerformanceTrace = running;
-  }
-
-  storeTraceRecording(result: TraceResult): void {
-    this._traceRecordings.push(result);
-  }
-
-  recordedTraces(): TraceResult[] {
-    return this._traceRecordings;
   }
 }

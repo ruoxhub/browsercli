@@ -156,4 +156,25 @@ describe('ToolContextProvider', () => {
     assert.equal(runtime.resolvePage({pageId: stableId!}).page, selected);
     assert.equal(runtime.getSelectedPageIndex(), 0);
   });
+
+  it('falls back to browser connector when browser is not yet connected', async () => {
+    const runtime = new ToolContextProvider();
+    let connectorCalled = false;
+    const fakeBrowser = {
+      isConnected: () => true,
+      contexts: () => [],
+      on: () => fakeBrowser,
+      once: () => fakeBrowser,
+    };
+    runtime.setBrowserConnector(async () => {
+      connectorCalled = true;
+      runtime.setBrowser(fakeBrowser as never);
+      return fakeBrowser as never;
+    });
+
+    const browser = await runtime.ensureConnectedBrowser();
+    assert.strictEqual(connectorCalled, true);
+    assert.strictEqual(browser, fakeBrowser);
+    assert.strictEqual(runtime.isBrowserConnected(), true);
+  });
 });

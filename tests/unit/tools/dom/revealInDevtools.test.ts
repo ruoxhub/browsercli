@@ -6,11 +6,10 @@
 import assert from 'node:assert/strict';
 import {describe, it} from 'node:test';
 
-import {getDevtoolsComments} from '../../../../src/tools/devtools/getDevtoolsComments.js';
-import {openDevtools} from '../../../../src/tools/devtools/openDevtools.js';
-import {resolveDevtoolsComment} from '../../../../src/tools/devtools/resolveDevtoolsComment.js';
-import {revealInDevtools} from '../../../../src/tools/devtools/revealInDevtools.js';
-import {ErrorCodes} from '../../../../src/utils/errors.js';
+import {revealInDevtools} from '../../../../src/tools/dom/revealInDevtools.js';
+import {GENERATED_DOMAIN_MANIFESTS} from '../../../../src/tools/generated-tools-index.js';
+import {ToolRegistry} from '../../../../src/tools/registry/ToolRegistry.js';
+import {loadToolMeta} from '../../../../src/tools/tools-meta.js';
 
 function capture() {
   const lines: string[] = [];
@@ -37,58 +36,29 @@ function makeContext(overrides: Record<string, unknown> = {}) {
   };
 }
 
-describe('devtools comment stubs', () => {
-  it('get_devtools_comments reports the CD4A bridge as unsupported', async () => {
-    const out = capture();
-    await assert.rejects(
-      () =>
-        getDevtoolsComments.handler(
-          {params: {}} as never,
-          out.response as never,
-          makeContext() as never,
-        ),
-      (err: unknown) => {
-        assert.equal(
-          (err as {code?: string}).code,
-          ErrorCodes.NATIVE_TOOL_MISSING,
-        );
-        return true;
-      },
-    );
+describe('devtools dissolution & reveal_in_devtools in dom', () => {
+  const registry = new ToolRegistry(GENERATED_DOMAIN_MANIFESTS);
+
+  it('dissolves the devtools domain completely', () => {
+    const domainNames = GENERATED_DOMAIN_MANIFESTS.map(m => m.name);
+    assert.ok(!domainNames.includes('devtools'), 'devtools domain must not exist');
   });
 
-  it('resolve_devtools_comment reports the CD4A bridge as unsupported', async () => {
-    const out = capture();
-    await assert.rejects(
-      () =>
-        resolveDevtoolsComment.handler(
-          {params: {threadId: 'comment-1'}} as never,
-          out.response as never,
-          makeContext() as never,
-        ),
-      (err: unknown) => {
-        assert.equal(
-          (err as {code?: string}).code,
-          ErrorCodes.NATIVE_TOOL_MISSING,
-        );
-        return true;
-      },
-    );
-  });
-});
+  it('reveal_in_devtools is registered under dom domain in full profile only', async () => {
+    const workflowTools = registry.listTools('workflow');
+    const fullTools = registry.listTools('full');
 
-describe('open_devtools', () => {
-  it('rejects when no page is selected', async () => {
-    const out = capture();
-    await assert.rejects(
-      () =>
-        openDevtools.handler(
-          {params: {}} as never,
-          out.response as never,
-          makeContext() as never,
-        ),
-      /当前无活跃页面|没有选中的页面|No active page/i,
-    );
+    const inWorkflow = workflowTools.find(t => t.handlerName === 'revealInDevtools');
+    assert.equal(inWorkflow, undefined, 'revealInDevtools must not be in workflow profile');
+
+    const inFull = fullTools.find(t => t.handlerName === 'revealInDevtools');
+    assert.ok(inFull, 'revealInDevtools must exist in full profile');
+    assert.equal(inFull.domain, 'dom');
+
+    const meta = await loadToolMeta(inFull);
+    assert.equal(meta.name, 'reveal_in_devtools');
+    assert.ok('selector' in meta.argSpecs);
+    assert.ok('durationMs' in meta.argSpecs);
   });
 });
 

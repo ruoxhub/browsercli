@@ -15,7 +15,6 @@
 import type {BrowserManagerConfig} from '../types/browser.js';
 import {type SourceMapConfig, SourceMapError} from '../types/sourcemap.js';
 
-import {assertBrowserConfigInvariants} from './browserInvariants.js';
 import {getEnvBoolean, getEnvNumber, getEnvValue} from './resolver.js';
 import {getRuntimeConfigStore} from './RuntimeConfigStore.js';
 import {
@@ -95,14 +94,6 @@ export function getSourceMapConfig(): SourceMapConfig {
  * 环境变量 + 配置文件（RuntimeConfigStore 的 browser 字段）合并出来的浏览器配置。
  *
  * 优先级：环境变量 > RuntimeConfigStore 中的 browser 字段。
- *
- * **这里不断言不变量**（见 `browserInvariants.ts`），因为在 IPC 这条链上它只是
- * 一个中间层：`worker/browserRequests` 还要把 store 覆盖层和本次请求的 patch 叠
- * 上去。若在这里断言，`BROWSER_KEEP_PAGE=true` + `browser connect --ego` 会先
- * 因为「缺 ego」被拒，而 ego 恰恰是下一次调用要补上的 —— 用户被告知「加 ego」，
- * 而加了 ego 仍然被拒，无从自救。断言只做在最终合并对象上（`browserRequests`
- * 的 `toBrowserConfig()`），需要一份「到此为止就是生效配置」的调用方改用
- * `getBrowserManagerConfig()`。
  */
 export function buildBrowserManagerConfig(): BrowserManagerConfig {
   const fileConfig = getRuntimeConfigStore().get();
@@ -125,6 +116,7 @@ export function buildBrowserManagerConfig(): BrowserManagerConfig {
       envKey: 'BROWSER_HEADLESS',
       kind: 'boolean',
       default: true,
+      extraFallback: 'headless',
     },
     {
       key: 'isolated',
@@ -143,6 +135,7 @@ export function buildBrowserManagerConfig(): BrowserManagerConfig {
       envKey: 'BROWSER_JS_STEALTH',
       kind: 'boolean',
       default: false,
+      extraFallback: 'jsStealth',
     },
     {
       key: 'cloak',
@@ -150,22 +143,6 @@ export function buildBrowserManagerConfig(): BrowserManagerConfig {
       kind: 'boolean',
       default: false,
       extraFallback: 'cloak',
-    },
-    {
-      key: 'ego',
-      envKey: 'BROWSER_EGO',
-      kind: 'boolean',
-    },
-    {
-      key: 'keepPage',
-      envKey: 'BROWSER_KEEP_PAGE',
-      kind: 'boolean',
-    },
-    {
-      key: 'egoProfile',
-      envKey: 'BROWSER_EGO_PROFILE',
-      kind: 'value',
-      cast: (v: string) => v.trim() || undefined,
     },
     {
       key: 'fullStealthArgs',
@@ -179,13 +156,25 @@ export function buildBrowserManagerConfig(): BrowserManagerConfig {
       envKey: 'BROWSER_MINIMAL_STEALTH',
       kind: 'boolean',
       default: true,
+      extraFallback: 'minimalStealth',
     },
-    {key: 'executablePath', envKey: 'BROWSER_EXECUTABLE_PATH', kind: 'value'},
+    {
+      key: 'executablePath',
+      envKey: 'BROWSER_EXECUTABLE_PATH',
+      kind: 'value',
+      extraFallback: 'executablePath',
+    },
     {
       key: 'channel',
       envKey: 'BROWSER_CHANNEL',
       kind: 'value',
       cast: v => v as BrowserManagerConfig['channel'],
+    },
+    {
+      key: 'autoConnect',
+      envKey: 'BROWSER_AUTO_CONNECT',
+      kind: 'boolean',
+      extraFallback: 'autoConnect',
     },
     {
       key: 'browserURL',
@@ -266,33 +255,35 @@ export function buildBrowserManagerConfig(): BrowserManagerConfig {
 
   for (const field of fields) {
     const fbKey = field.fileKey ?? (field.key as string);
-    let envVal = getters[field.kind](field.envKey) as unknown;
-    if (envVal === undefined && field.default !== undefined) {
-      envVal = field.default;
-    }
+    const envVal = getters[field.kind](field.envKey) as unknown;
     const fileVal = fileBrowser?.[fbKey as keyof typeof fileBrowser] as unknown;
+    const extraVal =
+      field.extraFallback && fileConfig[field.extraFallback] !== undefined
+        ? fileConfig[field.extraFallback]
+        : undefined;
 
-    if (envVal !== undefined) {
+    const chosenVal =
+      envVal !== undefined
+        ? envVal
+        : fileVal !== undefined
+          ? fileVal
+          : extraVal !== undefined
+            ? extraVal
+            : field.default;
+
+    if (chosenVal !== undefined) {
       (config as Record<string, unknown>)[field.key as string] = field.cast
-        ? field.cast(envVal as string)
-        : envVal;
-    } else if (fileVal !== undefined) {
-      (config as Record<string, unknown>)[field.key as string] = field.cast
-        ? field.cast(fileVal as string)
-        : fileVal;
-    } else if (
-      field.extraFallback &&
-      fileConfig[field.extraFallback] !== undefined
-    ) {
-      (config as Record<string, unknown>)[field.key as string] =
-        fileConfig[field.extraFallback];
+        ? field.cast(chosenVal as string)
+        : chosenVal;
     }
   }
 
   const envWsHeaders = getEnvValue('BROWSER_WS_HEADERS');
   if (envWsHeaders) {
     try {
-      config.wsHeaders = JSON.parse(envWsHeaders) as Record<string, string>;
+      config.wsHeaders = JSON.parse(
+        envWsHeaders.replace(/^\uFEFF/, ''),
+      ) as Record<string, string>;
     } catch {
       // 忽略非法 JSON
     }
@@ -318,25 +309,10 @@ export function buildBrowserManagerConfig(): BrowserManagerConfig {
 }
 
 /**
- * 环境变量 / 配置文件合并后的浏览器配置，**并在出口处断言不变量**。
- *
- * 给「到此为止就是最终生效配置」的调用方用：`runtime.ts`（MCP 工具看到的
- * 那份）、daemon 启动自动连接、`getSystemConfig()`。它们之后没有别的层再补
- * 字段，所以在这里断言既完整又不会误伤。
- *
- * IPC 的 `browser.connect` 不适用：它还要叠 store 覆盖层与本次请求的 patch，
- * 中间态缺 ego 是正常的（ego 就在同一份请求里），所以它走
- * `buildBrowserManagerConfig()` 并在**合并完成的最终对象**上断言 —— 见
- * `worker/browserRequests.toBrowserConfig()`。
- *
- * 只查 `keepPage`：ego 与目标参数的互斥是**请求级**约束（同一份配置里留着
- * 旧的 `channel` 并不矛盾，ego 模式下它只是不参与），所以那一条在 CLI 与 IPC
- * 请求层各自校验，不在这里。
+ * 环境变量 / 配置文件合并后的浏览器配置。
  */
 export function getBrowserManagerConfig(): BrowserManagerConfig {
-  const config = buildBrowserManagerConfig();
-  assertBrowserConfigInvariants(config);
-  return config;
+  return buildBrowserManagerConfig();
 }
 
 /**

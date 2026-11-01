@@ -36,13 +36,24 @@ export function checkPort(port: number): Promise<boolean> {
 /**
  * 获取 DevToolsActivePort 文件的可能路径列表（跨平台）
  */
-function getDevToolsActivePortPaths(): string[] {
+export function getDevToolsActivePortPaths(userDataDir?: string): string[] {
+  if (userDataDir) {
+    return [path.join(userDataDir, 'DevToolsActivePort')];
+  }
   const platform = os.platform();
   const home = os.homedir();
   const localAppData = process.env.LOCALAPPDATA || '';
 
   if (platform === 'darwin') {
     return [
+      path.join(
+        home,
+        'Library/Application Support/Citro Labs/ego lite/User Data/DevToolsActivePort',
+      ),
+      path.join(
+        home,
+        'Library/Application Support/Citro Labs/ego/User Data/DevToolsActivePort',
+      ),
       path.join(
         home,
         'Library/Application Support/Google/Chrome/DevToolsActivePort',
@@ -55,18 +66,30 @@ function getDevToolsActivePortPaths(): string[] {
         home,
         'Library/Application Support/Chromium/DevToolsActivePort',
       ),
+      path.join(
+        home,
+        'Library/Application Support/Microsoft Edge/DevToolsActivePort',
+      ),
     ];
   }
 
   if (platform === 'linux') {
     return [
+      path.join(home, '.config/citro-labs/ego-lite/DevToolsActivePort'),
+      path.join(home, '.config/citro-labs/ego/DevToolsActivePort'),
       path.join(home, '.config/google-chrome/DevToolsActivePort'),
       path.join(home, '.config/chromium/DevToolsActivePort'),
+      path.join(home, '.config/microsoft-edge/DevToolsActivePort'),
     ];
   }
 
   if (platform === 'win32') {
     return [
+      path.join(
+        localAppData,
+        'Citro Labs/ego lite/User Data/DevToolsActivePort',
+      ),
+      path.join(localAppData, 'Citro Labs/ego/User Data/DevToolsActivePort'),
       path.join(localAppData, 'Google/Chrome/User Data/DevToolsActivePort'),
       path.join(localAppData, 'Google/Chrome SxS/User Data/DevToolsActivePort'),
       path.join(localAppData, 'Chromium/User Data/DevToolsActivePort'),
@@ -94,18 +117,66 @@ function getDevToolsActivePortPaths(): string[] {
 }
 
 /**
- * Pure-file reader for `DevToolsActivePort`. Returns the first profile whose
- * file is well-formed, or `null` if none are. Unlike `discoverChromeDebugPort`
- * this does NOT require the port to be TCP-reachable — that lets `fetchVersionInfo`
- * fall back to the ws path when the user's browser instance has not been started
- * or is firewalled (typical for tests and for the 144+ Way 1 mode where HTTP
- * discovery is disabled but the ws path stored in this file still resolves).
+ * 寻找并验证 TCP 探活通过的 DevToolsActivePort。
  */
-export function readDevToolsActivePort(): {
+export async function findActiveDevToolsPort(options?: {
+  userDataDir?: string;
+  expectedPort?: number;
+  checkLiveness?: boolean;
+}): Promise<{port: number; wsPath: string} | null> {
+  const checkLiveness = options?.checkLiveness ?? true;
+  for (const filePath of getDevToolsActivePortPaths(options?.userDataDir)) {
+    try {
+      const content = fs.readFileSync(filePath, 'utf-8').trim();
+      const lines = content.split('\n').filter(Boolean);
+      const port = parseInt(lines[0] ?? '', 10);
+      const wsPath = (lines[1] ?? '').trim();
+      if (port > 0 && port < 65536 && wsPath.startsWith('/')) {
+        if (options?.expectedPort && port !== options.expectedPort) {
+          continue;
+        }
+        if (checkLiveness) {
+          const ok = await checkPort(port);
+          if (!ok) {
+            logger.debug(
+              `[findActiveDevToolsPort] 端口 ${port} (${filePath}) 无法响应，跳过`,
+            );
+            continue;
+          }
+        }
+        logger.debug(
+          `[findActiveDevToolsPort] 发现活跃调试端口：${port}${wsPath} (${filePath})`,
+        );
+        return {port, wsPath};
+      }
+    } catch {
+      // 文件不存在或不可读，继续尝试下一个
+    }
+  }
+  return null;
+}
+
+/**
+ * Pure-file reader for `DevToolsActivePort`. Returns the first profile whose
+ * file is well-formed, or `null` if none are.
+ */
+export function readDevToolsActivePort(
+  userDataDirOrOptions?: string | {userDataDir?: string; expectedPort?: number},
+  expectedPortParam?: number,
+): {
   port: number;
   wsPath: string;
 } | null {
-  for (const filePath of getDevToolsActivePortPaths()) {
+  const userDataDir =
+    typeof userDataDirOrOptions === 'string'
+      ? userDataDirOrOptions
+      : userDataDirOrOptions?.userDataDir;
+  const expectedPort =
+    typeof userDataDirOrOptions === 'object'
+      ? userDataDirOrOptions.expectedPort
+      : expectedPortParam;
+
+  for (const filePath of getDevToolsActivePortPaths(userDataDir)) {
     try {
       const lines = fs
         .readFileSync(filePath, 'utf-8')
@@ -115,6 +186,9 @@ export function readDevToolsActivePort(): {
       const port = parseInt(lines[0] ?? '', 10);
       const wsPath = (lines[1] ?? '').trim();
       if (port > 0 && port < 65536 && wsPath.startsWith('/')) {
+        if (expectedPort && port !== expectedPort) {
+          continue;
+        }
         return {port, wsPath};
       }
     } catch {
@@ -130,29 +204,18 @@ export function readDevToolsActivePort(): {
  * 2. 扫描常见端口 [9222, 9229, 9333]
  * 3. 使用 TCP 探测避免触发 Chrome 安全弹窗
  */
-async function discoverChromeDebugPort(): Promise<{
+export async function discoverChromeDebugPort(options?: {
+  userDataDir?: string;
+}): Promise<{
   port: number;
   wsPath?: string;
 } | null> {
-  // 1. 尝试读取 DevToolsActivePort 文件
-  for (const filePath of getDevToolsActivePortPaths()) {
-    try {
-      const content = fs.readFileSync(filePath, 'utf-8').trim();
-      const lines = content.split('\n').filter(Boolean);
-      const port = parseInt(lines[0], 10);
-      if (port > 0 && port < 65536) {
-        const ok = await checkPort(port);
-        if (ok) {
-          const wsPath = lines[1] || null;
-          logger.debug(
-            `[discoverChromeDebugPort] 从 DevToolsActivePort 发现端口：${port}${wsPath ? ' (带 wsPath)' : ''}`,
-          );
-          return {port, wsPath: wsPath || undefined};
-        }
-      }
-    } catch {
-      // 文件不存在，继续尝试
-    }
+  // 1. 尝试读取 DevToolsActivePort 文件并探活
+  const active = await findActiveDevToolsPort({
+    userDataDir: options?.userDataDir,
+  });
+  if (active) {
+    return {port: active.port, wsPath: active.wsPath};
   }
 
   // 2. 扫描常见端口
@@ -210,6 +273,7 @@ async function probeCandidates(
 export async function resolveAutoConnectTarget(options?: {
   candidates?: string[];
   fetchImpl?: typeof fetch;
+  userDataDir?: string;
 }): Promise<{browserURL: string; wsEndpoint?: string} | undefined> {
   const fetchImpl = options?.fetchImpl ?? fetch;
 
@@ -219,7 +283,9 @@ export async function resolveAutoConnectTarget(options?: {
   }
 
   // 2. 自动发现 Chrome 调试端口（生产模式）
-  const discovered = await discoverChromeDebugPort();
+  const discovered = await discoverChromeDebugPort({
+    userDataDir: options?.userDataDir,
+  });
   if (discovered) {
     const {port, wsPath} = discovered;
     const browserURL = `http://127.0.0.1:${port}`;
@@ -247,7 +313,10 @@ export async function resolveAutoConnectTarget(options?: {
     // 故意禁用了 HTTP /json/* 发现端点，但 DevToolsActivePort 文件里的
     // wsPath 仍可直连。`discoverChromeDebugPort` 已经验证过 TCP 端口可达，
     // 这里再读一次 wsPath 合成 ws:// 端点，绕过 Playwright 的二次探测。
-    const active = readDevToolsActivePort();
+    const active = await findActiveDevToolsPort({
+      userDataDir: options?.userDataDir,
+      expectedPort: port,
+    });
     if (active && active.port === port && active.wsPath) {
       logger.debug(
         `[resolveAutoConnectTarget] /json/version unavailable, using DevToolsActivePort wsPath for port ${port}`,

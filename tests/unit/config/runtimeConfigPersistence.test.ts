@@ -60,6 +60,18 @@ describe('runtimeConfigPersistence', () => {
       assert.strictEqual(loadCachedRuntimeConfig(), undefined);
     });
 
+    it('accepts cache file with UTF-8 BOM', () => {
+      writeFileSync(
+        RUNTIME_CONFIG_PATH,
+        '\uFEFF' +
+          JSON.stringify({browser: {browserURL: 'http://127.0.0.1:9222'}}),
+        'utf8',
+      );
+      const loaded = loadCachedRuntimeConfig();
+      assert.ok(loaded);
+      assert.strictEqual(loaded?.browser?.browserURL, 'http://127.0.0.1:9222');
+    });
+
     it('returns undefined on invalid config', () => {
       seedFile({browser: {remoteDebuggingPort: 1}});
       assert.strictEqual(loadCachedRuntimeConfig(), undefined);
@@ -96,6 +108,14 @@ describe('runtimeConfigPersistence', () => {
       assert.ok(
         shouldAutoConnectOnStartup({browser: {browserURL: 'http://x:9222'}}),
       );
+    });
+
+    it('true when top-level browserUrl present', () => {
+      assert.ok(shouldAutoConnectOnStartup({browserUrl: 'http://x:9222'}));
+    });
+
+    it('true when top-level wsEndpoint present', () => {
+      assert.ok(shouldAutoConnectOnStartup({wsEndpoint: 'ws://x'}));
     });
 
     it('false when only launch-mode fields present', () => {

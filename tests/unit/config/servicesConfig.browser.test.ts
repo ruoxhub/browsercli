@@ -4,9 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import assert from 'node:assert/strict';
-import {afterEach, beforeEach, describe, test} from 'node:test';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import {test} from 'node:test';
 
-import {BrowserConfigInvariantError} from '../../../src/config/browserInvariants.js';
 import {resetRuntimeConfigStore} from '../../../src/config/RuntimeConfigStore.js';
 import {
   buildBrowserManagerConfig,
@@ -15,135 +17,49 @@ import {
 import type {BrowserManagerConfig} from '../../../src/types/browser.js';
 
 test('getBrowserManagerConfig returns valid BrowserManagerConfig typed from L0', () => {
-  const originalEnv = process.env.CHROME_HEADLESS;
+  const originalEnv = process.env.BROWSER_HEADLESS;
+  const prevConfigDir = process.env.BROWSERCLI_CONFIG_DIR;
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'bcli-svc-cfg-'));
+  process.env.BROWSERCLI_CONFIG_DIR = tmpDir;
+  resetRuntimeConfigStore({});
   try {
-    process.env.CHROME_HEADLESS = 'true';
+    process.env.BROWSER_HEADLESS = 'true';
     const config: BrowserManagerConfig = getBrowserManagerConfig();
     assert.equal(config.headless, true);
     assert.equal(typeof config, 'object');
   } finally {
     if (originalEnv === undefined) {
-      delete process.env.CHROME_HEADLESS;
+      delete process.env.BROWSER_HEADLESS;
     } else {
-      process.env.CHROME_HEADLESS = originalEnv;
+      process.env.BROWSER_HEADLESS = originalEnv;
     }
+    if (prevConfigDir === undefined) {
+      delete process.env.BROWSERCLI_CONFIG_DIR;
+    } else {
+      process.env.BROWSERCLI_CONFIG_DIR = prevConfigDir;
+    }
+    fs.rmSync(tmpDir, {recursive: true, force: true});
+    resetRuntimeConfigStore({});
   }
 });
 
-describe('getBrowserManagerConfig ego fields (W3)', () => {
-  const ENV_KEYS = ['BROWSER_EGO', 'BROWSER_KEEP_PAGE'] as const;
-  const originalEnv: Record<string, string | undefined> = {};
+test('buildBrowserManagerConfig respects top-level flat config and overrides defaults', () => {
+  try {
+    resetRuntimeConfigStore({
+      browserUrl: 'http://127.0.0.1:9222',
+      headless: false,
+      executablePath: 'C:\\Test\\chrome.exe',
+      cloak: true,
+      jsStealth: true,
+    });
 
-  beforeEach(() => {
-    for (const key of ENV_KEYS) {
-      originalEnv[key] = process.env[key];
-      delete process.env[key];
-    }
-    // The file config must not leak into the assertions below.
-    resetRuntimeConfigStore({});
-  });
-
-  afterEach(() => {
-    for (const key of ENV_KEYS) {
-      const value = originalEnv[key];
-      if (value === undefined) delete process.env[key];
-      else process.env[key] = value;
-    }
-    resetRuntimeConfigStore({});
-  });
-
-  test('maps BROWSER_EGO onto config.ego', () => {
-    // The MCP/getRuntime startup path reads browser config through this table;
-    // without the entry the CLI (which sends a request body) and the daemon
-    // (which reads env) would disagree about ego mode.
-    process.env.BROWSER_EGO = 'true';
-    assert.equal(getBrowserManagerConfig().ego, true);
-
-    process.env.BROWSER_EGO = 'false';
-    assert.equal(getBrowserManagerConfig().ego, false);
-  });
-
-  test('maps BROWSER_KEEP_PAGE onto config.keepPage when ego is selected', () => {
-    // `keepPage` alone is rejected (I1): it is only read on the ego branch, so
-    // accepting it would be a silent no-op. The pair is the accepted shape.
-    process.env.BROWSER_EGO = 'true';
-    process.env.BROWSER_KEEP_PAGE = 'true';
-    assert.equal(getBrowserManagerConfig().keepPage, true);
-
-    process.env.BROWSER_KEEP_PAGE = 'false';
-    assert.equal(getBrowserManagerConfig().keepPage, false);
-  });
-
-  test('rejects BROWSER_KEEP_PAGE without BROWSER_EGO (I1)', () => {
-    // Before the guard this returned `{keepPage: true, ego: undefined}`,
-    // `ensureBrowser()` took the local-launch branch, and `keepPage` was never
-    // read — the user believed it took effect and it did not.
-    process.env.BROWSER_KEEP_PAGE = '1';
-    assert.throws(
-      () => getBrowserManagerConfig(),
-      (error: unknown) => {
-        assert.ok(
-          error instanceof BrowserConfigInvariantError,
-          'expected BrowserConfigInvariantError',
-        );
-        assert.strictEqual(error.code, 'VALIDATION');
-        assert.match(error.message, /keepPage/);
-        assert.match(error.message, /BROWSER_KEEP_PAGE/);
-        assert.match(error.message, /BROWSER_EGO/);
-        return true;
-      },
-    );
-
-    // An explicit `BROWSER_EGO=false` does not select ego mode either.
-    process.env.BROWSER_EGO = 'false';
-    assert.throws(() => getBrowserManagerConfig(), BrowserConfigInvariantError);
-  });
-
-  test('accepts ego alone and ego + keepPage (I1)', () => {
-    process.env.BROWSER_EGO = 'true';
-    assert.equal(getBrowserManagerConfig().ego, true);
-    assert.equal(getBrowserManagerConfig().keepPage, undefined);
-
-    process.env.BROWSER_KEEP_PAGE = 'true';
-    const config = getBrowserManagerConfig();
-    assert.strictEqual(config.ego, true);
-    assert.strictEqual(config.keepPage, true);
-  });
-
-  test('rejects a store/file config that only sets keepPage (I1)', () => {
-    // The CLI flag, the IPC body, the env var and config.json all funnel into
-    // this one merge, so the guard covers the store path as well.
-    resetRuntimeConfigStore({browser: {keepPage: true}});
-    assert.throws(() => getBrowserManagerConfig(), BrowserConfigInvariantError);
-  });
-
-  test('leaves both unset by default so no inherited policy reaches the bridge', () => {
-    const config = getBrowserManagerConfig();
-    // Unlike `cloak`, these two carry no `default: false`: an unset retention
-    // policy must stay distinguishable from an explicit `BROWSER_KEEP_PAGE=false`
-    // so the file config below can still win when no env var is present.
-    assert.ok(!config.ego);
-    assert.ok(!config.keepPage);
-  });
-
-  test('the env-layer builder does not assert (C1)', () => {
-    // `buildBrowserManagerConfig()` is an *intermediate* layer on the IPC path:
-    // browserRequests wraps it in the store overlay plus the request patch, and
-    // only the finished object is asserted. Asserting here made
-    // `BROWSER_KEEP_PAGE=true` + `browser connect --ego` unrecoverable — the
-    // request's own ego never got a chance to complete the pair.
-    process.env.BROWSER_KEEP_PAGE = 'true';
     const config = buildBrowserManagerConfig();
-    assert.strictEqual(config.keepPage, true);
-    assert.strictEqual(config.ego, undefined);
-    // ...while the entry point for consumers that genuinely end here still does.
-    assert.throws(() => getBrowserManagerConfig(), BrowserConfigInvariantError);
-  });
-
-  test('reads the file config keys when the env vars are absent', () => {
-    resetRuntimeConfigStore({browser: {ego: true, keepPage: true}});
-    const config = getBrowserManagerConfig();
-    assert.strictEqual(config.ego, true);
-    assert.strictEqual(config.keepPage, true);
-  });
+    assert.strictEqual(config.browserURL, 'http://127.0.0.1:9222');
+    assert.strictEqual(config.headless, false);
+    assert.strictEqual(config.executablePath, 'C:\\Test\\chrome.exe');
+    assert.strictEqual(config.cloak, true);
+    assert.strictEqual(config.jsStealth, true);
+  } finally {
+    resetRuntimeConfigStore({});
+  }
 });

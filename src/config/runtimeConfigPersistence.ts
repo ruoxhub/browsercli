@@ -43,7 +43,9 @@ export function loadCachedRuntimeConfig(): Partial<GlobalConfig> | undefined {
 
   let raw: unknown;
   try {
-    raw = JSON.parse(readFileSync(RUNTIME_CONFIG_PATH, 'utf8'));
+    raw = JSON.parse(
+      readFileSync(RUNTIME_CONFIG_PATH, 'utf8').replace(/^\uFEFF/, ''),
+    );
   } catch {
     return undefined;
   }
@@ -91,7 +93,14 @@ export function persistRuntimeConfig(config: GlobalConfig): void {
  */
 export function shouldAutoConnectOnStartup(config: GlobalConfig): boolean {
   const browser = config.browser;
-  return Boolean(browser?.wsEndpoint || browser?.browserURL);
+  return Boolean(
+    browser?.autoConnect ||
+    browser?.wsEndpoint ||
+    browser?.browserURL ||
+    (config as Record<string, unknown>).autoConnect ||
+    config.wsEndpoint ||
+    config.browserUrl,
+  );
 }
 
 /**

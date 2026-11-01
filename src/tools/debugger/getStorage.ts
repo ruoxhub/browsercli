@@ -98,7 +98,7 @@ export const getStorage = defineTool({
               cookie.name.toLowerCase().includes(filter.toLowerCase()),
           );
         } catch {
-          // 某些运行环境（如 ego 桥接）未暴露 Storage.getCookies，允许捕获失败并降级
+          // 某些运行环境未暴露 Storage.getCookies，允许捕获失败并降级
         }
 
         // 降级回退：当 CDP cookies 为空时，尝试从页面 document.cookie 补充非 HttpOnly 的 cookie

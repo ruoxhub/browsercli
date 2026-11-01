@@ -13,7 +13,6 @@ import {
   breakOnXhr,
   evaluateOnCallframe,
   findInScript,
-  getAiDebugStatus,
   getPausedInfo,
   getRequestInitiator,
   getScriptSource,
@@ -29,7 +28,6 @@ import {
   stepOut,
   stepOver,
   traceFunction,
-  xhrToJsBreakpoint,
 } from '../../../../src/tools/debugger/index.js';
 import type {ToolDefinition} from '../../../../src/tools/ToolDefinition.js';
 import {ToolError} from '../../../../src/utils/errors.js';
@@ -520,12 +518,6 @@ describe('src/tools/debugger/index.ts', () => {
       {url: '/api'},
       context,
     );
-    const xhrToJsLines = await callTool(
-      xhrToJsBreakpoint,
-      {url: '/api'},
-      context,
-    );
-    const statusLines = await callTool(getAiDebugStatus, {}, context);
     const initiatorLines = await callTool(
       getRequestInitiator,
       {requestId: 7},
@@ -541,8 +533,6 @@ describe('src/tools/debugger/index.ts', () => {
     const stepOutText = linesToText(stepOutLines);
     const xhrText = linesToText(xhrLines);
     const xhrRemoveText = linesToText(xhrRemoveLines);
-    const xhrToJsText = linesToText(xhrToJsLines);
-    const statusText = linesToText(statusLines);
     const initiatorText = linesToText(initiatorLines);
 
     assert.match(pausedInfoText, /已暂停/);
@@ -554,13 +544,10 @@ describe('src/tools/debugger/index.ts', () => {
     assert.match(stepOutText, /单步跳出/);
     assert.match(xhrText, /XHR/);
     assert.match(xhrRemoveText, /XHR/);
-    assert.match(xhrToJsText, /XHR/);
-    assert.match(statusText, /调试状态/);
     assert.match(initiatorText, /script/);
     assert.deepEqual(clientCalls, [
       {method: 'DOMDebugger.setXHRBreakpoint', params: {url: '/api'}},
       {method: 'DOMDebugger.removeXHRBreakpoint', params: {url: '/api'}},
-      {method: 'DOMDebugger.setXHRBreakpoint', params: {url: '/api'}},
     ]);
   });
 

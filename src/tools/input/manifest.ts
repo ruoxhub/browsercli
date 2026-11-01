@@ -27,7 +27,6 @@ export const manifest = {
     {modulePath: './input/hover.js', handlerName: 'hover'},
     {modulePath: './input/drag.js', handlerName: 'drag'},
     {modulePath: './input/clickAt.js', handlerName: 'clickAt'},
-    {modulePath: './input/setFiles.js', handlerName: 'setFiles'},
     {modulePath: './input/fill.js', handlerName: 'fill'},
   ],
 } satisfies DomainManifest;

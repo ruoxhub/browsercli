@@ -65,10 +65,6 @@ function assertValidRequirements(
 }
 
 describe('all-tools contract (Layer 1)', () => {
-  it('enumerates a non-empty full-profile set', () => {
-    assert.ok(fullEntries.length > 0, 'full profile should be non-empty');
-  });
-
   it('every registered tool loads to non-null ToolMeta (no requirement conflicts, no missing exports)', async () => {
     const failures: string[] = [];
     const metas: ToolMeta[] = [];
@@ -134,6 +130,90 @@ describe('all-tools contract (Layer 1)', () => {
       assert.equal(typeof meta.name, 'string');
       assert.ok(meta.name.length > 0);
       assert.equal(typeof meta.description, 'string');
+    }
+  });
+
+  it('full profile exposes exactly 98 tools', () => {
+    assert.equal(
+      fullEntries.length,
+      98,
+      `expected exactly 98 tools in full profile, got ${fullEntries.length}`,
+    );
+  });
+
+  it('pruned domains (extensions, performance, devtools) are absent, and dom contains reveal_in_devtools', async () => {
+    const domainNames = new Set(GENERATED_DOMAIN_MANIFESTS.map(m => m.name));
+    assert.ok(
+      !domainNames.has('extensions'),
+      'extensions domain must not exist',
+    );
+    assert.ok(
+      !domainNames.has('performance'),
+      'performance domain must not exist',
+    );
+    assert.ok(!domainNames.has('devtools'), 'devtools domain must not exist');
+    assert.ok(domainNames.has('dom'), 'dom domain must exist');
+
+    const domEntries = fullEntries.filter(e => e.domain === 'dom');
+    const domToolNames = new Set<string>();
+    for (const entry of domEntries) {
+      const meta = await loadToolMeta(entry);
+      if (meta) domToolNames.add(meta.name);
+    }
+    assert.ok(
+      domToolNames.has('reveal_in_devtools'),
+      'dom domain must contain reveal_in_devtools',
+    );
+  });
+
+  it('does not expose any of the 16 pruned tools in workflow or full profile', async () => {
+    const PRUNED_TOOLS = [
+      'get_devtools_comments',
+      'resolve_devtools_comment',
+      'open_devtools',
+      'xhr_to_js_breakpoint',
+      'set_files',
+      'type_text',
+      'capture_video_frame',
+      'get_video_info',
+      'seek_video',
+      'start_performance_trace',
+      'stop_performance_trace',
+      'get_performance_metrics',
+      'performance_analyze_insight',
+      'emulate_cpu',
+      'update_extensions',
+      'get_ai_debug_status',
+    ] as const;
+
+    for (const profile of ['workflow', 'full'] as const) {
+      const entries = registry.listTools(profile);
+      const names = new Set<string>();
+      for (const entry of entries) {
+        const meta = await loadToolMeta(entry);
+        if (meta) names.add(meta.name);
+      }
+      for (const pruned of PRUNED_TOOLS) {
+        assert.ok(
+          !names.has(pruned),
+          `${pruned} must not appear in ${profile} profile`,
+        );
+      }
+      assert.ok(names.has('fill'), `fill must appear in ${profile} profile`);
+      assert.ok(
+        names.has('press_key'),
+        `press_key must appear in ${profile} profile`,
+      );
+      assert.ok(
+        names.has('upload_file'),
+        `upload_file must appear in ${profile} profile`,
+      );
+      if (profile === 'full') {
+        assert.ok(
+          names.has('break_on_xhr'),
+          'break_on_xhr must appear in full profile',
+        );
+      }
     }
   });
 });

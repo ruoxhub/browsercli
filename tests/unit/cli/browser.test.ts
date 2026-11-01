@@ -4,7 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import assert from 'node:assert/strict';
-import {describe, it} from 'node:test';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import {describe, it, beforeEach, afterEach} from 'node:test';
 
 import {AxiError} from 'axi-sdk-js';
 
@@ -51,6 +54,21 @@ function context() {
 }
 
 describe('browserCommand', () => {
+  let tmpConfigDir: string;
+  let prevConfigDir: string | undefined;
+
+  beforeEach(() => {
+    tmpConfigDir = fs.mkdtempSync(path.join(os.tmpdir(), 'bcli-browser-test-'));
+    prevConfigDir = process.env.BROWSERCLI_CONFIG_DIR;
+    process.env.BROWSERCLI_CONFIG_DIR = tmpConfigDir;
+  });
+
+  afterEach(() => {
+    if (prevConfigDir === undefined) delete process.env.BROWSERCLI_CONFIG_DIR;
+    else process.env.BROWSERCLI_CONFIG_DIR = prevConfigDir;
+    fs.rmSync(tmpConfigDir, {recursive: true, force: true});
+  });
+
   it('registers browser as a top-level command', () => {
     assert.strictEqual(cliCommands.browser, browserCommand);
   });
@@ -126,10 +144,8 @@ describe('browserCommand', () => {
 
     const current = context();
     await browserCommand(['connect'], current.ctx);
-    // ego lite 是默认浏览器来源（本次改动之前就已如此），所以"一个来源参数都不
-    // 给"的 connect 会显式下发 `{ego:true}`，而不是空 body 让 daemon 去猜。
     assert.deepEqual(current.calls, [
-      {method: 'browser.connect', params: {body: {ego: true}}},
+      {method: 'browser.connect', params: {body: {}}},
     ]);
   });
 
@@ -195,5 +211,208 @@ describe('browserCommand', () => {
     assert.strictEqual(jsonOutput.status, 'success');
     assert.strictEqual(jsonOutput.mode, 'ws-endpoint');
     assert.strictEqual(jsonOutput.pages, 2);
+  });
+
+  it('falls back to ~/.browsercli/config.json when CLI flags are omitted', async () => {
+    fs.writeFileSync(
+      path.join(tmpConfigDir, 'config.json'),
+      JSON.stringify({
+        browserUrl: 'http://127.0.0.1:9222',
+        headless: 'false',
+        cloak: 'true',
+      }),
+      'utf-8',
+    );
+
+    const {calls, ctx} = context();
+    await browserCommand(['connect'], ctx);
+    assert.deepEqual(calls, [
+      {
+        method: 'browser.connect',
+        params: {
+          body: {
+            browserURL: 'http://127.0.0.1:9222',
+            headless: false,
+            cloak: true,
+          },
+        },
+      },
+    ]);
+  });
+
+  it('suppresses config file target when CLI provides a conflicting target flag', async () => {
+    fs.writeFileSync(
+      path.join(tmpConfigDir, 'config.json'),
+      JSON.stringify({
+        browserUrl: 'http://127.0.0.1:9222',
+      }),
+      'utf-8',
+    );
+
+    const {calls, ctx} = context();
+    await browserCommand(
+      ['connect', '--ws-endpoint', 'wss://override.host/devtools'],
+      ctx,
+    );
+    assert.deepEqual(calls, [
+      {
+        method: 'browser.connect',
+        params: {
+          body: {
+            wsEndpoint: 'wss://override.host/devtools',
+          },
+        },
+      },
+    ]);
+  });
+
+  it('supports nested browser object in config file', async () => {
+    fs.writeFileSync(
+      path.join(tmpConfigDir, 'config.json'),
+      JSON.stringify({
+        browser: {
+          browserURL: 'http://127.0.0.1:9333',
+          isolated: false,
+        },
+      }),
+      'utf-8',
+    );
+
+    const {calls, ctx} = context();
+    await browserCommand(['connect'], ctx);
+    assert.deepEqual(calls, [
+      {
+        method: 'browser.connect',
+        params: {
+          body: {
+            browserURL: 'http://127.0.0.1:9333',
+            isolated: false,
+          },
+        },
+      },
+    ]);
+  });
+
+  it('resolves remote target over default local channel when both exist in config file', async () => {
+    fs.writeFileSync(
+      path.join(tmpConfigDir, 'config.json'),
+      JSON.stringify({
+        browser: {
+          channel: 'stable',
+          browserURL: 'http://127.0.0.1:19222',
+        },
+      }),
+      'utf-8',
+    );
+
+    const {calls, ctx} = context();
+    await browserCommand(['connect'], ctx);
+    assert.deepEqual(calls, [
+      {
+        method: 'browser.connect',
+        params: {
+          body: {
+            browserURL: 'http://127.0.0.1:19222',
+          },
+        },
+      },
+    ]);
+  });
+
+  it('honors environment variables over config file but yields to CLI flags', async () => {
+    fs.writeFileSync(
+      path.join(tmpConfigDir, 'config.json'),
+      JSON.stringify({
+        browserUrl: 'http://127.0.0.1:9222',
+        headless: 'true',
+      }),
+      'utf-8',
+    );
+
+    process.env.BROWSER_URL = 'http://127.0.0.1:9555';
+    process.env.BROWSER_HEADLESS = 'false';
+
+    try {
+      // 1. Env takes precedence over config file
+      const envWinner = context();
+      await browserCommand(['connect'], envWinner.ctx);
+      assert.deepEqual(envWinner.calls, [
+        {
+          method: 'browser.connect',
+          params: {
+            body: {
+              browserURL: 'http://127.0.0.1:9555',
+              headless: false,
+            },
+          },
+        },
+      ]);
+
+      // 2. CLI flag takes precedence over env
+      const cliWinner = context();
+      await browserCommand(
+        ['connect', '--browser-url', 'http://127.0.0.1:9888'],
+        cliWinner.ctx,
+      );
+      assert.deepEqual(cliWinner.calls, [
+        {
+          method: 'browser.connect',
+          params: {
+            body: {
+              browserURL: 'http://127.0.0.1:9888',
+              headless: false,
+            },
+          },
+        },
+      ]);
+    } finally {
+      delete process.env.BROWSER_URL;
+      delete process.env.BROWSER_HEADLESS;
+    }
+  });
+
+  it('supports --auto-connect and --user-data-dir flags', async () => {
+    const {calls, ctx} = context();
+    await browserCommand(
+      ['connect', '--auto-connect', '--user-data-dir', 'C:\\profile'],
+      ctx,
+    );
+    assert.deepEqual(calls, [
+      {
+        method: 'browser.connect',
+        params: {
+          body: {
+            autoConnect: true,
+            userDataDir: 'C:\\profile',
+          },
+        },
+      },
+    ]);
+  });
+
+  it('supports autoConnect from config.json and suppresses local channel', async () => {
+    fs.writeFileSync(
+      path.join(tmpConfigDir, 'config.json'),
+      JSON.stringify({
+        autoConnect: true,
+        channel: 'stable',
+        userDataDir: 'C:\\citro-profile',
+      }),
+      'utf-8',
+    );
+
+    const {calls, ctx} = context();
+    await browserCommand(['connect'], ctx);
+    assert.deepEqual(calls, [
+      {
+        method: 'browser.connect',
+        params: {
+          body: {
+            autoConnect: true,
+            userDataDir: 'C:\\citro-profile',
+          },
+        },
+      },
+    ]);
   });
 });

@@ -1,10 +1,13 @@
 # Browser-CLI 连接与控制 Ego Lite 浏览器 (Ego-Bridge) 实施计划
 
+> **状态说明 (DEPRECATED)**: 本实施计划对应的 ego 连接桥接层已于 2026-10 下线并彻底移除。详见 [ADR 0003: Remove Ego Bridge Layer](../../adr/0003-remove-ego-bridge-layer.md)。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 让 `browsercli` 能够通过轻量本地 WebSocket CDP 桥接连接并接管运行中的 `ego lite` 浏览器，使全部 100+ 逆向分析、动态 Hook 与抓包工具直接生效于真实用户会话，同时物理隔离用户日常标签页。
 
-**Architecture:** 
+**Architecture:**
+
 1. `browsercli` 在后台按需拉起 `ego-browser nodejs` 驱动的轻量桥接服务（`ego-bridge-worker.mjs`），维持独立的 Agent TaskSpace，并在桥接层内置 CDP 协议垫片（Polyfill）与 Target 虚拟防火墙；
 2. 桥接服务暴露出标准的本地 WebSocket CDP 端点，`BrowserManager` 通过 Patchright 的 `chromium.connectOverCDP` 接入；
 3. 遵循官方生命周期规范，默认正常退出时自动清理 TaskSpace（`finish({ keep: [] })`），支持通过 `--keep-page` 保留现场给用户。
@@ -34,16 +37,19 @@
 ### Task 1: 桥接核心工作脚本与 CDP 垫片 (ego-bridge-worker.mjs)
 
 **Files:**
+
 - Create: `src/modules/browser/ego/ego-bridge-worker.mjs`
 - Test: `tests/unit/browser/ego/ego-bridge-worker.test.ts`
 
 **Interfaces:**
+
 - Consumes: `globalThis.ego` (Ego Lite Native Bindings) 或通过 `ego-browser nodejs` 环境运行。
 - Produces: 监听本地 HTTP/WebSocket 端口，向 stdout 输出格式为 `[ego-bridge:ready] ws://127.0.0.1:<port>/devtools/browser/<guid>` 的就绪字符串。支持处理标准 CDP 消息及 `Browser.getVersion` 拦截。
 
 - [ ] **Step 1: 编写 bridge worker 消息拦截与协议垫片单元测试**
 
 编写测试文件 `tests/unit/browser/ego/ego-bridge-worker.test.ts`，模拟注入 `FakeEgo` 对象，测试：
+
 1. 拦截 `Browser.getVersion` 并返回标准 Chromium 版本对象；
 2. 过滤非本 Space 的 `Target.attachedToTarget` 事件；
 3. 透明透传带 `sessionId` 的普通 CDP 请求；
@@ -57,6 +63,7 @@
 - [ ] **Step 3: 实现 `src/modules/browser/ego/ego-bridge-worker.mjs`**
 
 实现完整功能的轻量 worker 脚本：
+
 - 创建原生 HTTP Server 并升级 WebSocket（使用内置协议或纯轻量 WS 解析）；
 - 初始化 TaskSpace（`const task = await taskSpace("browsercli-" + hash)`）；
 - 实现 CDP 消息路由器：拦截 `Browser.getVersion` 合成并回复响应；拦截 `Target.setAutoAttach` 维护 Target 白名单；将其他消息转发至 `ego.sendCDPMessage`；
@@ -81,17 +88,20 @@ git commit -m "feat(ego): add ego-bridge-worker with CDP polyfills and Target fi
 ### Task 2: Ego 桥接进程生命周期管理器 (EgoBridgeManager)
 
 **Files:**
+
 - Create: `src/modules/browser/ego/EgoBridgeManager.ts`
 - Create: `src/modules/browser/ego/ego-detect.ts`
 - Test: `tests/unit/browser/ego/EgoBridgeManager.test.ts`
 
 **Interfaces:**
+
 - Consumes: 操作系统文件系统（检测安装路径）、Node.js `child_process.spawn`。
 - Produces: `class EgoBridgeManager`，提供 `start(options?: { keepPage?: boolean }): Promise<{ wsEndpoint: string }>` 和 `stop(): Promise<void>`。
 
 - [ ] **Step 1: 编写 EgoBridgeManager 生命周期与路径探测单元测试**
 
 编写测试文件 `tests/unit/browser/ego/EgoBridgeManager.test.ts`，验证：
+
 1. `findEgoBrowserBinary()` 正确检索 Windows 默认安装目录（`C:\Program Files\Citro Labs\ego lite\Application\*\ego-browser.exe`）及 macOS 路径；
 2. `start()` 正确启动子进程并解析 stdout 的 `[ego-bridge:ready]` 正则提取 `wsEndpoint`；
 3. 超时或进程异常退出时抛出友好错误；
@@ -124,18 +134,21 @@ git commit -m "feat(ego): implement EgoBridgeManager process lifecycle and binar
 ### Task 3: 改造 BrowserManager 与引擎连接层
 
 **Files:**
+
 - Modify: `src/types/browser.ts`
 - Modify: `src/modules/browser/browser-helpers.ts`
 - Modify: `src/modules/browser/browser.ts`
 - Test: `tests/unit/browser/ego/ego-browser-manager.test.ts`
 
 **Interfaces:**
+
 - Consumes: `EgoBridgeManager`、`patchright.chromium.connectOverCDP`。
 - Produces: `BrowserManager` 支持 `config.browser = 'ego'`，调用 `ensureBrowser()` 时通过 EgoBridge 接入并创建/管理独立专属 Page。
 
 - [ ] **Step 1: 编写 BrowserManager 连接 Ego 模式单元测试**
 
 编写测试 `tests/unit/browser/ego/ego-browser-manager.test.ts`，Mock `EgoBridgeManager` 与 `chromium.connectOverCDP`，验证：
+
 1. 当配置为 `{ browser: 'ego' }` 时，启动 `EgoBridgeManager` 并获取 `wsEndpoint`；
 2. 调用 `connectOverCDP(wsEndpoint)` 成功建立 Browser 与 BrowserContext；
 3. 验证默认获取/创建的页面正确绑定到 `BrowserManager.activePage`；
@@ -172,17 +185,20 @@ git commit -m "feat(browser): add ego browser type support to BrowserManager via
 ### Task 4: CLI 参数与配置项透传 (`--browser ego` / `--keep-page`)
 
 **Files:**
+
 - Modify: `src/config/schema.ts`
 - Modify: `src/cli/` 相关入口命令
 - Test: `tests/unit/cli/browsercli-ego-args.test.ts`
 
 **Interfaces:**
+
 - Consumes: `yargs` CLI 选项配置与 Zod 配置校验。
 - Produces: 用户可在终端通过 `browsercli --browser ego`、环境变量 `BROWSERCLI_BROWSER=ego`，以及 `browsercli close --keep-page` 控制行为。
 
 - [ ] **Step 1: 编写 CLI 命令行参数解析测试**
 
 编写测试 `tests/unit/cli/browsercli-ego-args.test.ts`，测试：
+
 1. 传入 `--browser ego` 时正确解析为 `browser: 'ego'`；
 2. 环境变量 `BROWSERCLI_BROWSER=ego` 生效；
 3. `close` 命令接收 `--keep-page` 标志并透传。
@@ -214,15 +230,18 @@ git commit -m "feat(cli): support --browser ego and --keep-page flags"
 ### Task 5: 全链路端到端真机集成与逆向工具验证
 
 **Files:**
+
 - Create: `tests/integration/ego-bridge.integration.test.ts`
 
 **Interfaces:**
+
 - Consumes: 完整的 `browsercli` 运行时、运行中的 `ego lite` 真实浏览器（或本地自动化环境）。
 - Produces: 验证一套完整的逆向工作流（打开网页 -> 动态 Hook 采样 -> 网络抓包 -> 提取 Storage -> 退出清理）。
 
 - [ ] **Step 1: 编写真机/环境 E2E 集成测试**
 
 在 `tests/integration/ego-bridge.integration.test.ts` 中：
+
 1. 启动 `browsercli` 并指定 `browser: 'ego'`；
 2. 检查连接成功建立，且活动页面为独立新建的 Agent 页面；
 3. 执行页面导航到测试 HTML（`page.goto("http://127.0.0.1:...")`）；

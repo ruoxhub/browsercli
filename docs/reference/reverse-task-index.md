@@ -109,7 +109,7 @@
 - `navigate_page`
 - `query_dom`
 - `click`
-- `type_text`
+- `fill`
 - `wait_for_element`
 - `take_screenshot`
 

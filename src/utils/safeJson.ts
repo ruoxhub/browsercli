@@ -107,7 +107,9 @@ export function safeStringify(
  */
 export function safeParse(text: string): any {
   try {
-    return JSON.parse(text);
+    return JSON.parse(
+      typeof text === 'string' ? text.replace(/^\uFEFF/, '') : text,
+    );
   } catch {
     return null;
   }

@@ -1,23 +1,20 @@
-# 会话状态持久化、存储导出与视频媒体参考文档 (Session & Storage Reference)
+# 会话状态持久化与存储导出参考文档 (Session & Storage Reference)
 
-浏览器 Storage/Cookie 提取、会话状态快照导入导出及 HTML5 视频帧截取工具。
+浏览器 Storage/Cookie 提取与会话状态快照导入导出工具。
 
 ## 概览 (Overview)
 
-用于保留已登录凭证、提取完整 HttpOnly Cookie 请求头、在不同环境间无缝迁移状态，以及 HTML5 视频元素播放控制与截帧。
+用于保留已登录凭证、提取完整 HttpOnly Cookie 请求头、在不同环境间无缝迁移状态。
 
-| 工具名称                | 功能描述                                                                          | 核心参数                                                         |
-| :---------------------- | :-------------------------------------------------------------------------------- | :--------------------------------------------------------------- |
-| `get_storage`           | 提取浏览器存储（包含 HttpOnly cookies 及可复制的 Cookie Header、localStorage 等） | `[--type <str>]`, `[--filter <str>]`                             |
-| `save_session_state`    | 保存当前浏览器状态快照（Cookies + Storage）到内存会话库                           | `[--sessionId <str>]`, `[--includeCookies <bool>]`               |
-| `restore_session_state` | 恢复已保存的浏览器状态快照并自动刷新/重定向                                       | `--sessionId <str>`, `[--navigateToSavedUrl <bool>]`             |
-| `list_session_states`   | 列出内存中所有已保存的会话状态快照                                                | 无                                                               |
-| `delete_session_state`  | 删除指定的会话状态快照                                                            | `--sessionId <str>`                                              |
-| `dump_session_state`    | 将会话状态快照导出为磁盘 JSON 文件（支持加密）                                    | `--sessionId <str>`, `[--path <str>]`, `[--encrypt <bool>]`      |
-| `load_session_state`    | 从磁盘文件或 JSON 字符串中加载外部会话快照                                        | `[--sessionId <str>]`, `[--path <str>]`                          |
-| `capture_video_frame`   | 捕获 HTML5 `<video>` 视频元素的当前画面帧（可选 seek 跳转）                       | `--selector <str>`, `[--seekTime <num>]`, `[--outputPath <str>]` |
-| `get_video_info`        | 查询视频元素元数据（时长、播放进度、暂停状态、src 地址）                          | `--selector <str>`                                               |
-| `seek_video`            | 将视频定位跳转到指定的时间戳（秒）                                                | `--selector <str>`, `--time <num>`                               |
+| 工具名称                | 功能描述                                                                          | 核心参数                                                    |
+| :---------------------- | :-------------------------------------------------------------------------------- | :---------------------------------------------------------- |
+| `get_storage`           | 提取浏览器存储（包含 HttpOnly cookies 及可复制的 Cookie Header、localStorage 等） | `[--type <str>]`, `[--filter <str>]`                        |
+| `save_session_state`    | 保存当前浏览器状态快照（Cookies + Storage）到内存会话库                           | `[--sessionId <str>]`, `[--includeCookies <bool>]`          |
+| `restore_session_state` | 恢复已保存的浏览器状态快照并自动刷新/重定向                                       | `--sessionId <str>`, `[--navigateToSavedUrl <bool>]`        |
+| `list_session_states`   | 列出内存中所有已保存的会话状态快照                                                | 无                                                          |
+| `delete_session_state`  | 删除指定的会话状态快照                                                            | `--sessionId <str>`                                         |
+| `dump_session_state`    | 将会话状态快照导出为磁盘 JSON 文件（支持加密）                                    | `--sessionId <str>`, `[--path <str>]`, `[--encrypt <bool>]` |
+| `load_session_state`    | 从磁盘文件或 JSON 字符串中加载外部会话快照                                        | `[--sessionId <str>]`, `[--path <str>]`                     |
 
 > **注意 (Deprecation Notice)**: 原独立抓包会话隔离工具（`session_create` / `session_list` / `session_get_data` / `session_export`）已下线。当前会话管理聚焦于浏览器 Cookie/Storage 状态快照备份与恢复。网络请求捕获与导出请查阅 [`references/network.md`](./network.md)（`list_network_requests` / `export_request_as_curl`）。
 
@@ -49,16 +46,4 @@ browsercli call dump_session_state --sessionId "vip_user_session" --path "artifa
 # 在新打开的浏览器中加载并恢复登录状态
 browsercli call load_session_state --path "artifacts/sessions/vip.json"
 browsercli call restore_session_state --sessionId "vip_user_session" --navigateToSavedUrl true
-```
-
-### 3. 视频播放器逆向与截帧 (`video`)
-
-用于排查带防盗链水印、分片解密播放的前端视频播放器：
-
-```bash
-# 查看视频时长和当前播放位置
-browsercli call get_video_info --selector "video#player"
-
-# 跳转到第 30 秒并截图截帧
-browsercli call capture_video_frame --selector "video#player" --seekTime 30 --outputPath "artifacts/frame_30s.png"
 ```

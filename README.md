@@ -147,12 +147,11 @@ Browser-CLI/
 │   │   ├── script/                  # 脚本管理工具 (list_scripts, get_script_source...)
 │   │   ├── dom/                     # DOM 操作工具
 │   │   ├── page/                    # 页面管理工具 (navigate_page, query_dom...)
-│   │   ├── input/                   # 输入自动化工具 (click, type_text, fill...)
+│   │   ├── input/                   # 输入自动化工具 (click, fill, press_key, upload_file...)
 │   │   ├── console/                 # 控制台工具 (list_console_messages)
 │   │   ├── navigation/              # 导航工具
 │   │   ├── screenshot/              # 截图工具
 │   │   ├── emulation/              # 设备仿真工具 (emulate_network, emulate_mobile...)
-│   │   ├── performance/            # 性能分析工具
 │   │   ├── websocket/ (network/)   # WebSocket 观察工具
 │   │   ├── storage/ (page/)        # 会话状态工具 (save_session_state...)
 │   │   ├── collector/              # 代码采集工具 (collect_code)
@@ -162,7 +161,6 @@ Browser-CLI/
 │   │   ├── frames/                 # Frame 管理工具
 │   │   ├── dialog/                 # 弹窗处理工具
 │   │   ├── anti-debug/             # 反调试工具
-│   │   ├── extensions/             # 扩展工具
 │   │   └── shared/                 # 共享辅助函数
 │   │
 │   ├── modules/                     # ★ 核心逆向模块
@@ -408,13 +406,13 @@ Browser-CLI/
 
 #### 3.2.11 Daemon IPC 层 (src/ipc/)
 
-| 方面         | 分析                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **职责**     | CLI 与 detached daemon 之间的本地 socket 通信：会话注册表发现 + NDJSON 行协议请求/响应 + 事件推送                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| 方面         | 分析                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **职责**     | CLI 与 detached daemon 之间的本地 socket 通信：会话注册表发现 + NDJSON 行协议请求/响应 + 事件推送                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | **实现逻辑** | win32 命名管道 / POSIX unix socket，地址 `browsercli-<workspaceHash16>-<session>`。`SocketConnection` 做 NDJSON 分帧与重组；`registry.ts` 按 workspace-hash 目录读写 `<session>.session`（含 pid/socketPath/consolePort/protocol）。`daemonServer.ts` 分发 `hello`/`tools.list`/`tool.invoke`/`browser.*`/`jobs.*`/`subscribe`/`stop`；客户端断线 ⇒ `AbortController` 中止该连接上的运行中 job。CLI 侧连不上就 spawn detached daemon，等 stdout 就绪行 `Daemon listening on <pipePath>` 完成握手。`PROTOCOL_VERSION = 1` 两侧各自定义（与 `browsercli/src/daemonClient.ts` 注释互指保持同步），不匹配时报错提示 `close` + 重新 `open` |
-| **关键文件** | `socketConnection.ts`（帧协议）、`registry.ts`（注册表）、`daemonArgs.ts`（参数解析）、`daemonServer.ts`（方法分发）                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| **被调用方** | `worker/daemonMain.ts` 启动时创建 `startDaemonServer()`；`browsercli` 包经 `daemonClient.ts` 连接                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| **设计模式** | **行协议 RPC（请求-响应 + 无 id 推送共用一条连接）、注册表服务发现**                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| **关键文件** | `socketConnection.ts`（帧协议）、`registry.ts`（注册表）、`daemonArgs.ts`（参数解析）、`daemonServer.ts`（方法分发）                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| **被调用方** | `worker/daemonMain.ts` 启动时创建 `startDaemonServer()`；`browsercli` 包经 `daemonClient.ts` 连接                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| **设计模式** | **行协议 RPC（请求-响应 + 无 id 推送共用一条连接）、注册表服务发现**                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 
 #### 3.2.12 Worker 层 (src/worker/)
 
@@ -650,7 +648,7 @@ flowchart TB
     OBSERVE --> HOOK[2. 运行时采样<br/>create_hook / inject_hook<br/>最小侵入式观测]
     HOOK --> CHECK_HOOK{检查 Hook 数据<br/>get_hook_data}
     CHECK_HOOK -->|已采集到数据| NETWORK[3. 网络分析<br/>trace_signature_generation<br/>从请求追踪签名生成过程]
-    CHECK_HOOK -->|无数据| DEBUG[3b. 断点调试<br/>xhr_to_js_breakpoint<br/>set_breakpoint + resume]
+    CHECK_HOOK -->|无数据| DEBUG[3b. 断点调试<br/>break_on_xhr<br/>set_breakpoint + resume]
     DEBUG --> NETWORK
     NETWORK --> EXPORT[4. 导出本地复现<br/>export_rebuild_bundle<br/>导出入口+补环境+证据]
     EXPORT --> ENV[5. 逐项补环境<br/>diff_env_requirements<br/>env.js + polyfills.js]
