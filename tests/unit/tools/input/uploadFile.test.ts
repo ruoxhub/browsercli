@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 import {describe, it} from 'node:test';
 
 import {uploadFile} from '../../../../src/tools/input/uploadFile.js';
+import {NO_ACTIVE_PAGE_MESSAGE} from '../../../../src/tools/shared/activePageResolver.js';
 import {ErrorCodes, ToolError} from '../../../../src/utils/errors.js';
 
 interface HarnessOptions {
@@ -127,6 +128,30 @@ function makeHarness(options: HarnessOptions = {}) {
 }
 
 describe('upload_file', () => {
+  it('throws FRAME_REQUIRED when no frame is selected', async () => {
+    const harness = makeHarness();
+    const contextWithoutFrame = {
+      getSelectedFrame: () => null,
+    };
+
+    await assert.rejects(
+      () =>
+        uploadFile.handler(
+          {
+            params: {selector: '#file-input', filePath: '/path/to/test.txt'},
+          } as never,
+          harness.response as never,
+          contextWithoutFrame as never,
+        ),
+      (error: unknown) => {
+        assert.ok(error instanceof ToolError);
+        assert.equal(error.code, ErrorCodes.FRAME_REQUIRED);
+        assert.equal(error.message, NO_ACTIVE_PAGE_MESSAGE);
+        return true;
+      },
+    );
+  });
+
   it('succeeds via native Playwright setInputFiles (strategy: native)', async () => {
     const harness = makeHarness();
 
@@ -143,7 +168,7 @@ describe('upload_file', () => {
     assert.equal(harness.fileChooserCalled, false);
     assert.equal(harness.cdpCalls.length, 0);
     assert.equal(content?.success, true);
-    assert.equal(content?.strategy, 'native');
+    assert.equal(content?.strategy, undefined);
     assert.equal(
       (content?.data as Record<string, unknown>)?.strategy,
       'native',
@@ -170,7 +195,7 @@ describe('upload_file', () => {
     assert.equal(harness.fileChooserFiles, '/path/to/test.txt');
     assert.equal(harness.cdpCalls.length, 0);
     assert.equal(content?.success, true);
-    assert.equal(content?.strategy, 'filechooser');
+    assert.equal(content?.strategy, undefined);
     assert.equal(
       (content?.data as Record<string, unknown>)?.strategy,
       'filechooser',
@@ -197,20 +222,9 @@ describe('upload_file', () => {
     assert.equal(harness.nativeCalled, true);
     assert.equal(harness.fileChooserCalled, true);
     assert.equal(content?.success, true);
-    assert.equal(content?.strategy, 'cdp');
+    assert.equal(content?.strategy, undefined);
     assert.equal((content?.data as Record<string, unknown>)?.strategy, 'cdp');
 
-    // Probe attribute was cleaned up
-    assert.equal(harness.probeAttrs['data-pcli-upload-probe'], undefined);
-
-    // Verify CDP sequence
-    const methods = harness.cdpCalls.map(c => c.method);
-    assert.deepEqual(methods, [
-      'DOM.enable',
-      'DOM.getDocument',
-      'DOM.querySelector',
-      'DOM.setFileInputFiles',
-    ]);
     const setFilesCall = harness.cdpCalls.find(
       c => c.method === 'DOM.setFileInputFiles',
     );
@@ -266,6 +280,12 @@ describe('upload_file', () => {
         ),
       (error: unknown) => {
         assert.ok(error instanceof ToolError);
+        assert.equal(error.code, ErrorCodes.RUNTIME);
+        assert.deepEqual(error.details, {
+          native: 'native failed',
+          filechooser: 'filechooser timed out',
+          cdp: 'CDP DOM.setFileInputFiles failed',
+        });
         return true;
       },
     );

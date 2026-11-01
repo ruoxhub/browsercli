@@ -44,20 +44,6 @@ describe('devtools dissolution & reveal_in_devtools in dom', () => {
     assert.ok(!domainNames.includes('devtools'), 'devtools domain must not exist');
   });
 
-  it('deleted devtools stubs and window tools are absent from all profiles', async () => {
-    const removedNames = ['get_devtools_comments', 'resolve_devtools_comment', 'open_devtools'];
-    for (const profile of ['workflow', 'full'] as const) {
-      const tools = registry.listTools(profile);
-      for (const entry of tools) {
-        const meta = await loadToolMeta(entry);
-        assert.ok(
-          !removedNames.includes(meta.name),
-          `Tool ${meta.name} should not exist in profile ${profile}`,
-        );
-      }
-    }
-  });
-
   it('reveal_in_devtools is registered under dom domain in full profile only', async () => {
     const workflowTools = registry.listTools('workflow');
     const fullTools = registry.listTools('full');

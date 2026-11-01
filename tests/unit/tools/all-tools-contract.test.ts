@@ -65,10 +65,6 @@ function assertValidRequirements(
 }
 
 describe('all-tools contract (Layer 1)', () => {
-  it('enumerates a non-empty full-profile set', () => {
-    assert.ok(fullEntries.length > 0, 'full profile should be non-empty');
-  });
-
   it('every registered tool loads to non-null ToolMeta (no requirement conflicts, no missing exports)', async () => {
     const failures: string[] = [];
     const metas: ToolMeta[] = [];

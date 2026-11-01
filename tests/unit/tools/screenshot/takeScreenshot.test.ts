@@ -71,8 +71,8 @@ describe('take_screenshot', () => {
   });
 });
 
-describe('screenshot domain manifest', () => {
-  it('contains exactly one tool: take_screenshot', () => {
+describe('screenshot domain', () => {
+  it('manifest contains exactly one tool: take_screenshot', () => {
     assert.equal(screenshotManifest.tools.length, 1);
     assert.equal(screenshotManifest.tools[0].handlerName, 'takeScreenshot');
     assert.equal(
@@ -81,29 +81,19 @@ describe('screenshot domain manifest', () => {
     );
   });
 
-  it('does not expose video tools in full or workflow profile', async () => {
+  it('registry exposes only take_screenshot for the screenshot domain', async () => {
     const registry = new ToolRegistry(GENERATED_DOMAIN_MANIFESTS);
-    const videoNames = ['capture_video_frame', 'get_video_info', 'seek_video'];
-
     for (const profile of ['workflow', 'full'] as const) {
-      const tools = registry.listTools(profile);
-      const names: string[] = [];
-      for (const tool of tools) {
-        const meta = await loadToolMeta(tool);
-        if (meta) {
-          names.push(meta.name);
-        }
-      }
-      for (const videoName of videoNames) {
-        assert.ok(
-          !names.includes(videoName),
-          `Tool ${videoName} should not exist in profile ${profile}`,
-        );
-      }
-      assert.ok(
-        names.includes('take_screenshot'),
-        `Tool take_screenshot must exist in profile ${profile}`,
+      const screenshotTools = registry
+        .listTools(profile)
+        .filter(tool => tool.domain === 'screenshot');
+      assert.equal(
+        screenshotTools.length,
+        1,
+        `screenshot domain must expose exactly 1 tool in ${profile} profile`,
       );
+      const meta = await loadToolMeta(screenshotTools[0]);
+      assert.equal(meta?.name, 'take_screenshot');
     }
   });
 });
