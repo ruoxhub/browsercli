@@ -26,16 +26,6 @@ export interface PageRuntimeServices {
 
 // ─── 参数类型 ──────────────────────────────────────────
 
-/** typeText 参数 */
-export interface TypeTextParams {
-  /** 元素定位器（CSS / role= / text= / xpath=） */
-  selector: string;
-  /** 输入文本 */
-  text: string;
-  /** 逐字输入间隔（毫秒） */
-  delay?: number;
-}
-
 /** waitForElement 参数 */
 export interface WaitForElementParams {
   /** 元素定位器（CSS / role= / text= / xpath=） */
@@ -119,13 +109,6 @@ export interface ElementInfo {
   className?: string;
   textContent?: string;
   attributes: Record<string, string>;
-}
-
-/** typeText 返回数据 */
-export interface TypeTextData {
-  selector: string;
-  textLength: number;
-  typed: boolean;
 }
 
 /** waitForElement 返回数据 */
@@ -245,11 +228,6 @@ export interface CheckBrowserHealthData {
 export interface PageResult<T = unknown> extends MessagesResult<T> {
   /** 使用的日志格式 */
   logFormat: string;
-}
-
-/** typeText 结果 */
-export interface TypeTextResult extends PageResult<TypeTextData> {
-  tooltype: 'type_text';
 }
 
 /** waitForElement 结果 */
