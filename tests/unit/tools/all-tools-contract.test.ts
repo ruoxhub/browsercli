@@ -136,4 +136,24 @@ describe('all-tools contract (Layer 1)', () => {
       assert.equal(typeof meta.description, 'string');
     }
   });
+
+  it('does not expose type_text in workflow or full profile, preserving fill and press_key', async () => {
+    for (const profile of ['workflow', 'full'] as const) {
+      const entries = registry.listTools(profile);
+      const names = new Set<string>();
+      for (const entry of entries) {
+        const meta = await loadToolMeta(entry);
+        if (meta) names.add(meta.name);
+      }
+      assert.ok(
+        !names.has('type_text'),
+        `type_text must not appear in ${profile} profile`,
+      );
+      assert.ok(names.has('fill'), `fill must appear in ${profile} profile`);
+      assert.ok(
+        names.has('press_key'),
+        `press_key must appear in ${profile} profile`,
+      );
+    }
+  });
 });

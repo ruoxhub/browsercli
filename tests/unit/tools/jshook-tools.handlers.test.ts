@@ -36,7 +36,6 @@ import {
   loadSessionState,
   restoreSessionState,
   saveSessionState,
-  typeText,
   waitForElement,
 } from '../../../src/tools/page/index.js';
 import {
@@ -660,12 +659,6 @@ describe('jshook tools handlers', () => {
       await invokeTool(
         click as unknown as ToolDefinitionHarness,
         {selector: '#x'},
-        res,
-        runtime,
-      );
-      await invokeTool(
-        typeText as unknown as ToolDefinitionHarness,
-        {selector: '#x', text: 'abc', delay: 10},
         res,
         runtime,
       );

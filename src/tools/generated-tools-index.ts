@@ -367,10 +367,6 @@ export const GENERATED_TOOL_REGISTRY = [
     handlerName: 'replayNetworkRequestBatch',
   },
   {
-    modulePath: './page/typeText.js',
-    handlerName: 'typeText',
-  },
-  {
     modulePath: './page/waitForElement.js',
     handlerName: 'waitForElement',
   },
