@@ -237,7 +237,6 @@ export default defineConfig([
       'src/modules/**/*.ts',
       'src/services/**/*.ts',
       'src/formatters/**/*.ts',
-      'src/trace-processing/**/*.ts',
       'src/diagnostics/**/*.ts',
       'src/database/**/*.ts',
     ],

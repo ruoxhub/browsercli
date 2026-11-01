@@ -6,7 +6,6 @@
 
 // ─── Page 纯函数 ──────────────────────────────────────
 
-export {typeText} from './typeText.js';
 export {waitForElement} from './waitForElement.js';
 export {scrollBy} from './scrollBy.js';
 export {checkBrowserHealth} from './checkBrowserHealth.js';
@@ -23,7 +22,6 @@ export {
 
 export type {
   PageRuntimeServices,
-  TypeTextParams,
   WaitForElementParams,
   ScrollByParams,
   SaveSessionStateParams,
@@ -34,7 +32,6 @@ export type {
   LoadSessionStateParams,
   CheckBrowserHealthParams,
   ElementInfo,
-  TypeTextData,
   WaitForElementData,
   ScrollByData,
   SessionSnapshot,
@@ -47,7 +44,6 @@ export type {
   HealthIssue,
   CheckBrowserHealthData,
   PageResult,
-  TypeTextResult,
   WaitForElementResult,
   ScrollByResult,
   SaveSessionStateResult,

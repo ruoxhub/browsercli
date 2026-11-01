@@ -6,7 +6,6 @@
 
 import type {TrafficSummary} from '../formatters/websocketFormatter.js';
 import type {Context} from '../tools/ToolDefinition.js';
-import type {TraceResult} from '../trace-processing/parse.js';
 
 import {wrapFrameWithTimeout} from './timeoutUtils.js';
 import type {ToolContextProvider} from './ToolContext.js';
@@ -20,12 +19,6 @@ export class DefineToolContextFactory {
     const provider = this.provider;
     return {
       getBrowserTargetInspector: () => provider.getBrowserTargetInspector(),
-      isRunningPerformanceTrace: () => provider.isRunningPerformanceTrace(),
-      setIsRunningPerformanceTrace: (x: boolean) =>
-        provider.setIsRunningPerformanceTrace(x),
-      recordedTraces: () => provider.recordedTraces() as TraceResult[],
-      storeTraceRecording: (result: TraceResult) =>
-        provider.storeTraceRecording(result),
       getSelectedPage: () => {
         const page = provider.getSelectedPage();
         if (!page) throw new Error('没有选中的页面');

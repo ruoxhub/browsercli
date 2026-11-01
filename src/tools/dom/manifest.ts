@@ -21,5 +21,10 @@ export const manifest = {
       modulePath: './dom/takeSnapshot.js',
       handlerName: 'takeSnapshot',
     },
+    {
+      modulePath: './dom/revealInDevtools.js',
+      handlerName: 'revealInDevtools',
+      profile: 'full',
+    },
   ],
 } satisfies DomainManifest;

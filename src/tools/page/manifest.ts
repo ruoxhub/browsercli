@@ -11,7 +11,6 @@ export const manifest = {
   description: 'Page interaction and state tools.',
   profile: 'workflow',
   tools: [
-    {modulePath: './page/typeText.js', handlerName: 'typeText'},
     {modulePath: './page/waitForElement.js', handlerName: 'waitForElement'},
     {modulePath: './page/scrollBy.js', handlerName: 'scrollBy'},
     {modulePath: './page/sessionState.js', handlerName: 'saveSessionState'},

@@ -11,19 +11,16 @@ import {manifest as collectorManifest} from './collector/manifest.js';
 import {manifest as consoleManifest} from './console/manifest.js';
 import {manifest as cssManifest} from './css/manifest.js';
 import {manifest as debuggerManifest} from './debugger/manifest.js';
-import {manifest as devtoolsManifest} from './devtools/manifest.js';
 import {manifest as diagnosticsManifest} from './diagnostics/manifest.js';
 import {manifest as dialogManifest} from './dialog/manifest.js';
 import {manifest as domManifest} from './dom/manifest.js';
 import {manifest as emulationManifest} from './emulation/manifest.js';
-import {manifest as extensionsManifest} from './extensions/manifest.js';
 import {manifest as framesManifest} from './frames/manifest.js';
 import {manifest as hookManifest} from './hook/manifest.js';
 import {manifest as inputManifest} from './input/manifest.js';
 import {manifest as navigationManifest} from './navigation/manifest.js';
 import {manifest as networkManifest} from './network/manifest.js';
 import {manifest as pageManifest} from './page/manifest.js';
-import {manifest as performanceManifest} from './performance/manifest.js';
 import {manifest as screenshotManifest} from './screenshot/manifest.js';
 import {manifest as scriptManifest} from './script/manifest.js';
 import {manifest as stealthManifest} from './stealth/manifest.js';
@@ -35,19 +32,16 @@ export const GENERATED_DOMAIN_MANIFESTS = [
   consoleManifest,
   cssManifest,
   debuggerManifest,
-  devtoolsManifest,
   diagnosticsManifest,
   dialogManifest,
   domManifest,
   emulationManifest,
-  extensionsManifest,
   framesManifest,
   hookManifest,
   inputManifest,
   navigationManifest,
   networkManifest,
   pageManifest,
-  performanceManifest,
   screenshotManifest,
   scriptManifest,
   stealthManifest,
@@ -164,10 +158,6 @@ export const GENERATED_TOOL_REGISTRY = [
     handlerName: 'traceFunction',
   },
   {
-    modulePath: './debugger/index.js',
-    handlerName: 'getAiDebugStatus',
-  },
-  {
     modulePath: './debugger/inspectObject.js',
     handlerName: 'inspectObject',
   },
@@ -208,26 +198,6 @@ export const GENERATED_TOOL_REGISTRY = [
     handlerName: 'unhookFunction',
   },
   {
-    modulePath: './debugger/index.js',
-    handlerName: 'xhrToJsBreakpoint',
-  },
-  {
-    modulePath: './devtools/openDevtools.js',
-    handlerName: 'openDevtools',
-  },
-  {
-    modulePath: './devtools/getDevtoolsComments.js',
-    handlerName: 'getDevtoolsComments',
-  },
-  {
-    modulePath: './devtools/resolveDevtoolsComment.js',
-    handlerName: 'resolveDevtoolsComment',
-  },
-  {
-    modulePath: './devtools/revealInDevtools.js',
-    handlerName: 'revealInDevtools',
-  },
-  {
     modulePath: './diagnostics/diagnoseEnvironment.js',
     handlerName: 'diagnoseEnvironmentTool',
   },
@@ -252,6 +222,11 @@ export const GENERATED_TOOL_REGISTRY = [
     handlerName: 'takeSnapshot',
   },
   {
+    modulePath: './dom/revealInDevtools.js',
+    handlerName: 'revealInDevtools',
+    profile: 'full',
+  },
+  {
     modulePath: './emulation/emulateMobile.js',
     handlerName: 'emulateMobile',
   },
@@ -260,16 +235,8 @@ export const GENERATED_TOOL_REGISTRY = [
     handlerName: 'emulateNetwork',
   },
   {
-    modulePath: './emulation/emulateCpu.js',
-    handlerName: 'emulateCpu',
-  },
-  {
     modulePath: './emulation/resizePage.js',
     handlerName: 'resizePage',
-  },
-  {
-    modulePath: './extensions/updateExtensions.js',
-    handlerName: 'updateExtensions',
   },
   {
     modulePath: './frames/listFrames.js',
@@ -392,10 +359,6 @@ export const GENERATED_TOOL_REGISTRY = [
     handlerName: 'replayNetworkRequestBatch',
   },
   {
-    modulePath: './page/typeText.js',
-    handlerName: 'typeText',
-  },
-  {
     modulePath: './page/waitForElement.js',
     handlerName: 'waitForElement',
   },
@@ -436,36 +399,8 @@ export const GENERATED_TOOL_REGISTRY = [
     handlerName: 'detectCaptcha',
   },
   {
-    modulePath: './performance/startPerformanceTrace.js',
-    handlerName: 'startPerformanceTrace',
-  },
-  {
-    modulePath: './performance/stopPerformanceTrace.js',
-    handlerName: 'stopPerformanceTrace',
-  },
-  {
-    modulePath: './performance/getPerformanceMetrics.js',
-    handlerName: 'getPerformanceMetrics',
-  },
-  {
-    modulePath: './performance/performanceAnalyzeInsight.js',
-    handlerName: 'performanceAnalyzeInsight',
-  },
-  {
     modulePath: './screenshot/takeScreenshot.js',
     handlerName: 'takeScreenshot',
-  },
-  {
-    modulePath: './screenshot/captureVideoFrame.js',
-    handlerName: 'captureVideoFrame',
-  },
-  {
-    modulePath: './screenshot/getVideoInfo.js',
-    handlerName: 'getVideoInfo',
-  },
-  {
-    modulePath: './screenshot/seekVideo.js',
-    handlerName: 'seekVideo',
   },
   {
     modulePath: './script/script.js',
