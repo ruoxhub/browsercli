@@ -144,9 +144,6 @@ export const GlobalConfigSchema = zod
     logLevel: optionalStringSchema.optional(),
     outputDir: optionalStringSchema.optional(),
     toolResultRecording: ToolResultRecordingConfigSchema.optional(),
-    sessionStateTtlMs: positiveIntSchema.optional(),
-    sessionStateCleanupIntervalMs: positiveIntSchema.optional(),
-    sessionStateEncryptionKey: optionalStringSchema.optional(),
   })
   .strip();
 

@@ -18,15 +18,7 @@ import {
   listCreatedHooks,
   removeHook,
 } from '../../../src/tools/hook/index.js';
-import {
-  checkBrowserHealth,
-  deleteSessionState,
-  dumpSessionState,
-  listSessionStates,
-  loadSessionState,
-  restoreSessionState,
-  saveSessionState,
-} from '../../../src/tools/page/index.js';
+import {checkBrowserHealth} from '../../../src/tools/page/index.js';
 
 describe('jshook tools schema', () => {
   it('validates collect_code schema', () => {
@@ -77,38 +69,11 @@ describe('jshook tools schema', () => {
   it('validates dom and page schemas', () => {
     const domSchema = zod.object(queryDom.schema);
     const healthSchema = zod.object(checkBrowserHealth.schema);
-    const saveSessionSchema = zod.object(saveSessionState.schema);
-    const restoreSessionSchema = zod.object(restoreSessionState.schema);
-    const listSessionSchema = zod.object(listSessionStates.schema);
-    const deleteSessionSchema = zod.object(deleteSessionState.schema);
-    const dumpSessionSchema = zod.object(dumpSessionState.schema);
-    const loadSessionSchema = zod.object(loadSessionState.schema);
 
     const dom = domSchema.parse({selector: 'button'});
     const health = healthSchema.parse({});
-    const saveSession = saveSessionSchema.parse({
-      sessionId: 's1',
-      includeCookies: true,
-    });
-    const restoreSession = restoreSessionSchema.parse({
-      sessionId: 's1',
-      clearStorageBeforeRestore: true,
-    });
-    const listed = listSessionSchema.parse({});
-    const removed = deleteSessionSchema.parse({sessionId: 's1'});
-    const dumped = dumpSessionSchema.parse({sessionId: 's1', pretty: false});
-    const loaded = loadSessionSchema.parse({
-      snapshotJson: '{"id":"s1"}',
-      overwrite: true,
-    });
 
     assert.strictEqual(dom.selector, 'button');
     assert.deepStrictEqual(health, {});
-    assert.strictEqual(saveSession.sessionId, 's1');
-    assert.strictEqual(restoreSession.clearStorageBeforeRestore, true);
-    assert.deepStrictEqual(listed, {});
-    assert.strictEqual(removed.sessionId, 's1');
-    assert.strictEqual(dumped.pretty, false);
-    assert.strictEqual(loaded.overwrite, true);
   });
 });

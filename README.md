@@ -153,7 +153,6 @@ Browser-CLI/
 │   │   ├── screenshot/              # 截图工具
 │   │   ├── emulation/              # 设备仿真工具 (emulate_network, emulate_mobile...)
 │   │   ├── websocket/ (network/)   # WebSocket 观察工具
-│   │   ├── storage/ (page/)        # 会话状态工具 (save_session_state...)
 │   │   ├── collector/              # 代码采集工具 (collect_code)
 │   │   ├── stealth/                # 隐身注入工具
 │   │   ├── wasm/                   # WASM 分析工具

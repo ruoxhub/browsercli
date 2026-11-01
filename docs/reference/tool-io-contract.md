@@ -66,12 +66,6 @@
 | `list_network_requests`      | Network 面板缓存                                                   | Response attach only                     | CDP Network                                          |
 | `check_browser_health`       | PageController + 浏览器会话状态                                    | SessionState 快照/恢复                   | In-memory SessionState                               |
 | `click`                      | PageController + 浏览器会话状态                                    | SessionState 快照/恢复                   | In-memory SessionState                               |
-| `delete_session_state`       | SessionState 管理器                                                | SessionState 管理器                      | In-memory SessionState                               |
-| `dump_session_state`         | SessionState 管理器                                                | SessionState 管理器                      | In-memory SessionState                               |
-| `list_session_states`        | SessionState 管理器                                                | SessionState 管理器                      | In-memory SessionState                               |
-| `load_session_state`         | SessionState 管理器                                                | SessionState 管理器                      | In-memory SessionState                               |
-| `restore_session_state`      | SessionState 管理器                                                | SessionState 管理器                      | In-memory SessionState                               |
-| `save_session_state`         | SessionState 管理器                                                | SessionState 管理器                      | In-memory SessionState                               |
 | `fill`                       | PageController + 浏览器会话状态                                    | SessionState 快照/恢复                   | In-memory SessionState                               |
 | `wait_for_element`           | PageController + 浏览器会话状态                                    | SessionState 快照/恢复                   | In-memory SessionState                               |
 | `list_pages`                 | BrowserManager pages                                               | 当前页选择/导航                          | BrowserManager currentPage                           |

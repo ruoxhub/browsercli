@@ -93,16 +93,10 @@
   - [`emulate_mobile`](#emulate_mobile)
   - [`emulate_network`](#emulate_network)
   - [`resize_page`](#resize_page)
-- **[Pages](#pages)** (9 tools)
+- **[Pages](#pages)** (3 tools)
   - [`check_browser_health`](#check_browser_health)
-  - [`delete_session_state`](#delete_session_state)
   - [`detect_captcha`](#detect_captcha)
-  - [`dump_session_state`](#dump_session_state)
   - [`handle_dialog`](#handle_dialog)
-  - [`list_session_states`](#list_session_states)
-  - [`load_session_state`](#load_session_state)
-  - [`restore_session_state`](#restore_session_state)
-  - [`save_session_state`](#save_session_state)
 - **[Diagnostics](#diagnostics)** (1 tools)
   - [`diagnose_environment`](#diagnose_environment)
 
@@ -922,14 +916,6 @@
 
 **Description:** 检查浏览器连接健康状态与页面可用性。
 
-### `delete_session_state` — delete_session_state
-
-**Description:** 删除会话状态
-
-**Parameters:**
-
-- `sessionId`
-
 ### `detect_captcha` — detect_captcha
 
 **Description:** 只读评估当前页面是否存在 CAPTCHA，并可等待挑战稳定清除；不会自动求解或操作页面。
@@ -939,17 +925,6 @@
 - `action`
 - `timeout`
 
-### `dump_session_state` — dump_session_state
-
-**Description:** 导出会话状态
-
-**Parameters:**
-
-- `sessionId`
-- `path`
-- `pretty`
-- `encrypt`
-
 ### `handle_dialog` — handle_dialog
 
 **Description:** 处理浏览器弹窗（alert/confirm/prompt），可接收或取消。
@@ -958,42 +933,6 @@
 
 - `action`
 - `promptText`
-
-### `list_session_states` — list_session_states
-
-**Description:** 列出会话状态
-
-### `load_session_state` — load_session_state
-
-**Description:** 加载会话状态
-
-**Parameters:**
-
-- `sessionId`
-- `path`
-- `snapshotJson`
-- `overwrite`
-
-### `restore_session_state` — restore_session_state
-
-**Description:** 恢复会话状态
-
-**Parameters:**
-
-- `sessionId`
-- `navigateToSavedUrl`
-- `clearStorageBeforeRestore`
-
-### `save_session_state` — save_session_state
-
-**Description:** 保存会话状态
-
-**Parameters:**
-
-- `sessionId`
-- `includeCookies`
-- `includeLocalStorage`
-- `includeSessionStorage`
 
 ## Diagnostics
 

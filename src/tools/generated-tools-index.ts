@@ -365,30 +365,6 @@ export const GENERATED_TOOL_REGISTRY = [
     handlerName: 'scrollBy',
   },
   {
-    modulePath: './page/sessionState.js',
-    handlerName: 'saveSessionState',
-  },
-  {
-    modulePath: './page/sessionState.js',
-    handlerName: 'restoreSessionState',
-  },
-  {
-    modulePath: './page/sessionState.js',
-    handlerName: 'listSessionStates',
-  },
-  {
-    modulePath: './page/sessionState.js',
-    handlerName: 'deleteSessionState',
-  },
-  {
-    modulePath: './page/sessionState.js',
-    handlerName: 'dumpSessionState',
-  },
-  {
-    modulePath: './page/sessionState.js',
-    handlerName: 'loadSessionState',
-  },
-  {
     modulePath: './page/checkBrowserHealth.js',
     handlerName: 'checkBrowserHealth',
   },

@@ -298,15 +298,6 @@ args = [
 > 代码理解、摘要、加密识别、风险评分与目标一键分析工具已下线，改由 skill
 > `code-analysis` / `target-analysis` 指导 Agent 用基础工具自行分析。
 
-### 6.10 会话与登录态复用
-
-| 工具                    | 用途             |
-| ----------------------- | ---------------- |
-| `save_session_state`    | 保存当前会话状态 |
-| `restore_session_state` | 恢复会话状态     |
-| `dump_session_state`    | 导出为 JSON 文件 |
-| `load_session_state`    | 从 JSON 加载会话 |
-
 ---
 
 ## 7. 完整逆向工作流
