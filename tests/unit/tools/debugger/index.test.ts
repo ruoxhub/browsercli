@@ -13,7 +13,6 @@ import {
   breakOnXhr,
   evaluateOnCallframe,
   findInScript,
-  getAiDebugStatus,
   getPausedInfo,
   getRequestInitiator,
   getScriptSource,
@@ -525,7 +524,6 @@ describe('src/tools/debugger/index.ts', () => {
       {url: '/api'},
       context,
     );
-    const statusLines = await callTool(getAiDebugStatus, {}, context);
     const initiatorLines = await callTool(
       getRequestInitiator,
       {requestId: 7},
@@ -542,7 +540,6 @@ describe('src/tools/debugger/index.ts', () => {
     const xhrText = linesToText(xhrLines);
     const xhrRemoveText = linesToText(xhrRemoveLines);
     const xhrToJsText = linesToText(xhrToJsLines);
-    const statusText = linesToText(statusLines);
     const initiatorText = linesToText(initiatorLines);
 
     assert.match(pausedInfoText, /已暂停/);
@@ -555,7 +552,6 @@ describe('src/tools/debugger/index.ts', () => {
     assert.match(xhrText, /XHR/);
     assert.match(xhrRemoveText, /XHR/);
     assert.match(xhrToJsText, /XHR/);
-    assert.match(statusText, /调试状态/);
     assert.match(initiatorText, /script/);
     assert.deepEqual(clientCalls, [
       {method: 'DOMDebugger.setXHRBreakpoint', params: {url: '/api'}},

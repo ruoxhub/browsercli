@@ -68,7 +68,6 @@ export const manifest = {
     {modulePath: './debugger/monitorEvents.js', handlerName: 'monitorEvents'},
     {modulePath: './debugger/stopMonitor.js', handlerName: 'stopMonitor'},
     {modulePath: './debugger/index.js', handlerName: 'traceFunction'},
-    {modulePath: './debugger/index.js', handlerName: 'getAiDebugStatus'},
     {modulePath: './debugger/inspectObject.js', handlerName: 'inspectObject'},
     {modulePath: './debugger/listHooks.js', handlerName: 'listHooks'},
     {modulePath: './debugger/index.js', handlerName: 'findInScript'},
