@@ -6,8 +6,8 @@
 import assert from 'node:assert/strict';
 import {describe, it} from 'node:test';
 
-import {GENERATED_DOMAIN_MANIFESTS} from '../../../../src/tools/generated-tools-index.js';
 import {revealInDevtools} from '../../../../src/tools/dom/revealInDevtools.js';
+import {GENERATED_DOMAIN_MANIFESTS} from '../../../../src/tools/generated-tools-index.js';
 import {ToolRegistry} from '../../../../src/tools/registry/ToolRegistry.js';
 import {loadToolMeta} from '../../../../src/tools/tools-meta.js';
 
