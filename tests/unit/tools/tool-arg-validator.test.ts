@@ -162,9 +162,8 @@ describe('validateToolArgs strict parameter validation and alias removal', () =>
   });
 
   it('string[] rejects scalar string and accepts string array', () => {
-    const rejectResult = validateToolArgs('set_files', {
-      selector: '#fileInput',
-      filePaths: '/tmp/test.txt',
+    const rejectResult = validateToolArgs('monitor_events', {
+      events: 'click',
     });
     assert.equal(rejectResult.ok, false);
     if (!rejectResult.ok) {
@@ -174,13 +173,12 @@ describe('validateToolArgs strict parameter validation and alias removal', () =>
       );
     }
 
-    const acceptResult = validateToolArgs('set_files', {
-      selector: '#fileInput',
-      filePaths: ['/tmp/test.txt'],
+    const acceptResult = validateToolArgs('monitor_events', {
+      events: ['click'],
     });
     assert.equal(acceptResult.ok, true);
     if (acceptResult.ok) {
-      assert.deepEqual(acceptResult.value.filePaths, ['/tmp/test.txt']);
+      assert.deepEqual(acceptResult.value.events, ['click']);
     }
   });
 

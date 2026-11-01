@@ -332,10 +332,6 @@ export const GENERATED_TOOL_REGISTRY = [
     handlerName: 'clickAt',
   },
   {
-    modulePath: './input/setFiles.js',
-    handlerName: 'setFiles',
-  },
-  {
     modulePath: './input/fill.js',
     handlerName: 'fill',
   },
