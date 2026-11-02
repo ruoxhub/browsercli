@@ -6,6 +6,7 @@
 
 import type {Locator, Page} from 'patchright';
 
+import {renderVom, type VomNode, type VomScene} from '../dom/vom/index.js';
 import type {
   AXNode,
   SnapshotNode,
@@ -19,16 +20,56 @@ interface AccessiblePage extends Page {
   };
 }
 
-type AriaRole = Parameters<Page['getByRole']>[0];
+export type SnapshotMode = 'ax' | 'vom';
+
+export interface ExtendedSnapshotOptions extends SnapshotOptions {
+  mode?: SnapshotMode;
+}
+
+export interface InPageVomRawNode {
+  id: number;
+  parentId: number | null;
+  tag: string;
+  role?: string;
+  name?: string;
+  value?: string;
+  text?: string;
+  placeholder?: string;
+  rect: {x: number; y: number; w: number; h: number} | null;
+  paintOrder: number;
+  position: string;
+  pointerEvents: string;
+  clickable: boolean;
+  modal?: boolean;
+  disabled?: boolean;
+  focused?: boolean;
+  referenceable?: boolean;
+  selector?: string;
+}
 
 export class PageSnapshotManager {
   private nextSnapshotId = 1;
   private readonly pageSnapshots = new WeakMap<object, TextSnapshotResult>();
+  private readonly nodeLocators = new WeakMap<
+    object,
+    Map<string, {selector?: string; role?: string; name?: string; x?: number; y?: number}>
+  >();
 
   /**
-   * 采集页面无障碍树（AXTree），分配数字 UID 并格式化为紧凑语义大纲。
+   * 采集页面语义快照，支持无障碍树（ax）与视口遮挡剪枝（vom）模式。
    */
   async capture(
+    page: Page,
+    options: ExtendedSnapshotOptions = {},
+  ): Promise<TextSnapshotResult> {
+    const mode = options.mode ?? 'ax';
+    if (mode === 'vom') {
+      return this.captureVom(page, options);
+    }
+    return this.captureAx(page, options);
+  }
+
+  private async captureAx(
     page: Page,
     options: SnapshotOptions = {},
   ): Promise<TextSnapshotResult> {
@@ -89,6 +130,182 @@ export class PageSnapshotManager {
     return result;
   }
 
+  private async captureVom(
+    page: Page,
+    options: SnapshotOptions = {},
+  ): Promise<TextSnapshotResult> {
+    const snapshotId = String(this.nextSnapshotId++);
+
+    const evaluated = await page.evaluate((): {
+      viewport: {width: number; height: number};
+      nodes: InPageVomRawNode[];
+    } => {
+      const vw = window.innerWidth || document.documentElement.clientWidth || 1280;
+      const vh = window.innerHeight || document.documentElement.clientHeight || 720;
+
+      const elements = Array.from(document.querySelectorAll('*'));
+      let idGen = 1;
+      const elToId = new Map<Element, number>();
+
+      const rawNodes: InPageVomRawNode[] = [];
+
+      for (const el of elements) {
+        const id = idGen++;
+        elToId.set(el, id);
+      }
+
+      for (const el of elements) {
+        const id = elToId.get(el)!;
+        const parentId = el.parentElement ? elToId.get(el.parentElement) ?? null : null;
+        const tag = el.tagName.toLowerCase();
+        const style = window.getComputedStyle(el);
+
+        if (style.display === 'none' || style.visibility === 'hidden') {
+          continue;
+        }
+
+        const bcr = el.getBoundingClientRect();
+        const rect = {
+          x: Math.round(bcr.left),
+          y: Math.round(bcr.top),
+          w: Math.round(bcr.width),
+          h: Math.round(bcr.height),
+        };
+
+        const role = el.getAttribute('role') || undefined;
+        const name =
+          el.getAttribute('aria-label') ||
+          el.getAttribute('title') ||
+          el.getAttribute('placeholder') ||
+          (el instanceof HTMLInputElement || el instanceof HTMLButtonElement
+            ? el.value
+            : undefined) ||
+          undefined;
+
+        const isInput = tag === 'input' || tag === 'textarea' || tag === 'select';
+        const isButton =
+          tag === 'button' ||
+          role === 'button' ||
+          (tag === 'input' && (el.getAttribute('type') === 'button' || el.getAttribute('type') === 'submit'));
+        const isLink = tag === 'a' && el.hasAttribute('href');
+        const isClickable =
+          isButton ||
+          isLink ||
+          isInput ||
+          style.cursor === 'pointer' ||
+          el.hasAttribute('onclick');
+
+        const isModal =
+          tag === 'dialog' ||
+          role === 'dialog' ||
+          role === 'alertdialog' ||
+          el.getAttribute('aria-modal') === 'true';
+
+        // 生成相对唯一的 CSS 选择器或辅助定位信息
+        let selector: string | undefined;
+        if (el.id) {
+          selector = `#${CSS.escape(el.id)}`;
+        } else if (name) {
+          selector = `[aria-label="${CSS.escape(name)}"]`;
+        }
+
+        const node: InPageVomRawNode = {
+          id,
+          parentId,
+          tag,
+          role: role ?? (isButton ? 'button' : isLink ? 'link' : undefined),
+          name: name ?? (el.childElementCount === 0 ? el.textContent?.trim().slice(0, 80) : undefined),
+          value: isInput && el instanceof HTMLInputElement ? el.value : undefined,
+          text: el.childElementCount === 0 ? el.textContent?.trim() : undefined,
+          rect: rect.w > 0 && rect.h > 0 ? rect : null,
+          paintOrder: id,
+          position: style.position || 'static',
+          pointerEvents: style.pointerEvents || 'auto',
+          clickable: isClickable,
+          modal: isModal,
+          disabled: el.hasAttribute('disabled') || el.getAttribute('aria-disabled') === 'true',
+          focused: document.activeElement === el,
+          referenceable: isClickable || isInput,
+          selector,
+        };
+
+        rawNodes.push(node);
+      }
+
+      return {
+        viewport: {width: vw, height: vh},
+        nodes: rawNodes,
+      };
+    });
+
+    const vomNodes: VomNode[] = evaluated.nodes.map(n => ({
+      ...n,
+      rect: n.rect,
+      attrs: {},
+    }));
+
+    const scene: VomScene = {
+      viewport: evaluated.viewport,
+      nodes: vomNodes,
+    };
+
+    const vomResult = renderVom(scene, {
+      maxDepth: options.maxDepth,
+    });
+
+    const idToNode = new Map<string, SnapshotNode>();
+    const locatorMap = new Map<string, {selector?: string; role?: string; name?: string; x?: number; y?: number}>();
+
+    // 构建符合 SnapshotNode 协议的节点树以兼容现有定位体系
+    const rootNode: SnapshotNode = {
+      id: `${snapshotId}_0`,
+      role: 'WebArea',
+      name: 'VOM Scene',
+      children: [],
+    };
+    idToNode.set(rootNode.id, rootNode);
+
+    let uidCounter = 1;
+    for (const renderedRef of vomResult.refs) {
+      const rawNode = evaluated.nodes.find(n => n.id === renderedRef.id);
+      const uid = `${snapshotId}_${uidCounter++}`;
+      const snapNode: SnapshotNode = {
+        id: uid,
+        role: rawNode?.role ?? renderedRef.role,
+        name: rawNode?.name ?? renderedRef.name,
+        value: rawNode?.value,
+        description: rawNode?.text,
+        disabled: rawNode?.disabled,
+        focused: rawNode?.focused,
+      };
+      idToNode.set(uid, snapNode);
+      rootNode.children!.push(snapNode);
+
+      locatorMap.set(uid, {
+        selector: rawNode?.selector,
+        role: snapNode.role,
+        name: snapNode.name,
+        x: rawNode?.rect?.x,
+        y: rawNode?.rect?.y,
+      });
+    }
+
+    const result: TextSnapshotResult = {
+      snapshotId,
+      root: rootNode,
+      idToNode,
+      formattedText: vomResult.text,
+      nodeCount: idToNode.size,
+    };
+
+    if (page && typeof page === 'object') {
+      this.pageSnapshots.set(page, result);
+      this.nodeLocators.set(page, locatorMap);
+    }
+
+    return result;
+  }
+
   /**
    * 获取指定页面缓存的快照。
    */
@@ -115,6 +332,12 @@ export class PageSnapshotManager {
       );
     }
 
+    const locators = this.nodeLocators.get(page);
+    const locMeta = locators?.get(uid);
+    if (locMeta?.selector) {
+      return page.locator(locMeta.selector);
+    }
+
     return this.resolveLocator(page, node);
   }
 
@@ -124,6 +347,7 @@ export class PageSnapshotManager {
   clear(page?: Page): void {
     if (page && typeof page === 'object') {
       this.pageSnapshots.delete(page);
+      this.nodeLocators.delete(page);
     }
   }
 
@@ -146,10 +370,9 @@ export class PageSnapshotManager {
     return page.locator(`[aria-label="${name ?? ''}"]`);
   }
 
-  private normalizeRole(role?: string): AriaRole | undefined {
+  private normalizeRole(role?: string): Parameters<Page['getByRole']>[0] | undefined {
     if (!role) return undefined;
-    const lower = role.toLowerCase() as AriaRole;
-    // Playwright 支持的标准 ARIA 角色
+    const lower = role.toLowerCase() as Parameters<Page['getByRole']>[0];
     const validRoles = new Set<string>([
       'alert',
       'alertdialog',
@@ -190,18 +413,17 @@ export class PageSnapshotManager {
       'main',
       'marquee',
       'math',
-      'meter',
       'menu',
       'menubar',
       'menuitem',
       'menuitemcheckbox',
       'menuitemradio',
+      'meter',
       'navigation',
       'none',
       'note',
       'option',
       'paragraph',
-      'presentation',
       'progressbar',
       'radio',
       'radiogroup',
@@ -235,10 +457,7 @@ export class PageSnapshotManager {
       'treeitem',
     ]);
 
-    if (validRoles.has(lower)) {
-      return lower;
-    }
-    return undefined;
+    return validRoles.has(lower) ? lower : undefined;
   }
 
   private formatTree(node: SnapshotNode, verbose: boolean, depth = 0): string {
