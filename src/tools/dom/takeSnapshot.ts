@@ -24,6 +24,12 @@ export const takeSnapshot = defineTool({
     },
   },
   schema: {
+    mode: zod
+      .enum(['ax', 'vom'])
+      .optional()
+      .describe(
+        '快照模式：ax 为标准无障碍树（默认），vom 为视口遮挡剪枝（剔除遮挡背景，聚焦可见交互层）。',
+      ),
     verbose: zod
       .boolean()
       .optional()
@@ -34,7 +40,7 @@ export const takeSnapshot = defineTool({
       .describe('是否仅包含有可访问性或交互价值的节点，默认 true。'),
   },
   handler: async (request, response, context) => {
-    const {verbose = false, interestingOnly = true} = request.params;
+    const {mode = 'ax', verbose = false, interestingOnly = true} = request.params;
     const page = (context as Context).getSelectedPage();
 
     if (!page) {
@@ -47,6 +53,7 @@ export const takeSnapshot = defineTool({
 
     try {
       const snapshot = await globalPageSnapshotManager.capture(page, {
+        mode,
         verbose,
         interestingOnly,
       });
