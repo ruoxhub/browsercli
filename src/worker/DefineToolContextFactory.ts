@@ -88,6 +88,11 @@ export class DefineToolContextFactory {
         this.trafficSummaryCache.set(wsid, summary);
       },
       getCachedTrafficSummary: wsid => this.trafficSummaryCache.get(wsid),
+      installExtension: path => provider.installExtension(path),
+      uninstallExtension: id => provider.uninstallExtension(id),
+      listExtensions: () => provider.listExtensions(),
+      getExtension: id => provider.getExtension(id),
+      triggerExtensionAction: id => provider.triggerExtensionAction(id),
     };
   }
 }

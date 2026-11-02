@@ -103,6 +103,12 @@
   - [`handle_dialog`](#handle_dialog)
 - **[Diagnostics](#diagnostics)** (1 tools)
   - [`diagnose_environment`](#diagnose_environment)
+- **[Extensions](#extensions)** (5 tools)
+  - [`install_extension`](#install_extension)
+  - [`list_extensions`](#list_extensions)
+  - [`reload_extension`](#reload_extension)
+  - [`trigger_extension_action`](#trigger_extension_action)
+  - [`uninstall_extension`](#uninstall_extension)
 
 ## Navigation automation
 
@@ -975,3 +981,41 @@
 **Parameters:**
 
 - `checks`
+
+## Extensions
+
+### `install_extension` — install_extension
+
+**Description:** Installs a Chrome extension from the given path.
+
+**Parameters:**
+
+- `path`
+
+### `list_extensions` — list_extensions
+
+**Description:** Lists all the Chrome extensions installed in the browser. This includes their name, ID, version, and enabled status.
+
+### `reload_extension` — reload_extension
+
+**Description:** Reloads an unpacked Chrome extension by its ID.
+
+**Parameters:**
+
+- `id`
+
+### `trigger_extension_action` — trigger_extension_action
+
+**Description:** Triggers the default action of an extension by its ID.
+
+**Parameters:**
+
+- `id`
+
+### `uninstall_extension` — uninstall_extension
+
+**Description:** Uninstalls a Chrome extension by its ID.
+
+**Parameters:**
+
+- `id`

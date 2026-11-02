@@ -17,6 +17,7 @@ import {
   BrowserTargetInspector,
   type BrowserManager,
 } from '../modules/browser/index.js';
+import {ExtensionManager} from '../modules/extension/ExtensionManager.js';
 import type {
   PageSelector,
   ResolvedPage,
@@ -29,6 +30,7 @@ import type {
 } from '../modules/network/NetworkTypes.js';
 import type {Runtime} from '../runtime.js';
 import type {HTTPRequest} from '../third_party/index.js';
+import type {Extension} from '../tools/ToolDefinition.js';
 import {createAppEventBusOptions, type AppEventMap} from '../types/events.js';
 import {EventBus} from '../utils/EventBus.js';
 
@@ -54,6 +56,7 @@ export class ToolContextProvider {
 
   private _isDisposed = false;
   private _browserTargetInspector?: BrowserTargetInspector;
+  private _extensionManager?: ExtensionManager;
   private activeSessionId?: string;
   public readonly eventBus: EventBus<AppEventMap>;
 
@@ -482,5 +485,32 @@ export class ToolContextProvider {
       this._browserContext.getCandidatePages(),
       ws,
     );
+  }
+
+  getExtensionManager(): ExtensionManager {
+    return (this._extensionManager ??= new ExtensionManager({
+      getBrowser: () => this.getBrowser(),
+      getSelectedPage: () => this.getSelectedPage(),
+    }));
+  }
+
+  async installExtension(path: string): Promise<string> {
+    return this.getExtensionManager().installExtension(path);
+  }
+
+  async uninstallExtension(id: string): Promise<void> {
+    return this.getExtensionManager().uninstallExtension(id);
+  }
+
+  async listExtensions(): Promise<Map<string, Extension>> {
+    return this.getExtensionManager().listExtensions();
+  }
+
+  async getExtension(id: string): Promise<Extension | undefined> {
+    return this.getExtensionManager().getExtension(id);
+  }
+
+  async triggerExtensionAction(id: string): Promise<void> {
+    return this.getExtensionManager().triggerExtensionAction(id);
   }
 }

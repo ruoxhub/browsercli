@@ -75,10 +75,19 @@ export interface DevToolsData {
   cdpBackendNodeId?: number;
 }
 
+export interface Extension {
+  id: string;
+  name: string;
+  version: string;
+  enabled: boolean;
+  path: string;
+}
+
 export interface Response {
   appendResponseLine(value: string): void;
   setStructuredContent<T = unknown>(content: T): void;
   setIncludePages(value: boolean): void;
+  setListExtensions?(): void;
   setIncludeNetworkRequests(
     value: boolean,
     options?: PaginationOptions & {
@@ -203,6 +212,14 @@ export type Context = Readonly<{
    * Get cached traffic summary for a WebSocket connection.
    */
   getCachedTrafficSummary(wsid: number): TrafficSummary | undefined;
+  /**
+   * Extension management methods
+   */
+  installExtension(path: string): Promise<string>;
+  uninstallExtension(id: string): Promise<void>;
+  listExtensions(): Promise<Map<string, Extension>>;
+  getExtension(id: string): Promise<Extension | undefined>;
+  triggerExtensionAction(id: string): Promise<void>;
 }>;
 
 /**

@@ -1,6 +1,6 @@
 ---
 name: browsercli
-description: 当需要通过 browsercli CLI 控制浏览器自动化、抓取与重放 HTTP/WebSocket 网络请求、追踪请求发起者调用栈、动态注入 JavaScript Hook 与加密拦截、安装 JSVMP 运行时探针、捕获与追踪 WebAssembly、设置断点与单步调试、绕过无限 debugger 与反反调试、模拟真实 DOM 拟人化交互、提取 Cookie/Storage 快照、沉淀逆向证据时使用。只要用户提到“浏览器逆向”、“抓包分析”、“Hook 加密”、“查找签名”、“调试混淆代码”或“browsercli”均应使用。
+description: 当需要通过 browsercli CLI 控制浏览器自动化、抓取与重放 HTTP/WebSocket 网络请求、追踪请求发起者调用栈、动态注入 JavaScript Hook 与加密拦截、安装 JSVMP 运行时探针、捕获与追踪 WebAssembly、设置断点与单步调试、绕过无限 debugger 与反反调试、模拟真实 DOM 拟人化交互、提取 Cookie/Storage 快照、沉淀逆向证据、安装与管理未打包扩展（Chrome Extension 插件调试与热重载）时使用。只要用户提到“浏览器逆向”、“抓包分析”、“Hook 加密”、“查找签名”、“调试混淆代码”、“浏览器插件”、“Chrome扩展”或“browsercli”均应使用。
 ---
 
 # BrowserCLI 逆向工程与浏览器自动化技能
@@ -85,17 +85,18 @@ browsercli video save <recording_id> artifacts/recordings/demo.mp4 --overwrite
 
 各领域工具的详细参数签名与使用示例已模块化整理在 `references/` 目录中，可按需精读：
 
-| 分类 / 领域              | 详细参考文档                                         | 涵盖的核心能力与代表工具                                                                                                                                                                   |
-| :----------------------- | :--------------------------------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **浏览器与页面控制**     | [`references/browser.md`](./references/browser.md)   | 多标签管理、iframe 切换、视口控制、设备/网络模拟、健康检查 (`browser connect`, `list_pages`, `new_page`, `select_frame`, `emulate_mobile`, `check_browser_health`)                         |
-| **脚本收集与源码定位**   | [`references/script.md`](./references/script.md)     | 脚本列举、源码按行截取、全局正则搜索、预加载脚本注入 (`list_scripts`, `get_script_source`, `search_in_sources`, `collect_code`)                                                            |
-| **动态 Hook 与加密拦截** | [`references/hook.md`](./references/hook.md)         | 非阻塞 Hook、Hook 生命周期管理、便捷函数 Hook (`create_hook`, `inject_hook`, `get_hook_data`, `hook_function`, `unhook_function`)。加密库 / JSVMP 专用拦截脚本见 `skills/web-reverse-hook` |
-| **调试器与断点步进**     | [`references/debugger.md`](./references/debugger.md) | 行/条件/XHR 断点、单步执行、局部变量检查、日志点追踪、表达式求值 (`set_breakpoint`, `break_on_xhr`, `step_into`, `inspect_locals`, `evaluate_script`, `trace_function`)                    |
-| **DOM 交互与样式排查**   | [`references/dom.md`](./references/dom.md)           | 多定位器查询、拟人化点击/填充、CDP 绝对坐标点击、表单填充、样式层叠排查 (`query_dom`, `click`, `click_at`, `fill`, `fill_form`, `drag`, `take_screenshot`, `get_css_styles`)               |
-| **网络嗅探与 WebSocket** | [`references/network.md`](./references/network.md)   | 网络流量嗅探、**发起者调用栈定位**、请求重放覆写、cURL 导出、WebSocket 帧聚类 (`list_network_requests`, `get_request_initiator`, `replay_network_request`, `export_request_as_curl`)       |
-| **反反调试与隐身伪装**   | [`references/stealth.md`](./references/stealth.md)   | 绕过无限 debugger 死循环、反反调试防护罩 (`bypass_debugger`, `anti_anti_debug`)                                                                                                            |
-| **WebAssembly 逆向**     | [`references/wasm.md`](./references/wasm.md)         | Wasm 模块捕获与磁盘 dump、JS-Wasm 跨边界调用追踪、线性内存搜索 (`collect_wasm`, `wasm_dump`, `wasm_vmp_trace`, `wasm_memory_inspect`)                                                      |
-| **会话持久化与存储导出** | [`references/session.md`](./references/session.md)   | HttpOnly Cookie/Storage 导出 (`get_storage`)                                                                                                                                               |
-| **环境诊断与证据录制**   | [`references/evidence.md`](./references/evidence.md) | 运行环境自检、验证码探测、交互轨迹录制与会话视频 (`diagnose_environment`, `detect_captcha`, `record_start`, `record_stop`, `video`)                                                        |
-| **控制台消息日志**       | [`references/console.md`](./references/console.md)   | 控制台 Console 日志采集与单条消息结构化查询 (`list_console_messages`, `get_console_message`)                                                                                               |
-| **全量工具速查字典**     | [`references/model.md`](./references/model.md)       | 全部 90 个 MCP 工具的 A-Z 快速检索字典与参数链接映射                                                                                                                                       |
+| 分类 / 领域              | 详细参考文档                                             | 涵盖的核心能力与代表工具                                                                                                                                                                   |
+| :----------------------- | :------------------------------------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **浏览器与页面控制**     | [`references/browser.md`](./references/browser.md)       | 多标签管理、iframe 切换、视口控制、设备/网络模拟、健康检查 (`browser connect`, `list_pages`, `new_page`, `select_frame`, `emulate_mobile`, `check_browser_health`)                         |
+| **脚本收集与源码定位**   | [`references/script.md`](./references/script.md)         | 脚本列举、源码按行截取、全局正则搜索、预加载脚本注入 (`list_scripts`, `get_script_source`, `search_in_sources`, `collect_code`)                                                            |
+| **动态 Hook 与加密拦截** | [`references/hook.md`](./references/hook.md)             | 非阻塞 Hook、Hook 生命周期管理、便捷函数 Hook (`create_hook`, `inject_hook`, `get_hook_data`, `hook_function`, `unhook_function`)。加密库 / JSVMP 专用拦截脚本见 `skills/web-reverse-hook` |
+| **调试器与断点步进**     | [`references/debugger.md`](./references/debugger.md)     | 行/条件/XHR 断点、单步执行、局部变量检查、日志点追踪、表达式求值 (`set_breakpoint`, `break_on_xhr`, `step_into`, `inspect_locals`, `evaluate_script`, `trace_function`)                    |
+| **DOM 交互与样式排查**   | [`references/dom.md`](./references/dom.md)               | 多定位器查询、拟人化点击/填充、CDP 绝对坐标点击、表单填充、样式层叠排查 (`query_dom`, `click`, `click_at`, `fill`, `fill_form`, `drag`, `take_screenshot`, `get_css_styles`)               |
+| **网络嗅探与 WebSocket** | [`references/network.md`](./references/network.md)       | 网络流量嗅探、**发起者调用栈定位**、请求重放覆写、cURL 导出、WebSocket 帧聚类 (`list_network_requests`, `get_request_initiator`, `replay_network_request`, `export_request_as_curl`)       |
+| **反反调试与隐身伪装**   | [`references/stealth.md`](./references/stealth.md)       | 绕过无限 debugger 死循环、反反调试防护罩 (`bypass_debugger`, `anti_anti_debug`)                                                                                                            |
+| **WebAssembly 逆向**     | [`references/wasm.md`](./references/wasm.md)             | Wasm 模块捕获与磁盘 dump、JS-Wasm 跨边界调用追踪、线性内存搜索 (`collect_wasm`, `wasm_dump`, `wasm_vmp_trace`, `wasm_memory_inspect`)                                                      |
+| **会话持久化与存储导出** | [`references/session.md`](./references/session.md)       | HttpOnly Cookie/Storage 导出 (`get_storage`)                                                                                                                                               |
+| **环境诊断与证据录制**   | [`references/evidence.md`](./references/evidence.md)     | 运行环境自检、验证码探测、交互轨迹录制与会话视频 (`diagnose_environment`, `detect_captcha`, `record_start`, `record_stop`, `video`)                                                        |
+| **控制台消息日志**       | [`references/console.md`](./references/console.md)       | 控制台 Console 日志采集与单条消息结构化查询 (`list_console_messages`, `get_console_message`)                                                                                               |
+| **未打包扩展管理与调试** | [`references/extensions.md`](./references/extensions.md) | 未打包扩展安装、卸载、列表查询、热重载与 Action 交互 (`install_extension`, `uninstall_extension`, `list_extensions`, `reload_extension`, `trigger_extension_action`)                       |
+| **全量工具速查字典**     | [`references/model.md`](./references/model.md)           | 全部 95 个 MCP 工具的 A-Z 快速检索字典与参数链接映射                                                                                                                                       |

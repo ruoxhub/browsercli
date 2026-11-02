@@ -133,20 +133,17 @@ describe('all-tools contract (Layer 1)', () => {
     }
   });
 
-  it('full profile exposes exactly 93 tools', () => {
+  it('full profile exposes exactly 95 tools', () => {
     assert.equal(
       fullEntries.length,
-      93,
-      `expected exactly 93 tools in full profile, got ${fullEntries.length}`,
+      95,
+      `expected exactly 95 tools in full profile, got ${fullEntries.length}`,
     );
   });
 
-  it('pruned domains (extensions, performance, devtools) are absent, and dom contains reveal_in_devtools', async () => {
+  it('pruned domains (performance, devtools) are absent, extensions is present, and dom contains reveal_in_devtools', async () => {
     const domainNames = new Set(GENERATED_DOMAIN_MANIFESTS.map(m => m.name));
-    assert.ok(
-      !domainNames.has('extensions'),
-      'extensions domain must not exist',
-    );
+    assert.ok(domainNames.has('extensions'), 'extensions domain must exist');
     assert.ok(
       !domainNames.has('performance'),
       'performance domain must not exist',

@@ -49,6 +49,10 @@ export class ToolResponseAccumulator implements Response {
     this.includePages = value;
   }
 
+  setListExtensions(): void {
+    // no-op for worker mode
+  }
+
   setIncludeNetworkRequests(
     _value: boolean,
     _options?: PaginationOptions & {
