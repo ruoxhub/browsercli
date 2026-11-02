@@ -63,14 +63,17 @@ export interface BrowserConnectOptions {
   autoConnect?: boolean;
   browserURL?: string;
   channel?: string;
+  chromeArg?: string[];
   cloak?: boolean;
   executablePath?: string;
   force?: boolean;
   fullStealthArgs?: boolean;
   headless?: boolean;
+  ignoreDefaultChromeArg?: string[];
   isolated?: boolean;
   jsStealth?: boolean;
   minimalStealth?: boolean;
+  proxyServer?: string;
   userDataDir?: string;
   viewport?: {width: number; height: number};
   wsEndpoint?: string;

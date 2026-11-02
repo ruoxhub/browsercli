@@ -31,6 +31,7 @@ const DOMAIN_DESCRIPTIONS: Record<string, string> = {
   pipeline: 'Analysis pipeline example tools.',
   screenshot: 'Page screenshot capture tool.',
   script: 'Page script evaluation tools.',
+  video: 'Browser session video recording tools.',
   wasm: 'WebAssembly reverse engineering tools.',
 };
 

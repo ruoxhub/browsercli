@@ -17,10 +17,7 @@ import net from 'node:net';
 import {dirname, join} from 'node:path';
 import {fileURLToPath} from 'node:url';
 
-import {
-  loadCachedRuntimeConfig,
-  shouldAutoConnectOnStartup,
-} from '../config/runtimeConfigPersistence.js';
+import {loadCachedRuntimeConfig} from '../config/runtimeConfigPersistence.js';
 import {getRuntimeConfigStore} from '../config/RuntimeConfigStore.js';
 import {type GlobalConfig} from '../config/schema.js';
 import {getBrowserManagerConfig} from '../config/servicesConfig.js';
@@ -231,18 +228,6 @@ export async function runDaemon(plan: DaemonPlan): Promise<DaemonRunResult> {
 
   // 就绪握手：stdout 精确一行，CLI 以此判定 daemon 可连接
   console.log(`Daemon listening on ${socketPath}`);
-
-  // 启动自动连接浏览器：在 IPC 服务就绪握手后异步执行，避免因等待 Chrome 弹窗授权阻塞 daemon 就绪
-  if (shouldAutoConnectOnStartup(getRuntimeConfigStore().get())) {
-    void connectBrowser(contextProvider, getBrowserManagerConfig()).catch(
-      err => {
-        console.warn(
-          '[Daemon] 启动自动连接浏览器失败，可稍后通过 browsercli browser connect 重连:',
-          err instanceof Error ? err.message : err,
-        );
-      },
-    );
-  }
 
   process.on(
     'SIGINT',

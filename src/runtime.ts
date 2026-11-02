@@ -23,6 +23,7 @@ import type {WasmAnalyzer} from './modules/wasm/WasmAnalyzer.js';
 import type {WasmCollector} from './modules/wasm/WasmCollector.js';
 import type {WasmDecompiler} from './modules/wasm/WasmDecompiler.js';
 import type {WasmRuntimeInspector} from './modules/wasm/WasmRuntimeInspector.js';
+import type {VideoManager} from './modules/video/index.js';
 import {RuntimeServices} from './runtime/RuntimeServices.js';
 import type {Page} from './third_party/index.js';
 import {createAppEventBusOptions, type AppEventMap} from './types/events.js';
@@ -52,6 +53,7 @@ export interface Runtime {
   eventBus: EventBus<AppEventMap>;
   contextProvider?: ToolContextProvider;
   sourceMapService?: SourceMapService;
+  videoManager?: VideoManager;
   bindPageContext: (resolver: () => Page) => void;
   syncPageContext: (page: Page) => void;
   clearPageContext: () => void;
@@ -111,6 +113,9 @@ export function getRuntime(): Runtime {
     },
     get sourceMapService() {
       return services.getSourceMapService();
+    },
+    get videoManager() {
+      return services.getVideoManager(browserManager);
     },
     eventBus,
     bindPageContext: resolver => {

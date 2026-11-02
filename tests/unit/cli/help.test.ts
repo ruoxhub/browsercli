@@ -17,13 +17,20 @@ describe('help', () => {
       const result = generateTopLevelHelp();
       assert.ok(result.includes('browsercli v1.0.0'));
       assert.ok(result.includes('逆向工程CLI服务'));
+      assert.ok(result.includes('start'));
+      assert.ok(result.includes('stop'));
+      assert.ok(result.includes('status'));
       assert.ok(result.includes('call'));
       assert.ok(result.includes('list-tools'));
-      assert.ok(result.includes('browser'));
       assert.ok(result.includes('jobs'));
       assert.ok(result.includes('config'));
       assert.ok(result.includes('scaffold'));
-      assert.ok(result.includes('status'));
+      // 已移除的命令不应在 top level help 中出现
+      assert.ok(!result.includes('open'));
+      assert.ok(!result.includes('close'));
+      assert.ok(!result.includes('list '));
+      assert.ok(!result.includes('kill-all'));
+      assert.ok(!result.includes('browser '));
     });
 
     it('accepts custom bin name', () => {
@@ -55,6 +62,28 @@ describe('help', () => {
   });
 
   describe('generateCommandHelp', () => {
+    it('returns help for start command', () => {
+      const result = generateCommandHelp('start');
+      assert.ok(result);
+      assert.ok(result.includes('start'));
+      assert.ok(result.includes('--browser-url'));
+      assert.ok(result.includes('--channel'));
+      assert.ok(result.includes('--headless'));
+    });
+
+    it('returns help for stop command', () => {
+      const result = generateCommandHelp('stop');
+      assert.ok(result);
+      assert.ok(result.includes('stop'));
+      assert.ok(result.includes('--all'));
+    });
+
+    it('returns help for status command', () => {
+      const result = generateCommandHelp('status');
+      assert.ok(result);
+      assert.ok(result.includes('status'));
+    });
+
     it('returns help for call command', () => {
       const result = generateCommandHelp('call');
       assert.ok(result);
@@ -68,57 +97,6 @@ describe('help', () => {
       const result = generateCommandHelp('list-tools');
       assert.ok(result);
       assert.ok(result!.includes('list-tools'));
-    });
-
-    it('returns help for browser control with detailed connect options', () => {
-      const result = generateCommandHelp('browser');
-      assert.ok(result);
-      assert.ok(result.includes('browser connect'));
-      assert.ok(result.includes('--browser-url'));
-      assert.ok(result.includes('--ws-endpoint'));
-      assert.ok(result.includes('--channel'));
-      assert.ok(result.includes('--executable-path'));
-      assert.ok(result.includes('--cloak'));
-      assert.ok(result.includes('--headless'));
-      assert.ok(result.includes('browser disconnect [--force] [--json]'));
-      assert.ok(result.includes('browser status'));
-    });
-
-    it('returns dedicated help for browser connect subcommand', () => {
-      const result = generateCommandHelp('browser', 'connect');
-      assert.ok(result);
-      assert.ok(result.includes('Usage: browsercli browser connect'));
-      assert.ok(!result.includes('browser disconnect'));
-      assert.ok(result.includes('--browser-url <url>'));
-      assert.ok(result.includes('--ws-endpoint <url>'));
-      assert.ok(result.includes('--channel <name>'));
-      assert.ok(result.includes('--executable-path <path>'));
-      assert.ok(result.includes('--user-data-dir <dir>'));
-      assert.ok(result.includes('--viewport <width>x<height>'));
-      assert.ok(result.includes('--cloak'));
-      assert.ok(result.includes('--minimal-stealth'));
-      assert.ok(result.includes('--full-stealth-args'));
-      assert.ok(result.includes('--js-stealth'));
-      assert.ok(result.includes('--force'));
-    });
-
-    it('returns dedicated help for browser disconnect and status subcommands', () => {
-      const disconnect = generateCommandHelp('browser', [
-        'disconnect',
-        '--help',
-      ]);
-      assert.ok(disconnect);
-      assert.ok(
-        disconnect.includes(
-          'Usage: browsercli browser disconnect [--force] [--json]',
-        ),
-      );
-      assert.ok(disconnect.includes('--force'));
-
-      const status = generateCommandHelp('browser', ['status']);
-      assert.ok(status);
-      assert.ok(status.includes('Usage: browsercli browser status [--json]'));
-      assert.ok(status.includes('--json'));
     });
 
     it('returns help for job recovery', () => {
@@ -140,17 +118,14 @@ describe('help', () => {
       assert.ok(result!.includes('--name'));
     });
 
-    it('returns help for status command', () => {
-      const result = generateCommandHelp('status');
-      assert.ok(result);
-      assert.ok(result!.includes('status'));
-    });
-
     it('returns null for removed commands', () => {
       assert.strictEqual(generateCommandHelp('web'), null);
-      assert.strictEqual(generateCommandHelp('start'), null);
-      assert.strictEqual(generateCommandHelp('stop'), null);
       assert.strictEqual(generateCommandHelp('repl'), null);
+      assert.strictEqual(generateCommandHelp('open'), null);
+      assert.strictEqual(generateCommandHelp('close'), null);
+      assert.strictEqual(generateCommandHelp('list'), null);
+      assert.strictEqual(generateCommandHelp('kill-all'), null);
+      assert.strictEqual(generateCommandHelp('browser'), null);
     });
 
     it('returns null for unknown command', () => {
@@ -159,13 +134,14 @@ describe('help', () => {
 
     it('returns help for all kept commands', () => {
       const commands = [
+        'start',
+        'stop',
+        'status',
         'call',
         'list-tools',
-        'browser',
         'jobs',
         'config',
         'scaffold',
-        'status',
       ];
       for (const cmd of commands) {
         const result = generateCommandHelp(cmd);

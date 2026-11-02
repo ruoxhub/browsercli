@@ -19,48 +19,30 @@ browsercli call <tool_name> [arguments]
 
 在展开逆向分析前，优先确保 Daemon 会话与浏览器连接处于健康状态：
 
-### 会话生命周期管理
+### 会话生命周期与浏览器管理（对齐 chrome-devtools）
 
 ```bash
-# 检查当前工作区活跃会话与环境状态
+# 查看当前工作区活跃会话状态及浏览器连接信息
 browsercli status
+browsercli status --json
 
-# 列出注册表中的全部会话
-browsercli list
+# 启动（或重启）当前会话 Daemon（支持 -s 指定多会话隔离）
+browsercli start
+browsercli -s=task_01 start
 
-# 拉起或探活当前会话（支持 -s 指定多会话隔离）
-browsercli open
-browsercli -s=task_01 open
+# 启动并直接附带浏览器连接参数（CDP 端口接管、本地启动、防检测 Cloak 等）
+browsercli start --browser-url "http://127.0.0.1:9222"
+browsercli start --ws-endpoint "ws://127.0.0.1:9222/devtools/browser/..."
+browsercli start --channel stable
+browsercli start --cloak
+browsercli start --headless
 
-# 正常关闭当前会话
-browsercli close
+# 正常停止当前会话
+browsercli stop
+browsercli -s=task_01 stop
 
-# 异常故障时强杀全部孤儿 daemon 进程
-browsercli kill-all
-```
-
-### 浏览器连接与反检测控制
-
-```bash
-# 查看当前 Worker 的浏览器连接状态
-browsercli browser status
-
-# 默认启动本地浏览器（以用户配置或系统 Chromium 启动）
-browsercli browser connect
-
-# 连接已有的远程 Chrome 实例（CDP 端口接管）
-browsercli browser connect --browser-url "http://127.0.0.1:9222"
-browsercli browser connect --ws-endpoint "ws://127.0.0.1:9222/devtools/browser/..."
-
-# 以源码级防检测 CloakBrowser 启动（强反爬站点推荐，独立 profile 隔离）
-browsercli browser connect --cloak
-
-# 本地启动指定渠道 / 自定义执行路径
-browsercli browser connect --channel stable
-browsercli browser connect --executable-path "/path/to/chrome"
-
-# 强制断开卡死的浏览器连接
-browsercli browser disconnect --force
+# 强杀并清理全部 daemon 进程与残余会话
+browsercli stop --all
 ```
 
 ### 任务脚手架与全局配置

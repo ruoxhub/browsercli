@@ -68,6 +68,9 @@ export interface BrowserManagerConfig {
   };
   args?: string[];
   devtools?: boolean;
+  proxyServer?: string;
+  chromeArg?: string[];
+  ignoreDefaultChromeArg?: string[];
   // 新增：自动启动浏览器能力（合并自 BrowserModeManager）
   autoLaunch?: boolean;
   browserPath?: string;

@@ -387,8 +387,15 @@ export class BrowserManager {
       }
 
       this.installDetachedFrameGuard();
+      const timeout =
+        this.config.timeout ?? (this.config.autoConnect ? 30000 : 10000);
+      if (this.config.autoConnect) {
+        logger.info(
+          '[autoConnect] 正在通过 WebSocket 请求连接 Chrome，若 Chrome 弹出"Allow remote debugging"对话框，请点击"允许"...',
+        );
+      }
       this.browser = await chromium.connectOverCDP(connectEndpoint, {
-        timeout: this.config.timeout ?? 10000,
+        timeout,
         ...(this.config.wsHeaders ? {headers: this.config.wsHeaders} : {}),
       });
       logger.debug('Connected to remote browser via Playwright');
@@ -708,6 +715,29 @@ export class BrowserManager {
       );
     }
 
+    if (
+      errorMessage.includes('Timeout') &&
+      errorMessage.includes('connectOverCDP')
+    ) {
+      if (this.config.autoConnect) {
+        return new Error(
+          `连接 Chrome 握手超时（WebSocket 已连上但未收到 CDP 初始化响应）。
+原因：使用 --autoConnect 连接 Chrome 144+ 时，Chrome 窗口顶部会弹出授权对话框：
+      "Allow remote debugging session?"（是否允许远程调试会话？）。
+      如果在等待时间内未在 Chrome 界面点击"允许"（Allow），连接将超时退出。
+
+解决方法：
+1. 请重新运行该命令，并留意 Chrome 窗口界面顶部，及时点击"允许"（Allow）；
+2. 亦可通过独立端口免弹窗方式连接：
+   启动 Chrome：chrome.exe --remote-debugging-port=9222 --user-data-dir="<临时目录>"
+   连接命令：browsercli start -u http://127.0.0.1:9222
+
+原始错误：${errorMessage}`,
+          {cause: error},
+        );
+      }
+    }
+
     return new Error(`Failed to connect to remote browser: ${errorMessage}`, {
       cause: error,
     });
@@ -773,6 +803,24 @@ export class BrowserManager {
       args.push(...cloakSetup.args);
     }
 
+    if (this.config.proxyServer) {
+      args.push(`--proxy-server=${this.config.proxyServer}`);
+    }
+    if (this.config.chromeArg && this.config.chromeArg.length > 0) {
+      args.push(...this.config.chromeArg);
+    }
+
+    let finalArgs = args;
+    if (
+      this.config.ignoreDefaultChromeArg &&
+      this.config.ignoreDefaultChromeArg.length > 0
+    ) {
+      const ignored = new Set(this.config.ignoreDefaultChromeArg);
+      finalArgs = args.filter(
+        a => !ignored.has(a) && !ignored.has(a.split('=')[0]),
+      );
+    }
+
     const launchChannel = resolveLaunchChannel(
       channel,
       engine,
@@ -798,7 +846,7 @@ export class BrowserManager {
         channel: launchChannel,
         executablePath,
         headless,
-        args,
+        args: finalArgs,
         ...(ignoreDefaultArgs ? {ignoreDefaultArgs} : {}),
       });
 

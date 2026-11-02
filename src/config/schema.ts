@@ -29,6 +29,27 @@ const portSchema = zod.coerce
 
 const nonNegativeIntSchema = zod.coerce.number().int().nonnegative();
 
+const stringArraySchema = zod.preprocess(value => {
+  if (Array.isArray(value)) return value.map(String);
+  if (typeof value === 'string') {
+    if (value.startsWith('[') && value.endsWith(']')) {
+      try {
+        const parsed = JSON.parse(value);
+        if (Array.isArray(parsed)) return parsed.map(String);
+      } catch {
+        // fallback to split
+      }
+    }
+    return value
+      .split(',')
+      .map(s => s.trim())
+      .filter(Boolean);
+  }
+  return value;
+}, zod.array(zod.string()));
+
+const screenshotFormatSchema = zod.enum(['jpeg', 'png', 'webp']);
+
 const ViewportSchema: zodType.ZodType<{width: number; height: number}> = zod
   .object({
     width: positiveIntSchema,
@@ -107,6 +128,39 @@ export const BrowserConfigSchema = zod
     maxTotalContentSize: positiveIntSchema.optional(),
     maxSingleFileSize: positiveIntSchema.optional(),
     userAgent: optionalStringSchema.optional(),
+
+    // chrome-devtools-mcp 对齐配置项
+    proxyServer: optionalStringSchema.optional(),
+    chromeArg: stringArraySchema.optional(),
+    ignoreDefaultChromeArg: stringArraySchema.optional(),
+    blockedUrlPattern: stringArraySchema.optional(),
+    allowedUrlPattern: stringArraySchema.optional(),
+    redactNetworkHeaders: booleanSchema.optional(),
+    maxNavigationSaved: zod.coerce.number().int().min(1).max(25).optional(),
+
+    screenshotFormat: screenshotFormatSchema.optional(),
+    screenshotQuality: zod.coerce.number().min(0).max(100).optional(),
+    screenshotMaxWidth: positiveIntSchema.optional(),
+    screenshotMaxHeight: positiveIntSchema.optional(),
+
+    logFile: optionalStringSchema.optional(),
+    experimentalDevtools: booleanSchema.optional(),
+    experimentalVision: booleanSchema.optional(),
+    memoryDebugging: booleanSchema.optional(),
+    experimentalMemory: booleanSchema.optional(),
+    experimentalIncludeAllPages: booleanSchema.optional(),
+    experimentalScreencast: booleanSchema.optional(),
+    experimentalFfmpegPath: optionalStringSchema.optional(),
+    screencastFps: positiveIntSchema.optional(),
+    experimentalScreencastFps: positiveIntSchema.optional(),
+    performanceCrux: booleanSchema.optional(),
+    usageStatistics: booleanSchema.optional(),
+    javascriptEvaluation: booleanSchema.optional(),
+    fileNavigations: booleanSchema.optional(),
+    sourceMaps: booleanSchema.optional(),
+    allowUnrestrictedPaths: booleanSchema.optional(),
+    workspace: stringArraySchema.optional(),
+    filesystemRoot: stringArraySchema.optional(),
   })
   .strip();
 
@@ -144,6 +198,73 @@ export const GlobalConfigSchema = zod
     logLevel: optionalStringSchema.optional(),
     outputDir: optionalStringSchema.optional(),
     toolResultRecording: ToolResultRecordingConfigSchema.optional(),
+
+    // 工具分类开关 (Category flags)
+    categoryInput: booleanSchema.optional(),
+    categoryNavigation: booleanSchema.optional(),
+    categoryEmulation: booleanSchema.optional(),
+    categoryPerformance: booleanSchema.optional(),
+    categoryNetwork: booleanSchema.optional(),
+    categoryDebugging: booleanSchema.optional(),
+    categoryExtensions: booleanSchema.optional(),
+    categoryExperimentalThirdParty: booleanSchema.optional(),
+    categoryMemory: booleanSchema.optional(),
+    categoryExperimentalWebmcp: booleanSchema.optional(),
+    categoryPwa: booleanSchema.optional(),
+
+    // 浏览器启动与网络连接扩展
+    channel: optionalStringSchema.optional(),
+    isolated: booleanSchema.optional(),
+    acceptInsecureCerts: booleanSchema.optional(),
+    wsHeaders: zod.preprocess(value => {
+      if (typeof value === 'string') {
+        try {
+          return JSON.parse(value);
+        } catch {
+          return value;
+        }
+      }
+      return value;
+    }, zod.record(zod.string()).optional()),
+    proxyServer: optionalStringSchema.optional(),
+    chromeArg: stringArraySchema.optional(),
+    ignoreDefaultChromeArg: stringArraySchema.optional(),
+    blockedUrlPattern: stringArraySchema.optional(),
+    allowedUrlPattern: stringArraySchema.optional(),
+    redactNetworkHeaders: booleanSchema.optional(),
+    maxNavigationSaved: zod.coerce.number().int().min(1).max(25).optional(),
+
+    // 截图与视觉
+    screenshotFormat: screenshotFormatSchema.optional(),
+    screenshotQuality: zod.coerce.number().min(0).max(100).optional(),
+    screenshotMaxWidth: positiveIntSchema.optional(),
+    screenshotMaxHeight: positiveIntSchema.optional(),
+    experimentalVision: booleanSchema.optional(),
+
+    // 调试、日志与实验特性
+    logFile: optionalStringSchema.optional(),
+    experimentalDevtools: booleanSchema.optional(),
+    memoryDebugging: booleanSchema.optional(),
+    experimentalMemory: booleanSchema.optional(),
+    experimentalIncludeAllPages: booleanSchema.optional(),
+    experimentalScreencast: booleanSchema.optional(),
+    experimentalFfmpegPath: optionalStringSchema.optional(),
+    screencastFps: positiveIntSchema.optional(),
+    experimentalScreencastFps: positiveIntSchema.optional(),
+    performanceCrux: booleanSchema.optional(),
+    usageStatistics: booleanSchema.optional(),
+    javascriptEvaluation: booleanSchema.optional(),
+    fileNavigations: booleanSchema.optional(),
+    sourceMaps: booleanSchema.optional(),
+
+    // 文件系统与工作区
+    allowUnrestrictedPaths: booleanSchema.optional(),
+    workspace: stringArraySchema.optional(),
+    filesystemRoot: stringArraySchema.optional(),
+
+    // 配置文件与监听
+    config: optionalStringSchema.optional(),
+    watchConfig: booleanSchema.optional(),
   })
   .strip();
 

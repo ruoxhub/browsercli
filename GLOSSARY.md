@@ -41,5 +41,9 @@ A single capability exposed to callers through the daemon's `tool.invoke` IPC re
 _Avoid_: Command, CLI command, endpoint, API route
 
 **Daemon Session**:
-A detached worker process bound to one workspace directory and identified by a workspace hash in the session registry. A session owns exactly one IPC socket, may host zero or more browser connections, and is discovered and spawned on demand by the `browsercli` client.
+A detached worker process bound to one workspace directory and identified by a workspace hash in the session registry. A session owns exactly one IPC socket, may host zero or more browser connections, and is discovered, spawned, and managed on demand by the `browsercli` client through the standard lifecycle commands (`start`, `stop`, `status`).
 _Avoid_: Workspace, server instance, background job, worker thread
+
+**Lifecycle Commands**:
+The triad of CLI commands (`start`, `stop`, `status`) modeled after `chrome-devtools` for managing daemon sessions and inspecting browser connections.
+_Avoid_: Session commands, daemon controls, process managers

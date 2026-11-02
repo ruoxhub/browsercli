@@ -8,6 +8,8 @@ import {getSourceMapConfig} from '../config/servicesConfig.js';
 import type {PageController} from '../modules/collector/PageController.js';
 import {NetworkModule} from '../modules/network/index.js';
 import {SourceMapService} from '../modules/sourcemap/SourceMapService.js';
+import {VideoManager} from '../modules/video/index.js';
+import type {BrowserManager} from '../modules/browser/index.js';
 import {WasmAnalyzer} from '../modules/wasm/WasmAnalyzer.js';
 import {WasmCollector} from '../modules/wasm/WasmCollector.js';
 import {WasmDecompiler} from '../modules/wasm/WasmDecompiler.js';
@@ -25,6 +27,7 @@ export class RuntimeServices {
   private wasmRuntimeInspector?: WasmRuntimeInspector;
   private wasmCollector?: WasmCollector;
   private sourceMapService: SourceMapService | null = null;
+  private videoManager?: VideoManager;
 
   constructor(private readonly pageController: PageController) {}
 
@@ -56,5 +59,17 @@ export class RuntimeServices {
     return (this.sourceMapService ??= new SourceMapService(
       getSourceMapConfig(),
     ));
+  }
+
+  getVideoManager(browserManager?: BrowserManager): VideoManager {
+    return (this.videoManager ??= new VideoManager({
+      getPage: async (tabId?: number) => {
+        if (tabId !== undefined) {
+          const pages = browserManager?.getContext()?.pages() ?? [];
+          return pages[tabId] ?? null;
+        }
+        return this.pageController.getPage();
+      },
+    }));
   }
 }
