@@ -8,17 +8,16 @@
 - **显式优于隐式**：配置、依赖和状态必须清晰、明确且可追踪。
 - **代码是给人看的**：可读性永远优先于炫技和不必要的技巧。
 
-## Project Structure &amp; Module Organization
+## Project Structure & Module Organization
 
-核心源码位于 `src/`。其中 `src/tools/` 提供 MCP 工具实现，`src/modules/` 放逆向分析、Hook、调试、去混淆等核心模块；`src/worker/` 是后台 worker 运行时（`src/index.ts` 为进程入口）。命令行客户端位于 `src/cli/`（`browsercli` 可执行命令），通过本地命名管道（POSIX 为 unix socket）与 detached daemon 会话通信：CLI 按 workspace-hash 注册表（`%LOCALAPPDATA%\browsercli\daemon`）发现会话，连不上就自动 spawn daemon 并等 stdout 就绪行握手（不再内置本地 worker 进程管理，start/stop/status/repl 等命令已删除；原 `/api/v1` HTTP 契约与 Sekiro RPC 均已下线）。构建产物输出到 `build/`，不要手改。文档集中在 `docs/`，公开案例与脚本入口在 `scripts/cases/`。真实任务证据默认保留在 `artifacts/tasks/<task-id>/`，仓库只跟踪模板目录。
+核心源码位于 `src/`。其中 `src/tools/` 提供能力工具实现（遵循 ADR 0006，MCP stdio、HTTP API 与 Sekiro RPC 均已下线，统一通过 IPC 本地 socket / 管道调用）；`src/modules/` 放逆向分析、Hook、调试、去混淆等核心模块；`src/worker/` 是后台 worker 运行时（`src/index.ts` 为进程入口）。命令行客户端位于 `src/cli/`（`browsercli` 可执行命令），通过本地命名管道（POSIX 为 unix socket）与 detached daemon 会话通信：CLI 按 workspace-hash 注册表（`%LOCALAPPDATA%\browsercli\daemon`）发现会话，并通过标准的生命周期命令 `start`/`stop`/`status` 进行管理，连不上或按需时自动 spawn daemon 并等 stdout 就绪行握手。构建产物输出到 `build/`，不要手改。文档集中在 `docs/`，公开案例与脚本入口在 `scripts/cases/`。真实任务证据默认保留在 `artifacts/tasks/<task-id>/`，仓库只跟踪模板目录。
 
 ## Build, Test, and Development Commands
 
 先使用 `npm install` 安装依赖，要求 Node `^20.19.0 || ^22.12.0 || >=23`。
 
 - `npm run build`：编译 `src/` 与 `tests/` 到 `build/`
-- `npm run start`：构建后启动 MCP 服务
-- `npm run start-debug`：以 `DEBUG=mcp:*` 启动，适合排查工具链问题
+- `npm run cli:start`：启动后台 Daemon 服务
 - `npm test`：构建后运行全部测试
 - `npm run test:unit` / `npm run test:integration` / `npm run test:property` / `npm run test:perf`：按类型执行测试
 - `npm run typecheck`：只做 TypeScript 类型检查
@@ -77,7 +76,6 @@
 | `getRuntime`    | `src/runtime.ts`              | 57+      | 全局运行时访问器                                           |
 | `safeStringify` | `src/utils/safeJson.ts`       | 16       | JSON 安全序列化                                            |
 | `getEnvValue`   | `src/config/resolver.ts`      | 11       | 环境变量读取                                               |
-
 
 <!-- code-review-graph MCP tools -->
 

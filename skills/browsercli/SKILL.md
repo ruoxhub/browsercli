@@ -67,6 +67,20 @@ browsercli jobs list --json
 browsercli jobs cancel <job-id>
 ```
 
+### 会话操作视频录制
+
+```bash
+# 启动会话录屏（支持 standard 1280x720@15fps 或 clear 1920x1080@30fps，默认限时 60 秒）
+browsercli video start --quality standard --max-duration 60000
+
+# 查看录制状态与停止录制
+browsercli video status <recording_id>
+browsercli video stop <recording_id>
+
+# 另存为 MP4 视频文件
+browsercli video save <recording_id> artifacts/recordings/demo.mp4 --overwrite
+```
+
 ## 模块化工具速查索引 (Tool Reference Index)
 
 各领域工具的详细参数签名与使用示例已模块化整理在 `references/` 目录中，可按需精读：
@@ -82,6 +96,6 @@ browsercli jobs cancel <job-id>
 | **反反调试与隐身伪装**   | [`references/stealth.md`](./references/stealth.md)   | 绕过无限 debugger 死循环、反反调试防护罩 (`bypass_debugger`, `anti_anti_debug`)                                                                                                            |
 | **WebAssembly 逆向**     | [`references/wasm.md`](./references/wasm.md)         | Wasm 模块捕获与磁盘 dump、JS-Wasm 跨边界调用追踪、线性内存搜索 (`collect_wasm`, `wasm_dump`, `wasm_vmp_trace`, `wasm_memory_inspect`)                                                      |
 | **会话持久化与存储导出** | [`references/session.md`](./references/session.md)   | HttpOnly Cookie/Storage 导出 (`get_storage`)                                                                                                                                               |
-| **环境诊断与验证码探测** | [`references/evidence.md`](./references/evidence.md) | 运行环境自检、页面验证码只读探测 (`diagnose_environment`, `detect_captcha`)                                                                                                                |
+| **环境诊断与证据录制**   | [`references/evidence.md`](./references/evidence.md) | 运行环境自检、验证码探测、交互轨迹录制与会话视频 (`diagnose_environment`, `detect_captcha`, `record_start`, `record_stop`, `video`)                                                        |
 | **控制台消息日志**       | [`references/console.md`](./references/console.md)   | 控制台 Console 日志采集与单条消息结构化查询 (`list_console_messages`, `get_console_message`)                                                                                               |
-| **全量工具速查字典**     | [`references/model.md`](./references/model.md)       | 全部 93 个 MCP 工具的 A-Z 快速检索字典与参数链接映射                                                                                                                                       |
+| **全量工具速查字典**     | [`references/model.md`](./references/model.md)       | 全部 90 个 MCP 工具的 A-Z 快速检索字典与参数链接映射                                                                                                                                       |

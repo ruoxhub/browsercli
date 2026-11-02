@@ -35,7 +35,9 @@ function fakeSession(name: string, socketPath: string): SessionConfig {
 }
 
 describe('statusCommand (registry probe + stale GC)', () => {
-  const daemonDir = fs.mkdtempSync(path.join(os.tmpdir(), 'browsercli-status-'));
+  const daemonDir = fs.mkdtempSync(
+    path.join(os.tmpdir(), 'browsercli-status-'),
+  );
   let liveServer: net.Server;
   let livePath: string;
 
@@ -95,7 +97,7 @@ describe('statusCommand (registry probe + stale GC)', () => {
 
   it('探活成功计 open、失败计 closed-stale 并 GC session 文件', async () => {
     const ctx: WorkerContext = {
-      session: 'default',
+      session: 'live',
       daemonDir,
       connect: async () => {
         throw new Error('不应被调用');

@@ -6,4 +6,4 @@
 >   1. **嗅探流量**：`list_network_requests` + `get_request_initiator`
 >   2. **定位源码**：`get_script_source` + `search_in_sources`
 >   3. **动态监控**：`hook_function` + `get_hook_data`
->   4. **沉淀证据**：结论写入 `artifacts/tasks/<task-id>/`（证据落盘工具已随 `src/tools/analyzer` 下线）
+>   4. **沉淀证据**：通过 `record_start` / `record_stop` 录制交互轨迹与因果网络请求（或用 `video` 录制会话操作视频），结论与分析切片写入 `artifacts/tasks/<task-id>/`

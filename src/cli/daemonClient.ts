@@ -22,6 +22,8 @@ import {
   cliConfigPath,
   computeClientInfo,
   deleteSession,
+  isPidAlive,
+  killPidForce,
   loadCliConfig,
   loadSession,
   type CliConfig,
@@ -381,38 +383,13 @@ export async function spawnDaemon(
   if (!cfg) throw new Error('daemon 就绪但 session 文件缺失');
   if (cfg.protocol !== PROTOCOL_VERSION) {
     throw new Error(
-      `协议不匹配: daemon v${cfg.protocol} vs cli v${PROTOCOL_VERSION}，运行 browsercli -s=${opts.session} close 后重新 open`,
+      `协议不匹配: daemon v${cfg.protocol} vs cli v${PROTOCOL_VERSION}，运行 browsercli -s=${opts.session} stop 后重新 start`,
     );
   }
   return cfg;
 }
 
-/** 检查系统进程列表中指定 PID 是否仍存活。 */
-export function isPidAlive(pid: number): boolean {
-  if (!Number.isInteger(pid) || pid <= 0) return false;
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (error) {
-    return (error as NodeJS.ErrnoException).code === 'EPERM';
-  }
-}
-
-/** 跨平台强杀指定 PID 的进程。 */
-export function killPidForce(pid: number): void {
-  if (!isPidAlive(pid)) return;
-  try {
-    if (process.platform === 'win32') {
-      execFileSync('taskkill', ['/PID', String(pid), '/F'], {
-        stdio: 'ignore',
-      });
-    } else {
-      process.kill(pid, 'SIGKILL');
-    }
-  } catch {
-    // 忽略进程退出竞争或无权限
-  }
-}
+export {isPidAlive, killPidForce};
 
 /** 发现 → 探活 → 陈旧则清理并自动拉起（带跨进程并发互斥锁防重）。 */
 export async function ensureDaemon(
@@ -715,7 +692,7 @@ export async function verifyDaemonVersion(
     );
     conn.close();
     if (status?.version && status.version !== cliVersion) {
-      return `Warning: Daemon server version (${status.version}) does not match CLI version (${cliVersion}). Run 'browsercli -s=${session} close' to update and restart the daemon.`;
+      return `Warning: Daemon server version (${status.version}) does not match CLI version (${cliVersion}). Run 'browsercli -s=${session} stop' to update and restart the daemon.`;
     }
   } catch {
     // 忽略探活时的偶发通讯错误，由命令自身处理错误

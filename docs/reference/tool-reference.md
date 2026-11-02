@@ -32,7 +32,7 @@
   - [`list_websocket_connections`](#list_websocket_connections)
   - [`replay_network_request`](#replay_network_request)
   - [`replay_network_request_batch`](#replay_network_request_batch)
-- **[Debugging](#debugging)** (19 tools)
+- **[Debugging](#debugging)** (21 tools)
   - [`evaluate_on_callframe`](#evaluate_on_callframe)
   - [`evaluate_script`](#evaluate_script)
   - [`get_console_message`](#get_console_message)
@@ -43,6 +43,8 @@
   - [`list_console_messages`](#list_console_messages)
   - [`list_frames`](#list_frames)
   - [`pause`](#pause)
+  - [`record_start`](#record_start)
+  - [`record_stop`](#record_stop)
   - [`remove_breakpoint`](#remove_breakpoint)
   - [`resume`](#resume)
   - [`reveal_in_devtools`](#reveal_in_devtools)
@@ -93,6 +95,8 @@
   - [`emulate_mobile`](#emulate_mobile)
   - [`emulate_network`](#emulate_network)
   - [`resize_page`](#resize_page)
+- **[Screenshot](#screenshot)** (1 tools)
+  - [`video`](#video)
 - **[Pages](#pages)** (3 tools)
   - [`check_browser_health`](#check_browser_health)
   - [`detect_captcha`](#detect_captcha)
@@ -235,6 +239,7 @@
 
 **Parameters:**
 
+- `mode`
 - `verbose`
 - `interestingOnly`
 
@@ -447,6 +452,14 @@
 ### `pause` — 暂停执行
 
 **Description:** 暂停 JavaScript 执行。用于中断运行中的代码。
+
+### `record_start` — 开始轨迹录制
+
+**Description:** 启动用户交互轨迹录制器。在当前活动页面注入监听，实时捕获点击、输入、改动等行为，准备与网络请求关联沉淀 Operation Evidence。
+
+### `record_stop` — 停止轨迹录制
+
+**Description:** 停止用户交互轨迹录制器，提取记录的所有用户点击/输入步骤，并与捕获的网络因果请求关联输出 Operation Evidence。
 
 ### `remove_breakpoint` — 移除断点
 
@@ -909,6 +922,25 @@
 
 - `width`
 - `height`
+
+## Screenshot
+
+### `video` — 视频录制
+
+**Description:** Record and manage browser session video via CDP screencast. Supports start, stop, status, save, read, list, discard, and capabilities.
+
+**Parameters:**
+
+- `action`
+- `recording_id`
+- `tab_id`
+- `session_id`
+- `quality`
+- `max_duration_ms`
+- `request_id`
+- `output`
+- `overwrite`
+- `offset`
 
 ## Pages
 

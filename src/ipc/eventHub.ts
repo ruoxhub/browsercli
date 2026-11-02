@@ -14,7 +14,7 @@
 /**
  * 状态类频道：订阅时立即回放最新快照（lastState），后续仅在状态变化时推送。
  */
-export type StateChannel = 'worker.status' | 'browser.event';
+export type StateChannel = 'worker.status';
 
 /**
  * 流式频道：订阅后只推增量事件，不回放历史。
@@ -27,10 +27,7 @@ export type StreamChannel =
 
 export type Channel = StateChannel | StreamChannel;
 
-export const STATE_CHANNELS: readonly StateChannel[] = [
-  'worker.status',
-  'browser.event',
-];
+export const STATE_CHANNELS: readonly StateChannel[] = ['worker.status'];
 
 const STATE_CHANNEL_SET: ReadonlySet<Channel> = new Set<Channel>(
   STATE_CHANNELS,

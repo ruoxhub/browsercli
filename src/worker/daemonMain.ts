@@ -75,18 +75,18 @@ function readPackageVersion(): string {
   return '0.0.0';
 }
 
-/** 播种配置：CLI/env flag → 透传 spawnFlags → 上次持久化的连接设置。 */
-function seedConfig(plan: DaemonPlan): GlobalConfig {
+/** 播种配置：上次持久化的连接设置（保底回填）→ 透传 spawnFlags 与 minimalStealth（显式 CLI 输入最高优先级）。 */
+export function seedConfig(plan: DaemonPlan): GlobalConfig {
+  const cached = loadCachedRuntimeConfig();
+  if (cached) {
+    getRuntimeConfigStore().update(cached);
+  }
   const cliConfig = parseWorkerArgs(plan.spawnFlags);
   const seed: GlobalConfig = {...cliConfig};
   if (plan.minimalStealth) {
     seed.browser = {...(seed.browser ?? {}), minimalStealth: true};
   }
   getRuntimeConfigStore().update(seed);
-  const cached = loadCachedRuntimeConfig();
-  if (cached) {
-    getRuntimeConfigStore().update(cached);
-  }
   return cliConfig;
 }
 
