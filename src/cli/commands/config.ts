@@ -81,7 +81,7 @@ function resolveMerged(): CliConfig {
     ...file,
     workerEntry:
       process.env.BROWSERCLI_ENTRY ??
-      process.env.BROWSERCLI_ENTRY ??
+      process.env.PROXYCLI_ENTRY ??
       file.workerEntry,
   };
 }

@@ -5,9 +5,19 @@
  */
 
 import assert from 'node:assert/strict';
-import {describe, it} from 'node:test';
+import {existsSync, rmSync} from 'node:fs';
+import {afterEach, beforeEach, describe, it} from 'node:test';
 
+import {
+  getRuntimeConfigStore,
+  resetRuntimeConfigStore,
+} from '../../../src/config/RuntimeConfigStore.js';
+import {
+  persistRuntimeConfig,
+  RUNTIME_CONFIG_PATH,
+} from '../../../src/config/runtimeConfigPersistence.js';
 import {buildDaemonArgPlan} from '../../../src/ipc/daemonArgs.js';
+import {seedConfig} from '../../../src/worker/daemonMain.js';
 
 describe('buildDaemonArgPlan', () => {
   it('consumes daemon-only tokens and keeps the rest for parseWorkerArgs', () => {
@@ -84,3 +94,37 @@ describe('buildDaemonArgPlan', () => {
     assert.deepEqual(plan.spawnFlags, []);
   });
 });
+
+describe('seedConfig priority', () => {
+  beforeEach(() => {
+    resetRuntimeConfigStore();
+    if (existsSync(RUNTIME_CONFIG_PATH)) rmSync(RUNTIME_CONFIG_PATH);
+  });
+
+  afterEach(() => {
+    resetRuntimeConfigStore();
+    if (existsSync(RUNTIME_CONFIG_PATH)) rmSync(RUNTIME_CONFIG_PATH);
+  });
+
+  it('explicit spawnFlags override cached runtime config', () => {
+    // 模拟上次持久化的配置（例如连接到 9222）
+    persistRuntimeConfig({
+      browser: {browserURL: 'http://127.0.0.1:9222', headless: false},
+    });
+
+    // 本次显式启动传入不同的 URL 和 headless flag
+    const plan = buildDaemonArgPlan([
+      '--daemon',
+      '--browserUrl=http://127.0.0.1:9555',
+      '--headless',
+    ]);
+
+    seedConfig(plan);
+
+    const effective = getRuntimeConfigStore().get();
+    assert.equal(effective.browserUrl, 'http://127.0.0.1:9555');
+    assert.equal(effective.headless, true);
+  });
+});
+
+

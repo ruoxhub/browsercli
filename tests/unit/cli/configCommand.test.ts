@@ -35,4 +35,23 @@ describe('configCommand isolate_workspace', () => {
     const cfg = loadCliConfig();
     assert.equal(cfg.isolate_workspace, 'true');
   });
+
+  it('resolves workerEntry with PROXYCLI_ENTRY fallback when BROWSERCLI_ENTRY is unset', async () => {
+    const prevBcli = process.env.BROWSERCLI_ENTRY;
+    const prevProxy = process.env.PROXYCLI_ENTRY;
+    delete process.env.BROWSERCLI_ENTRY;
+    process.env.PROXYCLI_ENTRY = 'build/proxy-worker.js';
+    try {
+      const ctx = {session: 'default'} as WorkerContext;
+      const res = (await configCommand(['--get', 'workerEntry'], ctx)) as {
+        value: unknown;
+      };
+      assert.equal(res.value, 'build/proxy-worker.js');
+    } finally {
+      if (prevBcli !== undefined) process.env.BROWSERCLI_ENTRY = prevBcli;
+      else delete process.env.BROWSERCLI_ENTRY;
+      if (prevProxy !== undefined) process.env.PROXYCLI_ENTRY = prevProxy;
+      else delete process.env.PROXYCLI_ENTRY;
+    }
+  });
 });
