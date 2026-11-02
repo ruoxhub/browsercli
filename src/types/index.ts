@@ -346,13 +346,19 @@ export interface HookRecord {
   [key: string]: unknown;
 }
 
-// ==================== 浏览器上下文类型 ====================
+// ==================== 浏览器页面快照类型 ====================
 
-export interface BrowserContext {
+/**
+ * 浏览器页面快照（注意区别于 Patchright/Playwright 的 BrowserContext 上下文实例）
+ */
+export interface BrowserPageSnapshot {
   browser: Browser;
   page: Page;
   url: string;
 }
+
+/** @deprecated 请使用 BrowserPageSnapshot，保留以兼容旧代码引用 */
+export type BrowserContext = BrowserPageSnapshot;
 
 // ==================== 通用结果类型 ====================
 

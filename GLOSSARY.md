@@ -47,3 +47,19 @@ _Avoid_: Workspace, server instance, background job, worker thread
 **Lifecycle Commands**:
 The triad of CLI commands (`start`, `stop`, `status`) modeled after `chrome-devtools` for managing daemon sessions and inspecting browser connections.
 _Avoid_: Session commands, daemon controls, process managers
+
+**Runtime Configuration**:
+The in-memory dynamic configuration maintained by `RuntimeConfigStore` and optionally cached to `~/.browsercli/runtime-config.json` across worker restarts, adhering to strict precedence: explicit CLI flags > environment variables > cached runtime config > user configuration (`~/.browsercli/config.json`) > system defaults.
+_Avoid_: Static config, global options, session flags
+
+**Job Store**:
+The daemon-side memory store for async and long-running execution tasks, supporting query and result retrieval across client calls.
+_Avoid_: Task queue, background worker table
+
+**Worker Activity Coordination**:
+The synchronization mechanism (`WorkerActivityCoordinator`) that arbitrates concurrent tool invocations, active network/CDP subscriptions, and idle state detection to ensure orderly worker shutdown.
+_Avoid_: Activity monitor, idle watcher
+
+**Browser Page Snapshot**:
+A plain object `{ browser, page, url }` capturing the active browser instance, current page, and location at an inspection boundary, distinct from the driver's native `BrowserContext`.
+_Avoid_: BrowserContext (internal alias), page handle

@@ -132,7 +132,7 @@ describe('UnifiedCacheManager extended', () => {
     manager.unregisterCache('large-hit');
   });
 
-  it('runs cleanupExpired, clearAll and preheat without errors', async () => {
+  it('runs cleanupExpired and clearAll without errors', async () => {
     const manager = UnifiedCacheManager.getInstance();
     let cleanupCount = 0;
     let clearCount = 0;
@@ -149,7 +149,6 @@ describe('UnifiedCacheManager extended', () => {
 
     await (manager as unknown as ExtendedUnifiedCacheManager).cleanupExpired();
     await manager.clearAll();
-    await manager.preheat(['https://a.example', 'https://b.example']);
 
     assert.ok(cleanupCount >= 1);
     assert.ok(clearCount >= 1);

@@ -345,18 +345,6 @@ export class UnifiedCacheManager {
   }
 
   /**
-   * 缓存预热
-   */
-  async preheat(urls: string[]): Promise<void> {
-    logger.info(`Preheating cache for ${urls.length} URLs...`);
-
-    // 这里可以触发代码收集等操作
-    // 具体实现取决于业务需求
-
-    logger.info('Cache preheat completed');
-  }
-
-  /**
    * 生成建议
    */
   private generateRecommendations(
