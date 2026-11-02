@@ -424,13 +424,15 @@ test('isDaemonRunning 与 verifyDaemonVersion 正确探活与核验版本', asyn
     const noWarn = await verifyDaemonVersion(session, '2.0.0', daemonDir);
     assert.strictEqual(noWarn, undefined);
 
-    // verifyDaemonVersion: 版本不一致时返回 warning 文本
+    // verifyDaemonVersion: 版本不一致时返回 warning 文本，且提示使用 stop 命令而非已废弃的 close
     const warn = await verifyDaemonVersion(session, '1.0.0', daemonDir);
     assert.ok(warn);
     assert.match(
       warn,
       /Warning: Daemon server version \(2\.0\.0\) does not match CLI version \(1\.0\.0\)/,
     );
+    assert.match(warn, new RegExp(`browsercli -s=${session} stop`));
+    assert.doesNotMatch(warn, /close/);
   } finally {
     await server.close();
     fs.rmSync(workspace, {recursive: true, force: true});

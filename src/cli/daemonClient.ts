@@ -383,7 +383,7 @@ export async function spawnDaemon(
   if (!cfg) throw new Error('daemon 就绪但 session 文件缺失');
   if (cfg.protocol !== PROTOCOL_VERSION) {
     throw new Error(
-      `协议不匹配: daemon v${cfg.protocol} vs cli v${PROTOCOL_VERSION}，运行 browsercli -s=${opts.session} close 后重新 open`,
+      `协议不匹配: daemon v${cfg.protocol} vs cli v${PROTOCOL_VERSION}，运行 browsercli -s=${opts.session} stop 后重新 start`,
     );
   }
   return cfg;
@@ -692,7 +692,7 @@ export async function verifyDaemonVersion(
     );
     conn.close();
     if (status?.version && status.version !== cliVersion) {
-      return `Warning: Daemon server version (${status.version}) does not match CLI version (${cliVersion}). Run 'browsercli -s=${session} close' to update and restart the daemon.`;
+      return `Warning: Daemon server version (${status.version}) does not match CLI version (${cliVersion}). Run 'browsercli -s=${session} stop' to update and restart the daemon.`;
     }
   } catch {
     // 忽略探活时的偶发通讯错误，由命令自身处理错误
