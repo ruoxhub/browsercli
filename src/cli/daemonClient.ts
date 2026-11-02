@@ -22,6 +22,8 @@ import {
   cliConfigPath,
   computeClientInfo,
   deleteSession,
+  isPidAlive,
+  killPidForce,
   loadCliConfig,
   loadSession,
   type CliConfig,
@@ -387,32 +389,7 @@ export async function spawnDaemon(
   return cfg;
 }
 
-/** 检查系统进程列表中指定 PID 是否仍存活。 */
-export function isPidAlive(pid: number): boolean {
-  if (!Number.isInteger(pid) || pid <= 0) return false;
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (error) {
-    return (error as NodeJS.ErrnoException).code === 'EPERM';
-  }
-}
-
-/** 跨平台强杀指定 PID 的进程。 */
-export function killPidForce(pid: number): void {
-  if (!isPidAlive(pid)) return;
-  try {
-    if (process.platform === 'win32') {
-      execFileSync('taskkill', ['/PID', String(pid), '/F'], {
-        stdio: 'ignore',
-      });
-    } else {
-      process.kill(pid, 'SIGKILL');
-    }
-  } catch {
-    // 忽略进程退出竞争或无权限
-  }
-}
+export {isPidAlive, killPidForce};
 
 /** 发现 → 探活 → 陈旧则清理并自动拉起（带跨进程并发互斥锁防重）。 */
 export async function ensureDaemon(

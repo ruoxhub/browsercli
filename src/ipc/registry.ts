@@ -5,28 +5,28 @@
  */
 
 /**
- * Daemon 会话注册表。与 browsercli/src/sessionPaths.ts 配对，
- * 两侧的路径算法（base dir / workspace 探测 / hash / 管道名）必须保持同步。
+ * Daemon 会话注册表门面。
+ * 共享核心实现统一收敛于 src/cli/sessionPaths.ts，本模块保留并转接原有导出以兼容 Worker 及测试。
  */
 
-import {execFileSync} from 'node:child_process';
-import crypto from 'node:crypto';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 
-import {pipePath} from './socketConnection.js';
-
-export interface SessionConfig {
-  name: string;
-  version: string;
-  protocol: number;
-  timestamp: number;
-  socketPath: string;
-  pid: number;
-  workspaceDir?: string;
-  consolePort?: number;
-}
+import {
+  assertValidSessionName,
+  computeBaseDaemonDir,
+  computeClientInfo,
+  computeWorkspaceDir,
+  explicitSessionName,
+  isPidAlive,
+  isWorkspaceIsolationEnabled,
+  killPidForce,
+  loadSession,
+  makePipePath,
+  resolveSessionName,
+  type ClientInfo,
+  type SessionConfig,
+} from '../cli/sessionPaths.js';
 
 export interface SessionFile {
   file: string;
@@ -34,144 +34,20 @@ export interface SessionFile {
   config: SessionConfig;
 }
 
-export interface ClientInfo {
-  version: string;
-  workspaceDir: string;
-  workspaceDirHash: string;
-  daemonDir: string;
-}
-
-export function computeWorkspaceDir(startDir: string): string {
-  // 显式覆盖：任意目录/会话都路由到同一个 workspace（与 CLI 侧 sessionPaths.ts 同步）
-  const override =
-    process.env.BROWSERCLI_WORKSPACE ?? process.env.PROXYCLI_WORKSPACE;
-  if (override) return path.resolve(override);
-  let dir = path.resolve(startDir);
-  for (let i = 0; i < 10; i++) {
-    if (
-      fs.existsSync(path.join(dir, '.browsercli')) ||
-      fs.existsSync(path.join(dir, '.proxycli'))
-    )
-      return dir;
-    const parent = path.dirname(dir);
-    if (parent === dir) break;
-    dir = parent;
-  }
-  dir = path.resolve(startDir);
-  for (let i = 0; i < 10; i++) {
-    if (fs.existsSync(path.join(dir, 'package.json'))) return dir;
-    const parent = path.dirname(dir);
-    if (parent === dir) break;
-    dir = parent;
-  }
-  return path.resolve(startDir);
-}
-
-function computeBaseDaemonDir(): string {
-  const custom =
-    process.env.BROWSERCLI_DAEMON_DIR ?? process.env.PROXYCLI_DAEMON_DIR;
-  if (custom) return custom;
-  let cache: string;
-  if (process.platform === 'linux')
-    cache = process.env.XDG_CACHE_HOME || path.join(os.homedir(), '.cache');
-  else if (process.platform === 'darwin')
-    cache = path.join(os.homedir(), 'Library', 'Caches');
-  else
-    cache =
-      process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local');
-  return path.join(cache, 'browsercli', 'daemon');
-}
-
-function cliConfigPath(): string {
-  const custom =
-    process.env.BROWSERCLI_CONFIG_DIR ?? process.env.PROXYCLI_CONFIG_DIR;
-  if (custom) return path.join(custom, 'config.json');
-  const browserDir = path.join(os.homedir(), '.browsercli');
-  if (fs.existsSync(browserDir)) return path.join(browserDir, 'config.json');
-  const proxyDir = path.join(os.homedir(), '.proxycli');
-  if (fs.existsSync(proxyDir)) return path.join(proxyDir, 'config.json');
-  return path.join(browserDir, 'config.json');
-}
-
-function loadCliConfig(): Record<string, string> {
-  try {
-    const parsed = JSON.parse(fs.readFileSync(cliConfigPath(), 'utf-8'));
-    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-      return parsed as Record<string, string>;
-    }
-  } catch {
-    // 无配置文件或损坏 → 视为空
-  }
-  return {};
-}
-
-export function isWorkspaceIsolationEnabled(): boolean {
-  if (process.env.BROWSERCLI_WORKSPACE || process.env.PROXYCLI_WORKSPACE) {
-    return true;
-  }
-  const envOverride =
-    process.env.BROWSERCLI_ISOLATE_WORKSPACE ??
-    process.env.PROXYCLI_ISOLATE_WORKSPACE;
-  if (envOverride !== undefined) {
-    return envOverride === 'true' || envOverride === '1';
-  }
-  const cfg = loadCliConfig();
-  return cfg.isolate_workspace === 'true' || cfg.isolate_workspace === '1';
-}
-
-export function computeClientInfo(
-  startDir?: string,
-  version = '0.0.0',
-): ClientInfo {
-  if (!isWorkspaceIsolationEnabled()) {
-    const baseDir = computeBaseDaemonDir();
-    return {
-      version,
-      workspaceDir: baseDir,
-      workspaceDirHash: 'global',
-      daemonDir: path.join(baseDir, 'global'),
-    };
-  }
-  const workspaceDir = computeWorkspaceDir(startDir ?? process.cwd());
-  const hashAlgo = ['sha', '1'].join('');
-  const workspaceDirHash = crypto
-    .createHash(hashAlgo)
-    .update(workspaceDir)
-    .digest('hex')
-    .slice(0, 16);
-  return {
-    version,
-    workspaceDir,
-    workspaceDirHash,
-    daemonDir: path.join(computeBaseDaemonDir(), workspaceDirHash),
-  };
-}
-
-export function assertValidSessionName(name: string): void {
-  if (!name) return;
-  if (!/^[a-zA-Z0-9_-]+$/.test(name)) {
-    throw new Error(
-      `Invalid session name: "${name}". Session name must contain only alphanumeric characters, dashes, and underscores.`,
-    );
-  }
-}
-
-export function makePipePath(dirHash: string, sessionName: string): string {
-  assertValidSessionName(sessionName);
-  if (process.platform === 'win32')
-    return pipePath(`browsercli-${dirHash}-${sessionName}`);
-  return path.join(os.tmpdir(), `browsercli-${dirHash}-${sessionName}.sock`);
-}
-
-export function explicitSessionName(name?: string): string | undefined {
-  return name || process.env.BROWSERCLI_SESSION || process.env.PROXYCLI_SESSION;
-}
-
-export function resolveSessionName(name?: string): string {
-  const resolved = explicitSessionName(name) ?? 'default';
-  assertValidSessionName(resolved);
-  return resolved;
-}
+export {
+  assertValidSessionName,
+  computeBaseDaemonDir,
+  computeClientInfo,
+  computeWorkspaceDir,
+  explicitSessionName,
+  isPidAlive,
+  isWorkspaceIsolationEnabled,
+  killPidForce,
+  makePipePath,
+  resolveSessionName,
+  type ClientInfo,
+  type SessionConfig,
+};
 
 export async function saveSessionFile(
   info: ClientInfo,
@@ -189,17 +65,14 @@ export async function loadSessionFile(
   name: string,
 ): Promise<SessionFile | undefined> {
   assertValidSessionName(name);
-  try {
-    const file = path.join(info.daemonDir, `${name}.session`);
-    const data = await fs.promises.readFile(file, 'utf-8');
-    return {
-      file,
-      daemonDir: info.daemonDir,
-      config: JSON.parse(data) as SessionConfig,
-    };
-  } catch {
-    return undefined;
-  }
+  const config = await loadSession(info.daemonDir, name);
+  if (!config) return undefined;
+  const file = path.join(info.daemonDir, `${name}.session`);
+  return {
+    file,
+    daemonDir: info.daemonDir,
+    config,
+  };
 }
 
 export async function listSessionFiles(
@@ -216,31 +89,4 @@ export async function listSessionFiles(
 
 export async function deleteSessionFile(sf: SessionFile): Promise<void> {
   await fs.promises.rm(sf.file, {force: true}).catch(() => undefined);
-}
-
-/** 检查指定 PID 是否在当前系统运行。 */
-export function isPidAlive(pid: number): boolean {
-  if (!Number.isInteger(pid) || pid <= 0) return false;
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (error) {
-    return (error as NodeJS.ErrnoException).code === 'EPERM';
-  }
-}
-
-/** 跨平台强杀指定 PID 的进程。 */
-export function killPidForce(pid: number): void {
-  if (!isPidAlive(pid)) return;
-  try {
-    if (process.platform === 'win32') {
-      execFileSync('taskkill', ['/PID', String(pid), '/F'], {
-        stdio: 'ignore',
-      });
-    } else {
-      process.kill(pid, 'SIGKILL');
-    }
-  } catch {
-    // 忽略已退出或无权限
-  }
 }

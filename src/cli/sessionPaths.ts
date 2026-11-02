@@ -5,11 +5,10 @@
  */
 
 /**
- * Daemon 会话注册表的路径/哈希计算。与 worker 侧 src/ipc/registry.ts 配对，
- * 两侧的路径算法（base dir / workspace 探测 / hash / 管道名）必须保持同步。
- * 两包零耦合，此处为有意的最小复制（无 save 侧写逻辑，CLI 只读注册表）。
+ * Daemon 会话注册表的路径/哈希计算。统一作为 CLI 与 Worker 侧的 Single Source of Truth。
  */
 
+import {execFileSync} from 'node:child_process';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -30,6 +29,7 @@ export interface ClientInfo {
   workspaceDir: string;
   workspaceDirHash: string;
   daemonDir: string;
+  version?: string;
 }
 
 export function computeWorkspaceDir(startDir: string): string {
@@ -58,7 +58,7 @@ export function computeWorkspaceDir(startDir: string): string {
   return path.resolve(startDir);
 }
 
-function computeBaseDaemonDir(): string {
+export function computeBaseDaemonDir(): string {
   const custom =
     process.env.BROWSERCLI_DAEMON_DIR ?? process.env.PROXYCLI_DAEMON_DIR;
   if (custom) return custom;
@@ -123,10 +123,14 @@ export function isWorkspaceIsolationEnabled(): boolean {
   return cfg.isolate_workspace === 'true' || cfg.isolate_workspace === '1';
 }
 
-export function computeClientInfo(startDir?: string): ClientInfo {
+export function computeClientInfo(
+  startDir?: string,
+  version = '0.0.0',
+): ClientInfo {
   if (!isWorkspaceIsolationEnabled()) {
     const baseDir = computeBaseDaemonDir();
     return {
+      version,
       workspaceDir: baseDir,
       workspaceDirHash: 'global',
       daemonDir: path.join(baseDir, 'global'),
@@ -140,6 +144,7 @@ export function computeClientInfo(startDir?: string): ClientInfo {
     .digest('hex')
     .slice(0, 16);
   return {
+    version,
     workspaceDir,
     workspaceDirHash,
     daemonDir: path.join(computeBaseDaemonDir(), workspaceDirHash),
@@ -208,4 +213,31 @@ export async function deleteSession(
   await fs.promises
     .rm(path.join(daemonDir, `${name}.session`), {force: true})
     .catch(() => undefined);
+}
+
+/** 检查指定 PID 是否在当前系统运行。 */
+export function isPidAlive(pid: number): boolean {
+  if (!Number.isInteger(pid) || pid <= 0) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === 'EPERM';
+  }
+}
+
+/** 跨平台强杀指定 PID 的进程。 */
+export function killPidForce(pid: number): void {
+  if (!isPidAlive(pid)) return;
+  try {
+    if (process.platform === 'win32') {
+      execFileSync('taskkill', ['/PID', String(pid), '/F'], {
+        stdio: 'ignore',
+      });
+    } else {
+      process.kill(pid, 'SIGKILL');
+    }
+  } catch {
+    // 忽略已退出或无权限
+  }
 }
