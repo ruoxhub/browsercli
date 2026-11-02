@@ -52,7 +52,10 @@ export class PageSnapshotManager {
   private readonly pageSnapshots = new WeakMap<object, TextSnapshotResult>();
   private readonly nodeLocators = new WeakMap<
     object,
-    Map<string, {selector?: string; role?: string; name?: string; x?: number; y?: number}>
+    Map<
+      string,
+      {selector?: string; role?: string; name?: string; x?: number; y?: number}
+    >
   >();
 
   /**
@@ -136,107 +139,124 @@ export class PageSnapshotManager {
   ): Promise<TextSnapshotResult> {
     const snapshotId = String(this.nextSnapshotId++);
 
-    const evaluated = await page.evaluate((): {
-      viewport: {width: number; height: number};
-      nodes: InPageVomRawNode[];
-    } => {
-      const vw = window.innerWidth || document.documentElement.clientWidth || 1280;
-      const vh = window.innerHeight || document.documentElement.clientHeight || 720;
+    const evaluated = await page.evaluate(
+      (): {
+        viewport: {width: number; height: number};
+        nodes: InPageVomRawNode[];
+      } => {
+        const vw =
+          window.innerWidth || document.documentElement.clientWidth || 1280;
+        const vh =
+          window.innerHeight || document.documentElement.clientHeight || 720;
 
-      const elements = Array.from(document.querySelectorAll('*'));
-      let idGen = 1;
-      const elToId = new Map<Element, number>();
+        const elements = Array.from(document.querySelectorAll('*'));
+        let idGen = 1;
+        const elToId = new Map<Element, number>();
 
-      const rawNodes: InPageVomRawNode[] = [];
+        const rawNodes: InPageVomRawNode[] = [];
 
-      for (const el of elements) {
-        const id = idGen++;
-        elToId.set(el, id);
-      }
-
-      for (const el of elements) {
-        const id = elToId.get(el)!;
-        const parentId = el.parentElement ? elToId.get(el.parentElement) ?? null : null;
-        const tag = el.tagName.toLowerCase();
-        const style = window.getComputedStyle(el);
-
-        if (style.display === 'none' || style.visibility === 'hidden') {
-          continue;
+        for (const el of elements) {
+          const id = idGen++;
+          elToId.set(el, id);
         }
 
-        const bcr = el.getBoundingClientRect();
-        const rect = {
-          x: Math.round(bcr.left),
-          y: Math.round(bcr.top),
-          w: Math.round(bcr.width),
-          h: Math.round(bcr.height),
-        };
+        for (const el of elements) {
+          const id = elToId.get(el)!;
+          const parentId = el.parentElement
+            ? (elToId.get(el.parentElement) ?? null)
+            : null;
+          const tag = el.tagName.toLowerCase();
+          const style = window.getComputedStyle(el);
 
-        const role = el.getAttribute('role') || undefined;
-        const name =
-          el.getAttribute('aria-label') ||
-          el.getAttribute('title') ||
-          el.getAttribute('placeholder') ||
-          (el instanceof HTMLInputElement || el instanceof HTMLButtonElement
-            ? el.value
-            : undefined) ||
-          undefined;
+          if (style.display === 'none' || style.visibility === 'hidden') {
+            continue;
+          }
 
-        const isInput = tag === 'input' || tag === 'textarea' || tag === 'select';
-        const isButton =
-          tag === 'button' ||
-          role === 'button' ||
-          (tag === 'input' && (el.getAttribute('type') === 'button' || el.getAttribute('type') === 'submit'));
-        const isLink = tag === 'a' && el.hasAttribute('href');
-        const isClickable =
-          isButton ||
-          isLink ||
-          isInput ||
-          style.cursor === 'pointer' ||
-          el.hasAttribute('onclick');
+          const bcr = el.getBoundingClientRect();
+          const rect = {
+            x: Math.round(bcr.left),
+            y: Math.round(bcr.top),
+            w: Math.round(bcr.width),
+            h: Math.round(bcr.height),
+          };
 
-        const isModal =
-          tag === 'dialog' ||
-          role === 'dialog' ||
-          role === 'alertdialog' ||
-          el.getAttribute('aria-modal') === 'true';
+          const role = el.getAttribute('role') || undefined;
+          const name =
+            el.getAttribute('aria-label') ||
+            el.getAttribute('title') ||
+            el.getAttribute('placeholder') ||
+            (el instanceof HTMLInputElement || el instanceof HTMLButtonElement
+              ? el.value
+              : undefined) ||
+            undefined;
 
-        // 生成相对唯一的 CSS 选择器或辅助定位信息
-        let selector: string | undefined;
-        if (el.id) {
-          selector = `#${CSS.escape(el.id)}`;
-        } else if (name) {
-          selector = `[aria-label="${CSS.escape(name)}"]`;
+          const isInput =
+            tag === 'input' || tag === 'textarea' || tag === 'select';
+          const isButton =
+            tag === 'button' ||
+            role === 'button' ||
+            (tag === 'input' &&
+              (el.getAttribute('type') === 'button' ||
+                el.getAttribute('type') === 'submit'));
+          const isLink = tag === 'a' && el.hasAttribute('href');
+          const isClickable =
+            isButton ||
+            isLink ||
+            isInput ||
+            style.cursor === 'pointer' ||
+            el.hasAttribute('onclick');
+
+          const isModal =
+            tag === 'dialog' ||
+            role === 'dialog' ||
+            role === 'alertdialog' ||
+            el.getAttribute('aria-modal') === 'true';
+
+          // 生成相对唯一的 CSS 选择器或辅助定位信息
+          let selector: string | undefined;
+          if (el.id) {
+            selector = `#${CSS.escape(el.id)}`;
+          } else if (name) {
+            selector = `[aria-label="${CSS.escape(name)}"]`;
+          }
+
+          const node: InPageVomRawNode = {
+            id,
+            parentId,
+            tag,
+            role: role ?? (isButton ? 'button' : isLink ? 'link' : undefined),
+            name:
+              name ??
+              (el.childElementCount === 0
+                ? el.textContent?.trim().slice(0, 80)
+                : undefined),
+            value:
+              isInput && el instanceof HTMLInputElement ? el.value : undefined,
+            text:
+              el.childElementCount === 0 ? el.textContent?.trim() : undefined,
+            rect: rect.w > 0 && rect.h > 0 ? rect : null,
+            paintOrder: id,
+            position: style.position || 'static',
+            pointerEvents: style.pointerEvents || 'auto',
+            clickable: isClickable,
+            modal: isModal,
+            disabled:
+              el.hasAttribute('disabled') ||
+              el.getAttribute('aria-disabled') === 'true',
+            focused: document.activeElement === el,
+            referenceable: isClickable || isInput,
+            selector,
+          };
+
+          rawNodes.push(node);
         }
 
-        const node: InPageVomRawNode = {
-          id,
-          parentId,
-          tag,
-          role: role ?? (isButton ? 'button' : isLink ? 'link' : undefined),
-          name: name ?? (el.childElementCount === 0 ? el.textContent?.trim().slice(0, 80) : undefined),
-          value: isInput && el instanceof HTMLInputElement ? el.value : undefined,
-          text: el.childElementCount === 0 ? el.textContent?.trim() : undefined,
-          rect: rect.w > 0 && rect.h > 0 ? rect : null,
-          paintOrder: id,
-          position: style.position || 'static',
-          pointerEvents: style.pointerEvents || 'auto',
-          clickable: isClickable,
-          modal: isModal,
-          disabled: el.hasAttribute('disabled') || el.getAttribute('aria-disabled') === 'true',
-          focused: document.activeElement === el,
-          referenceable: isClickable || isInput,
-          selector,
+        return {
+          viewport: {width: vw, height: vh},
+          nodes: rawNodes,
         };
-
-        rawNodes.push(node);
-      }
-
-      return {
-        viewport: {width: vw, height: vh},
-        nodes: rawNodes,
-      };
-    });
+      },
+    );
 
     const vomNodes: VomNode[] = evaluated.nodes.map(n => ({
       ...n,
@@ -254,7 +274,10 @@ export class PageSnapshotManager {
     });
 
     const idToNode = new Map<string, SnapshotNode>();
-    const locatorMap = new Map<string, {selector?: string; role?: string; name?: string; x?: number; y?: number}>();
+    const locatorMap = new Map<
+      string,
+      {selector?: string; role?: string; name?: string; x?: number; y?: number}
+    >();
 
     // 构建符合 SnapshotNode 协议的节点树以兼容现有定位体系
     const rootNode: SnapshotNode = {
@@ -267,7 +290,9 @@ export class PageSnapshotManager {
 
     let uidCounter = 1;
     for (const renderedRef of vomResult.refs) {
-      const rawNode = evaluated.nodes.find(n => n.id === renderedRef.id);
+      const rawNode = evaluated.nodes.find(
+        n => n.id === renderedRef.backendNodeId,
+      );
       const uid = `${snapshotId}_${uidCounter++}`;
       const snapNode: SnapshotNode = {
         id: uid,
@@ -370,7 +395,9 @@ export class PageSnapshotManager {
     return page.locator(`[aria-label="${name ?? ''}"]`);
   }
 
-  private normalizeRole(role?: string): Parameters<Page['getByRole']>[0] | undefined {
+  private normalizeRole(
+    role?: string,
+  ): Parameters<Page['getByRole']>[0] | undefined {
     if (!role) return undefined;
     const lower = role.toLowerCase() as Parameters<Page['getByRole']>[0];
     const validRoles = new Set<string>([

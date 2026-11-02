@@ -21,6 +21,7 @@ import {manifest as inputManifest} from './input/manifest.js';
 import {manifest as navigationManifest} from './navigation/manifest.js';
 import {manifest as networkManifest} from './network/manifest.js';
 import {manifest as pageManifest} from './page/manifest.js';
+import {manifest as recorderManifest} from './recorder/manifest.js';
 import {manifest as screenshotManifest} from './screenshot/manifest.js';
 import {manifest as scriptManifest} from './script/manifest.js';
 import {manifest as videoManifest} from './video/manifest.js';
@@ -42,6 +43,7 @@ export const GENERATED_DOMAIN_MANIFESTS = [
   navigationManifest,
   networkManifest,
   pageManifest,
+  recorderManifest,
   screenshotManifest,
   scriptManifest,
   videoManifest,
@@ -373,6 +375,14 @@ export const GENERATED_TOOL_REGISTRY = [
   {
     modulePath: './page/detectCaptcha.js',
     handlerName: 'detectCaptcha',
+  },
+  {
+    modulePath: './recorder/recordTools.js',
+    handlerName: 'recordStart',
+  },
+  {
+    modulePath: './recorder/recordTools.js',
+    handlerName: 'recordStop',
   },
   {
     modulePath: './screenshot/takeScreenshot.js',
