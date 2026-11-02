@@ -209,13 +209,9 @@ describe('daemon socket end-to-end', () => {
     assert.match(output, /UNKNOWN_TOOL/);
   });
 
-  it('call list_stealth_presets over socket returns valid structured data', () => {
-    const {stdout} = runCli([
-      `-s=${SESSION_NAME}`,
-      'call',
-      'list_stealth_presets',
-    ]);
-    assert.match(stdout, /list_stealth_presets/);
+  it('call list_pages over socket returns valid structured data', () => {
+    const {stdout} = runCli([`-s=${SESSION_NAME}`, 'call', 'list_pages']);
+    assert.match(stdout, /list_pages/);
     assert.match(stdout, /status:\s*success/);
   });
 

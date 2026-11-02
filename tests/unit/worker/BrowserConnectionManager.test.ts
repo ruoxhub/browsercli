@@ -343,6 +343,57 @@ describe('BrowserConnectionManager', () => {
     }
   });
 
+  it('deduplicates concurrent connectBrowser calls for the same target without WORKER_BUSY', async () => {
+    let releaseConnect!: () => void;
+    const connectGate = new Promise<void>(resolve => {
+      releaseConnect = resolve;
+    });
+
+    const resetMock = mock.method(
+      BrowserManager,
+      'resetInstance',
+      async () => undefined,
+    );
+    let ensureBrowserCallCount = 0;
+    const getInstanceMock = mock.method(BrowserManager, 'getInstance', () => ({
+      ensureBrowser: async () => {
+        ensureBrowserCallCount += 1;
+        await connectGate;
+        return {
+          isConnected: () => true,
+          contexts: () => [],
+        };
+      },
+      getContext: () => null,
+    }));
+
+    const contextProvider = {
+      isBrowserConnected: () => false,
+      getBrowser: () => null,
+      setBrowserManager: () => undefined,
+      setBrowser: () => undefined,
+      setContext: () => undefined,
+      clearContext: () => undefined,
+      init: async () => undefined,
+    };
+
+    try {
+      const config = {autoConnect: true};
+      const p1 = connectBrowser(contextProvider as never, config);
+      const p2 = connectBrowser(contextProvider as never, config);
+
+      releaseConnect();
+      const [r1, r2] = await Promise.all([p1, p2]);
+
+      assert.strictEqual(r1.connected, true);
+      assert.strictEqual(r2.connected, true);
+      assert.strictEqual(ensureBrowserCallCount, 1);
+    } finally {
+      resetMock.mock.restore();
+      getInstanceMock.mock.restore();
+    }
+  });
+
   it('disconnectBrowser resets instance and clears contextProvider browser', async () => {
     const resetMock = mock.method(BrowserManager, 'resetInstance', () =>
       Promise.resolve(),

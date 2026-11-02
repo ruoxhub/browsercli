@@ -58,7 +58,7 @@
 | `debugger`（21）                         | `debugger` 域（29 工具）+ `DebuggerManager`                                                     | 断点/单步/脚本源/对象检查/hook 均覆盖                                                                          |
 | `core`/`analysis`（25）                  | `analyzer`（8）+ `deobfuscator` + `crypto`（3）                                                 | LLM 去混淆 / 加密识别 / AST 理解均有                                                                           |
 | `instrumentation`（13）                  | `hook`（6）+ `crypto`（`hookCryptoJS`/`hookJSEncrypt`/`hookSMCrypto`）                          | JS Hook 是 Reverser 强项                                                                                       |
-| `v8-inspector`（22）                     | `src/modules/v8-inspector`                                                                      | 部分覆盖，堆快照/对象图深化可在 relied 场景单独评估                                                            |
+| `v8-inspector`（22）                     | `src/modules/v8-inspector`（模块已迁移，**未接线到工具层**）                                    | ⚠️ 模块代码在库（4,725 行），但全仓零外部引用、无对应工具，**当前不构成能力覆盖**；接线前不应计入复用          |
 | `wasm`（17）                             | `wasm` 域（10 工具）+ `wabt`                                                                    | dump/disassemble/decompile/vmpTrace/offlineRun 全覆盖                                                          |
 | `workflow`+`coordination`（12+12）       | `workflow`（9）+ `pipeline` + `advisor`                                                         | observeFlow/autoHook/rebuildBundle 对齐                                                                        |
 | `transform`（7）                         | `deobfuscator` + AST 工具链                                                                     | 字符串表 / CF 平坦化 / JSVMP 覆盖                                                                              |
@@ -140,5 +140,8 @@ jshookmcp 的三档 profile + 8 元工具 + 混合搜索（BM25+向量+亲和图
    域级结论不受个别工具数浮动影响。
 2. `4.1` 中「复用」判定的充分性基于目录清单 + 工具名语义，个别深实现（如 `v8-inspector` 的堆对象图）
    未逐函数核对，W 波次落地前仍须以「差距分析 + brainstorming」回填。
+   其中 `v8-inspector` 一项已核实：`src/modules/v8-inspector/` 13 个文件 4,725 行在库，但除自身单测外
+   **全仓零引用**，且工具层没有任何 `v8_*` / heap 工具 —— 能力写完了但未接进工具面，等于当前为零覆盖。
+   该项在接线前不应作为「已复用」证据。
 3. `canvas` 域的 skia-capture 与 Reverser 现有 `stealth`（指纹）的职责边界需在 W3 设计时明确，
    避免与「零 JS 注入哲学」冲突（canvas 捕获本身可能引入可被检测的读点）。

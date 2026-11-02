@@ -52,6 +52,39 @@ describe('take_screenshot', () => {
     assert.equal(output.content?.success, true);
   });
 
+  it('invokes preparePageForLongScreenshot when fullPage is true', async () => {
+    let prepared = false;
+    let restored = false;
+    const page = {
+      evaluateHandle: async () => {
+        prepared = true;
+        return {
+          restore: () => {
+            restored = true;
+          },
+        };
+      },
+      evaluate: async (fn: any, handle: any) => {
+        fn(handle);
+      },
+      screenshot: async (options: unknown) => {
+        assert.equal(prepared, true, 'page should be prepared before screenshot');
+        return Buffer.from('image');
+      },
+    };
+    const output = captureResponse();
+
+    await takeScreenshot.handler(
+      {params: {format: 'png', fullPage: true}} as never,
+      output.response as never,
+      {getSelectedPage: () => page} as never,
+    );
+
+    assert.equal(output.content?.success, true);
+    assert.equal(prepared, true);
+    assert.equal(restored, true);
+  });
+
   it('returns a structured timeout when rendering stays blocked', async () => {
     const page = {
       screenshot: async () => await new Promise<never>(() => undefined),

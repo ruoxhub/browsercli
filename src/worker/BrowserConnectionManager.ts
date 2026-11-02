@@ -44,6 +44,16 @@ export interface DisconnectBrowserOptions {
   force?: boolean;
 }
 
+let inFlightConnectPromise: Promise<ConnectResult> | null = null;
+let inFlightConnectTarget: BrowserManagerConfig | null = null;
+
+/**
+ * 获取当前正在执行中的浏览器连接目标配置（若有）。
+ */
+export function getInFlightBrowserConnectTarget(): BrowserManagerConfig | null {
+  return inFlightConnectTarget;
+}
+
 /**
  * 连接方式判定。
  */
@@ -132,20 +142,33 @@ export async function connectBrowser(
 
   // 幂等复用保护：若当前连接健康且未要求强制重连，且请求的目标配置与当前活跃连接一致，
   // 直接复用已有会话，避免主动 resetInstance() 掐断 WebSocket 导致 Chrome 反复弹出远程调试安全授权确认框。
-  if (!options.force && contextProvider.isBrowserConnected?.()) {
-    const existingBrowser = contextProvider.getBrowser?.();
-    if (
-      existingBrowser &&
-      (typeof existingBrowser.isConnected !== 'function' ||
-        existingBrowser.isConnected())
-    ) {
-      const activeConfig = contextProvider.getBrowserManager?.()?.getConfig?.();
-      if (!activeConfig || isSameBrowserTarget(activeConfig, config)) {
-        return {
-          connected: true,
-          mode: getBrowserConnectionMode(activeConfig ?? config),
-        };
+  if (!options.force) {
+    if (contextProvider.isBrowserConnected?.()) {
+      const existingBrowser = contextProvider.getBrowser?.();
+      if (
+        existingBrowser &&
+        (typeof existingBrowser.isConnected !== 'function' ||
+          existingBrowser.isConnected())
+      ) {
+        const activeConfig = contextProvider
+          .getBrowserManager?.()
+          ?.getConfig?.();
+        if (!activeConfig || isSameBrowserTarget(activeConfig, config)) {
+          return {
+            connected: true,
+            mode: getBrowserConnectionMode(activeConfig ?? config),
+          };
+        }
       }
+    }
+
+    // 并发去重：若当前已有针对相同目标的连接正在执行中，直接共享并等待该 Promise，避免并发锁竞争产生 WORKER_BUSY
+    if (
+      inFlightConnectPromise &&
+      inFlightConnectTarget &&
+      isSameBrowserTarget(inFlightConnectTarget, config)
+    ) {
+      return await inFlightConnectPromise;
     }
   }
 
@@ -155,45 +178,59 @@ export async function connectBrowser(
   const maxRetries = options.maxRetries ?? (isRemote ? 1 : 3);
   const initialDelayMs = options.initialDelayMs ?? 200;
 
-  return await workerActivityCoordinator.runBrowserOperation(
-    'connect',
-    async () => {
-      let lastError: unknown;
-      for (let attempt = 0; attempt < maxRetries; attempt++) {
-        try {
-          if ((await BrowserManager.resetInstance()) === false) {
-            throw new Error(
-              'Failed to tear down the previous browser before reconnecting',
-            );
-          }
-          contextProvider.setBrowser(null);
-          contextProvider.clearContext();
-          const manager = BrowserManager.getInstance(config);
-          const browser = await manager.ensureBrowser();
-          const context = manager.getContext() ?? browser.contexts()[0] ?? null;
+  const connectPromise = (async () => {
+    try {
+      return await workerActivityCoordinator.runBrowserOperation(
+        'connect',
+        async () => {
+          let lastError: unknown;
+          for (let attempt = 0; attempt < maxRetries; attempt++) {
+            try {
+              if ((await BrowserManager.resetInstance()) === false) {
+                throw new Error(
+                  'Failed to tear down the previous browser before reconnecting',
+                );
+              }
+              contextProvider.setBrowser(null);
+              contextProvider.clearContext();
+              const manager = BrowserManager.getInstance(config);
+              const browser = await manager.ensureBrowser();
+              const context =
+                manager.getContext() ?? browser.contexts()[0] ?? null;
 
-          contextProvider.setBrowserManager(manager);
-          contextProvider.setBrowser(browser);
-          if (context) {
-            contextProvider.setContext(context);
-          } else {
-            contextProvider.clearContext();
-          }
-          await contextProvider.init();
+              contextProvider.setBrowserManager(manager);
+              contextProvider.setBrowser(browser);
+              if (context) {
+                contextProvider.setContext(context);
+              } else {
+                contextProvider.clearContext();
+              }
+              await contextProvider.init();
 
-          const mode = getBrowserConnectionMode(config);
-          return {connected: true, mode};
-        } catch (err) {
-          lastError = err;
-          if (attempt < maxRetries - 1) {
-            const delay = initialDelayMs * Math.pow(2, attempt);
-            await new Promise(resolve => setTimeout(resolve, delay));
+              const mode = getBrowserConnectionMode(config);
+              return {connected: true, mode};
+            } catch (err) {
+              lastError = err;
+              if (attempt < maxRetries - 1) {
+                const delay = initialDelayMs * Math.pow(2, attempt);
+                await new Promise(resolve => setTimeout(resolve, delay));
+              }
+            }
           }
-        }
+          throw lastError;
+        },
+      );
+    } finally {
+      if (inFlightConnectPromise === connectPromise) {
+        inFlightConnectPromise = null;
+        inFlightConnectTarget = null;
       }
-      throw lastError;
-    },
-  );
+    }
+  })();
+
+  inFlightConnectPromise = connectPromise;
+  inFlightConnectTarget = config;
+  return await connectPromise;
 }
 
 /**
@@ -204,6 +241,8 @@ export async function disconnectBrowser(
   options: DisconnectBrowserOptions = {},
 ): Promise<void> {
   const disconnect = async () => {
+    inFlightConnectPromise = null;
+    inFlightConnectTarget = null;
     await BrowserManager.resetInstance();
     contextProvider.setBrowser(null);
     contextProvider.clearContext();

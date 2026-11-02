@@ -99,9 +99,6 @@ const ENV_MAP: Readonly<Record<string, keyof GlobalConfig>> = {
   BROWSER_OUTPUT_DIR: 'outputDir',
   BROWSER_RECORD_TOOL_RESULTS: 'toolResultRecording',
   BROWSER_TOOL_RESULTS_DIR: 'toolResultRecording',
-  SESSION_STATE_TTL_MS: 'sessionStateTtlMs',
-  SESSION_STATE_CLEANUP_INTERVAL_MS: 'sessionStateCleanupIntervalMs',
-  SESSION_STATE_ENCRYPTION_KEY: 'sessionStateEncryptionKey',
 };
 
 const BROWSER_ENV_MAP = {

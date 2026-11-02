@@ -60,6 +60,37 @@ describe('WorkerArgs', () => {
     });
   });
 
+  it('parses migrated chrome-devtools options into GlobalConfig', () => {
+    const config = parseWorkerArgs([
+      '-u',
+      'http://127.0.0.1:9222',
+      '--categoryNavigation=false',
+      '--no-categoryInput',
+      '--categoryDebugging',
+      '--proxyServer',
+      'http://10.0.0.1:8080',
+      '--screenshotFormat=webp',
+      '--screenshotMaxWidth=1280',
+      '--chromeArg=--no-sandbox,--disable-gpu',
+      '--blockedUrlPattern',
+      '*://adservice.google.com/*',
+      '--watchConfig',
+    ]);
+
+    assert.strictEqual(config.browserUrl, 'http://127.0.0.1:9222');
+    assert.strictEqual(config.categoryNavigation, false);
+    assert.strictEqual(config.categoryInput, false);
+    assert.strictEqual(config.categoryDebugging, true);
+    assert.strictEqual(config.proxyServer, 'http://10.0.0.1:8080');
+    assert.strictEqual(config.screenshotFormat, 'webp');
+    assert.strictEqual(config.screenshotMaxWidth, '1280');
+    assert.deepStrictEqual(config.chromeArg, ['--no-sandbox', '--disable-gpu']);
+    assert.deepStrictEqual(config.blockedUrlPattern, [
+      '*://adservice.google.com/*',
+    ]);
+    assert.strictEqual(config.watchConfig, true);
+  });
+
   it('maps resolved config into WorkerStartOptions', () => {
     const options = toWorkerOptions({
       browserUrl: 'http://127.0.0.1:9222',

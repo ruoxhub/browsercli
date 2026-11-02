@@ -36,7 +36,6 @@ export {HookStore, DEFAULT_HOOK_STORE_KEY} from './HookStore.js';
 export type {HookStoreSnapshot} from './HookStore.js';
 
 export {
-  createPreloadHookId,
   hashPersistentHookScript,
   PersistentHookRegistry,
 } from './PersistentHookRegistry.js';

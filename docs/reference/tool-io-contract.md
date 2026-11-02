@@ -66,12 +66,6 @@
 | `list_network_requests`      | Network 面板缓存                                                   | Response attach only                     | CDP Network                                          |
 | `check_browser_health`       | PageController + 浏览器会话状态                                    | SessionState 快照/恢复                   | In-memory SessionState                               |
 | `click`                      | PageController + 浏览器会话状态                                    | SessionState 快照/恢复                   | In-memory SessionState                               |
-| `delete_session_state`       | SessionState 管理器                                                | SessionState 管理器                      | In-memory SessionState                               |
-| `dump_session_state`         | SessionState 管理器                                                | SessionState 管理器                      | In-memory SessionState                               |
-| `list_session_states`        | SessionState 管理器                                                | SessionState 管理器                      | In-memory SessionState                               |
-| `load_session_state`         | SessionState 管理器                                                | SessionState 管理器                      | In-memory SessionState                               |
-| `restore_session_state`      | SessionState 管理器                                                | SessionState 管理器                      | In-memory SessionState                               |
-| `save_session_state`         | SessionState 管理器                                                | SessionState 管理器                      | In-memory SessionState                               |
 | `fill`                       | PageController + 浏览器会话状态                                    | SessionState 快照/恢复                   | In-memory SessionState                               |
 | `wait_for_element`           | PageController + 浏览器会话状态                                    | SessionState 快照/恢复                   | In-memory SessionState                               |
 | `list_pages`                 | BrowserManager pages                                               | 当前页选择/导航                          | BrowserManager currentPage                           |
@@ -82,11 +76,6 @@
 | `export_rebuild_bundle`      | 请求参数 + 当前上下文                                              | task artifact 文件                       | `artifacts/tasks/*`                                  |
 | `take_screenshot`            | 页面/元素渲染                                                      | 截图文件或响应附件                       | filesystem(optional)                                 |
 | `evaluate_script`            | 当前 frame runtime                                                 | 页面注入脚本                             | PreloadScript Registry                               |
-| `inject_preload_script`      | 当前 frame runtime                                                 | 页面注入脚本                             | PreloadScript Registry                               |
-| `inject_stealth`             | Stealth 配置                                                       | 页面 stealth 注入 / UA                   | Stealth Runtime                                      |
-| `list_stealth_features`      | Stealth 配置                                                       | 页面 stealth 注入 / UA                   | Stealth Runtime                                      |
-| `list_stealth_presets`       | Stealth 配置                                                       | 页面 stealth 注入 / UA                   | Stealth Runtime                                      |
-| `set_user_agent`             | Stealth 配置                                                       | 页面 stealth 注入 / UA                   | Stealth Runtime                                      |
 | `analyze_websocket_messages` | WebSocket 帧缓存                                                   | Response attach only                     | CDP WebSocket                                        |
 | `get_websocket_message`      | WebSocket 帧缓存                                                   | Response attach only                     | CDP WebSocket                                        |
 | `get_websocket_messages`     | WebSocket 帧缓存                                                   | Response attach only                     | CDP WebSocket                                        |

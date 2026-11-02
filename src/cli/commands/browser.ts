@@ -18,24 +18,157 @@ import type {
   BrowserDisconnectOptions,
 } from '../types.js';
 
-const CONNECT_FLAGS = new Set([
-  'accept-insecure-certs',
-  'auto-connect',
+export const BROWSER_LAUNCH_OR_CONNECT_FLAGS = new Set([
+  'u',
   'browser-url',
-  'channel',
-  'cloak',
-  'executable-path',
-  'force',
-  'full-stealth-args',
-  'headless',
-  'isolated',
-  'js-stealth',
-  'json',
-  'minimal-stealth',
-  'user-data-dir',
-  'viewport',
+  'browserUrl',
+  'w',
   'ws-endpoint',
+  'wsEndpoint',
+  'e',
+  'executable-path',
+  'executablePath',
+  'auto-connect',
+  'autoConnect',
+  'channel',
+  'user-data-dir',
+  'userDataDir',
   'ws-headers',
+  'wsHeaders',
+  'viewport',
+  'headless',
+  'no-headless',
+  'isolated',
+  'no-isolated',
+  'accept-insecure-certs',
+  'acceptInsecureCerts',
+  'cloak',
+  'js-stealth',
+  'jsStealth',
+  'minimal-stealth',
+  'minimalStealth',
+  'full-stealth-args',
+  'fullStealthArgs',
+  'proxy-server',
+  'proxyServer',
+  'chrome-arg',
+  'chromeArg',
+  'ignore-default-chrome-arg',
+  'ignoreDefaultChromeArg',
+]);
+
+export const CONNECT_FLAGS = new Set([
+  ...BROWSER_LAUNCH_OR_CONNECT_FLAGS,
+  'force',
+  'json',
+
+  // 工具分类开关 (Category flags)
+  'category-input',
+  'categoryInput',
+  'no-category-input',
+  'no-categoryInput',
+  'category-navigation',
+  'categoryNavigation',
+  'no-category-navigation',
+  'no-categoryNavigation',
+  'category-emulation',
+  'categoryEmulation',
+  'no-category-emulation',
+  'no-categoryEmulation',
+  'category-performance',
+  'categoryPerformance',
+  'no-category-performance',
+  'no-categoryPerformance',
+  'category-network',
+  'categoryNetwork',
+  'no-category-network',
+  'no-categoryNetwork',
+  'category-debugging',
+  'categoryDebugging',
+  'no-category-debugging',
+  'no-categoryDebugging',
+  'category-extensions',
+  'categoryExtensions',
+  'no-category-extensions',
+  'no-categoryExtensions',
+  'category-experimental-third-party',
+  'categoryExperimentalThirdParty',
+  'category-memory',
+  'categoryMemory',
+  'no-category-memory',
+  'no-categoryMemory',
+  'category-experimental-webmcp',
+  'categoryExperimentalWebmcp',
+  'category-pwa',
+  'categoryPwa',
+
+  // 截图与视觉
+  'screenshot-format',
+  'screenshotFormat',
+  'screenshot-quality',
+  'screenshotQuality',
+  'screenshot-max-width',
+  'screenshotMaxWidth',
+  'screenshot-max-height',
+  'screenshotMaxHeight',
+  'experimental-vision',
+  'experimentalVision',
+
+  // 调试与网络限制
+  'blocked-url-pattern',
+  'blockedUrlPattern',
+  'allowed-url-pattern',
+  'allowedUrlPattern',
+  'redact-network-headers',
+  'redactNetworkHeaders',
+  'max-navigation-saved',
+  'maxNavigationSaved',
+  'log-file',
+  'logFile',
+  'experimental-devtools',
+  'experimentalDevtools',
+  'memory-debugging',
+  'memoryDebugging',
+  'experimental-memory',
+  'experimentalMemory',
+  'experimental-include-all-pages',
+  'experimentalIncludeAllPages',
+  'experimental-screencast',
+  'experimentalScreencast',
+  'experimental-ffmpeg-path',
+  'experimentalFfmpegPath',
+  'screencast-fps',
+  'screencastFps',
+  'experimental-screencast-fps',
+  'experimentalScreencastFps',
+  'performance-crux',
+  'performanceCrux',
+  'no-performance-crux',
+  'no-performanceCrux',
+  'usage-statistics',
+  'usageStatistics',
+  'no-usage-statistics',
+  'no-usageStatistics',
+  'javascript-evaluation',
+  'javascriptEvaluation',
+  'no-javascript-evaluation',
+  'no-javascriptEvaluation',
+  'file-navigations',
+  'fileNavigations',
+  'no-file-navigations',
+  'no-fileNavigations',
+  'source-maps',
+  'sourceMaps',
+  'no-source-maps',
+  'no-sourceMaps',
+  'allow-unrestricted-paths',
+  'allowUnrestrictedPaths',
+  'workspace',
+  'filesystem-root',
+  'filesystemRoot',
+  'config',
+  'watch-config',
+  'watchConfig',
 ]);
 const READ_FLAGS = new Set(['json']);
 const DISCONNECT_FLAGS = new Set(['force', 'json']);
@@ -164,10 +297,65 @@ function urlFlag(
   return normalizeTargetUrl(value, protocols, `--${key}`);
 }
 
+function findStringFlag(
+  flags: Record<string, string | boolean>,
+  ...keys: string[]
+): string | undefined {
+  for (const k of keys) {
+    const v = stringFlag(flags, k);
+    if (v !== undefined) return v;
+  }
+  return undefined;
+}
+
+function findUrlFlag(
+  flags: Record<string, string | boolean>,
+  protocols: string[],
+  ...keys: string[]
+): string | undefined {
+  for (const k of keys) {
+    const v = urlFlag(flags, k, protocols);
+    if (v !== undefined) return v;
+  }
+  return undefined;
+}
+
+function findBooleanFlag(
+  flags: Record<string, string | boolean>,
+  ...keys: string[]
+): boolean | undefined {
+  for (const k of keys) {
+    if (k.startsWith('no-')) {
+      const v = booleanFlag(flags, k);
+      if (v !== undefined) return !v;
+    } else {
+      const v = booleanFlag(flags, k);
+      if (v !== undefined) return v;
+    }
+  }
+  return undefined;
+}
+
+function findArrayFlag(
+  flags: Record<string, string | boolean>,
+  ...keys: string[]
+): string[] | undefined {
+  for (const k of keys) {
+    const v = flags[k];
+    if (typeof v === 'string') {
+      return v
+        .split(',')
+        .map(s => s.trim())
+        .filter(Boolean);
+    }
+  }
+  return undefined;
+}
+
 function headersFlag(
   flags: Record<string, string | boolean>,
 ): Record<string, string> | undefined {
-  const raw = stringFlag(flags, 'ws-headers');
+  const raw = findStringFlag(flags, 'ws-headers', 'wsHeaders');
   if (raw === undefined) return undefined;
   let value: unknown;
   try {
@@ -199,15 +387,32 @@ function viewportFlag(
   return {width, height};
 }
 
-function connectOptions(
+export function connectOptions(
   flags: Record<string, string | boolean>,
 ): BrowserConnectOptions {
   assertFlags(flags, CONNECT_FLAGS);
-  let browserURL = urlFlag(flags, 'browser-url', ['http:', 'https:']);
-  let wsEndpoint = urlFlag(flags, 'ws-endpoint', ['ws:', 'wss:']);
-  let autoConnect = booleanFlag(flags, 'auto-connect');
-  let channel = stringFlag(flags, 'channel');
-  let executablePath = stringFlag(flags, 'executable-path');
+  let browserURL = findUrlFlag(
+    flags,
+    ['http:', 'https:'],
+    'browser-url',
+    'browserUrl',
+    'u',
+  );
+  let wsEndpoint = findUrlFlag(
+    flags,
+    ['ws:', 'wss:'],
+    'ws-endpoint',
+    'wsEndpoint',
+    'w',
+  );
+  let autoConnect = findBooleanFlag(flags, 'auto-connect', 'autoConnect');
+  let channel = findStringFlag(flags, 'channel');
+  let executablePath = findStringFlag(
+    flags,
+    'executable-path',
+    'executablePath',
+    'e',
+  );
 
   const cliHasTarget =
     browserURL !== undefined ||
@@ -333,7 +538,7 @@ function connectOptions(
   const viewport =
     viewportFlag(flags) ?? nestedBrowser?.viewport ?? rawConfig.viewport;
 
-  let userDataDir = stringFlag(flags, 'user-data-dir');
+  let userDataDir = findStringFlag(flags, 'user-data-dir', 'userDataDir');
   if (userDataDir === undefined) {
     userDataDir =
       process.env.BROWSER_USER_DATA_DIR ??
@@ -341,27 +546,48 @@ function connectOptions(
       rawConfig.userDataDir;
   }
 
+  const proxyServer = findStringFlag(flags, 'proxy-server', 'proxyServer');
+  const chromeArg = findArrayFlag(flags, 'chrome-arg', 'chromeArg');
+  const ignoreDefaultChromeArg = findArrayFlag(
+    flags,
+    'ignore-default-chrome-arg',
+    'ignoreDefaultChromeArg',
+  );
+
   if (wsHeaders !== undefined) options.wsHeaders = wsHeaders;
   if (viewport !== undefined) options.viewport = viewport;
   if (userDataDir !== undefined) options.userDataDir = userDataDir;
+  if (proxyServer !== undefined) options.proxyServer = proxyServer;
+  if (chromeArg !== undefined) options.chromeArg = chromeArg;
+  if (ignoreDefaultChromeArg !== undefined) {
+    options.ignoreDefaultChromeArg = ignoreDefaultChromeArg;
+  }
 
   const booleanKeys = [
     [
       'acceptInsecureCerts',
-      'accept-insecure-certs',
+      ['accept-insecure-certs', 'acceptInsecureCerts'],
       'BROWSER_ACCEPT_INSECURE_CERTS',
     ],
-    ['cloak', 'cloak', 'BROWSER_CLOAK'],
-    ['force', 'force', ''],
-    ['fullStealthArgs', 'full-stealth-args', 'BROWSER_FULL_STEALTH_ARGS'],
-    ['headless', 'headless', 'BROWSER_HEADLESS'],
-    ['isolated', 'isolated', 'BROWSER_ISOLATED'],
-    ['jsStealth', 'js-stealth', 'BROWSER_JS_STEALTH'],
-    ['minimalStealth', 'minimal-stealth', 'BROWSER_MINIMAL_STEALTH'],
+    ['cloak', ['cloak'], 'BROWSER_CLOAK'],
+    ['force', ['force'], ''],
+    [
+      'fullStealthArgs',
+      ['full-stealth-args', 'fullStealthArgs'],
+      'BROWSER_FULL_STEALTH_ARGS',
+    ],
+    ['headless', ['headless', 'no-headless'], 'BROWSER_HEADLESS'],
+    ['isolated', ['isolated', 'no-isolated'], 'BROWSER_ISOLATED'],
+    ['jsStealth', ['js-stealth', 'jsStealth'], 'BROWSER_JS_STEALTH'],
+    [
+      'minimalStealth',
+      ['minimal-stealth', 'minimalStealth'],
+      'BROWSER_MINIMAL_STEALTH',
+    ],
   ] as const;
 
-  for (const [prop, flagName, envKey] of booleanKeys) {
-    let val = booleanFlag(flags, flagName);
+  for (const [prop, flagNames, envKey] of booleanKeys) {
+    let val = findBooleanFlag(flags, ...flagNames);
     if (val === undefined && envKey && process.env[envKey] !== undefined) {
       val = parseBooleanValue(process.env[envKey]);
     }
@@ -434,6 +660,7 @@ export const browserCommand: AxiCliCommand<WorkerContext> = async (
     let state: BrowserConnectionStatus;
     if (typedAction === 'connect') {
       const startTime = Date.now();
+      const retryTimeoutMs = 35_000;
       for (;;) {
         try {
           state = await client.request<BrowserConnectionStatus>(
@@ -445,11 +672,16 @@ export const browserCommand: AxiCliCommand<WorkerContext> = async (
           if (
             err instanceof Error &&
             /WORKER_BUSY/.test(err.message) &&
-            /browser connect/.test(err.message) &&
-            Date.now() - startTime < 15_000
+            /browser connect/.test(err.message)
           ) {
-            await new Promise(r => setTimeout(r, 400));
-            continue;
+            if (Date.now() - startTime < retryTimeoutMs) {
+              await new Promise(r => setTimeout(r, 400));
+              continue;
+            }
+            throw new Error(
+              '[WORKER_BUSY] Worker 正在连接浏览器中（可能正在等待 Chrome 弹窗授权或网络连接响应）。\n' +
+                '请留意 Chrome 界面顶部的 "Allow remote debugging" 弹窗，或稍后运行 "browsercli status" 查看连接结果。',
+            );
           }
           throw err;
         }

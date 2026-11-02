@@ -21,9 +21,10 @@ import {manifest as inputManifest} from './input/manifest.js';
 import {manifest as navigationManifest} from './navigation/manifest.js';
 import {manifest as networkManifest} from './network/manifest.js';
 import {manifest as pageManifest} from './page/manifest.js';
+import {manifest as recorderManifest} from './recorder/manifest.js';
 import {manifest as screenshotManifest} from './screenshot/manifest.js';
 import {manifest as scriptManifest} from './script/manifest.js';
-import {manifest as stealthManifest} from './stealth/manifest.js';
+import {manifest as videoManifest} from './video/manifest.js';
 import {manifest as wasmManifest} from './wasm/manifest.js';
 
 export const GENERATED_DOMAIN_MANIFESTS = [
@@ -42,9 +43,10 @@ export const GENERATED_DOMAIN_MANIFESTS = [
   navigationManifest,
   networkManifest,
   pageManifest,
+  recorderManifest,
   screenshotManifest,
   scriptManifest,
-  stealthManifest,
+  videoManifest,
   wasmManifest,
 ] as const;
 
@@ -367,36 +369,20 @@ export const GENERATED_TOOL_REGISTRY = [
     handlerName: 'scrollBy',
   },
   {
-    modulePath: './page/sessionState.js',
-    handlerName: 'saveSessionState',
-  },
-  {
-    modulePath: './page/sessionState.js',
-    handlerName: 'restoreSessionState',
-  },
-  {
-    modulePath: './page/sessionState.js',
-    handlerName: 'listSessionStates',
-  },
-  {
-    modulePath: './page/sessionState.js',
-    handlerName: 'deleteSessionState',
-  },
-  {
-    modulePath: './page/sessionState.js',
-    handlerName: 'dumpSessionState',
-  },
-  {
-    modulePath: './page/sessionState.js',
-    handlerName: 'loadSessionState',
-  },
-  {
     modulePath: './page/checkBrowserHealth.js',
     handlerName: 'checkBrowserHealth',
   },
   {
     modulePath: './page/detectCaptcha.js',
     handlerName: 'detectCaptcha',
+  },
+  {
+    modulePath: './recorder/recordTools.js',
+    handlerName: 'recordStart',
+  },
+  {
+    modulePath: './recorder/recordTools.js',
+    handlerName: 'recordStop',
   },
   {
     modulePath: './screenshot/takeScreenshot.js',
@@ -407,24 +393,8 @@ export const GENERATED_TOOL_REGISTRY = [
     handlerName: 'evaluateScript',
   },
   {
-    modulePath: './script/script.js',
-    handlerName: 'injectPreloadScript',
-  },
-  {
-    modulePath: './stealth/stealth.js',
-    handlerName: 'setUserAgent',
-  },
-  {
-    modulePath: './stealth/stealth.js',
-    handlerName: 'injectStealth',
-  },
-  {
-    modulePath: './stealth/stealth.js',
-    handlerName: 'listStealthFeatures',
-  },
-  {
-    modulePath: './stealth/stealth.js',
-    handlerName: 'listStealthPresets',
+    modulePath: './video/video.js',
+    handlerName: 'video',
   },
   {
     modulePath: './wasm/index.js',

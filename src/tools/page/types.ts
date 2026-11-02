@@ -42,61 +42,6 @@ export interface ScrollByParams {
   pixels?: number;
 }
 
-/** saveSessionState 参数 */
-export interface SaveSessionStateParams {
-  /** 会话 ID，省略则自动生成 */
-  sessionId?: string;
-  /** 是否包含 cookies */
-  includeCookies?: boolean;
-  /** 是否包含 localStorage */
-  includeLocalStorage?: boolean;
-  /** 是否包含 sessionStorage */
-  includeSessionStorage?: boolean;
-}
-
-/** restoreSessionState 参数 */
-export interface RestoreSessionStateParams {
-  /** 会话 ID */
-  sessionId: string;
-  /** 是否导航到保存时的 URL */
-  navigateToSavedUrl?: boolean;
-  /** 恢复前是否清除现有存储 */
-  clearStorageBeforeRestore?: boolean;
-}
-
-/** listSessionStates 参数（无参数） */
-export type ListSessionStatesParams = object;
-
-/** deleteSessionState 参数 */
-export interface DeleteSessionStateParams {
-  /** 会话 ID */
-  sessionId: string;
-}
-
-/** dumpSessionState 参数 */
-export interface DumpSessionStateParams {
-  /** 会话 ID */
-  sessionId: string;
-  /** 导出文件路径 */
-  path?: string;
-  /** 是否美化输出 */
-  pretty?: boolean;
-  /** 是否加密 */
-  encrypt?: boolean;
-}
-
-/** loadSessionState 参数 */
-export interface LoadSessionStateParams {
-  /** 会话 ID */
-  sessionId?: string;
-  /** 从文件路径加载 */
-  path?: string;
-  /** 从 JSON 字符串加载 */
-  snapshotJson?: string;
-  /** 是否覆盖已存在的快照 */
-  overwrite?: boolean;
-}
-
 /** checkBrowserHealth 参数（无参数） */
 export type CheckBrowserHealthParams = object;
 
@@ -123,85 +68,6 @@ export interface ScrollByData {
   direction: string;
   pixels: number;
   result: string;
-}
-
-/** 会话快照 */
-export interface SessionSnapshot {
-  id: string;
-  savedAt: string;
-  expiresAt: string;
-  url: string;
-  title: string;
-  cookies: Array<Record<string, unknown>>;
-  localStorage: Record<string, string>;
-  sessionStorage: Record<string, string>;
-}
-
-/** saveSessionState 返回数据 */
-export interface SaveSessionStateData {
-  sessionId: string;
-  savedAt: string;
-  url: string;
-  title: string;
-  counts: {
-    cookies: number;
-    localStorage: number;
-    sessionStorage: number;
-  };
-}
-
-/** restoreSessionState 返回数据 */
-export interface RestoreSessionStateData {
-  sessionId: string;
-  restoredAt: string;
-  url: string;
-  restored: {
-    cookies: number;
-    localStorage: number;
-    sessionStorage: number;
-  };
-}
-
-/** listSessionStates 返回数据 */
-export interface ListSessionStatesData {
-  total: number;
-  cleanedExpired: number;
-  sessions: Array<{
-    sessionId: string;
-    savedAt: string;
-    url: string;
-    title: string;
-    counts: {cookies: number; localStorage: number; sessionStorage: number};
-    expiresAt: string;
-  }>;
-}
-
-/** deleteSessionState 返回数据 */
-export interface DeleteSessionStateData {
-  sessionId: string;
-  deleted: boolean;
-  remaining: number;
-}
-
-/** dumpSessionState 返回数据 */
-export interface DumpSessionStateData {
-  sessionId: string;
-  path: string | null;
-  bytes: number;
-  encrypted: boolean;
-}
-
-/** loadSessionState 返回数据 */
-export interface LoadSessionStateData {
-  sessionId: string;
-  loaded: boolean;
-  source: 'memory' | 'file' | 'json';
-  overwritten?: boolean;
-  counts: {
-    cookies: number;
-    localStorage: number;
-    sessionStorage: number;
-  };
 }
 
 /** 健康检查问题 */
@@ -238,36 +104,6 @@ export interface WaitForElementResult extends PageResult<WaitForElementData> {
 /** scrollBy 结果 */
 export interface ScrollByResult extends PageResult<ScrollByData> {
   tooltype: 'scroll_by';
-}
-
-/** saveSessionState 结果 */
-export interface SaveSessionStateResult extends PageResult<SaveSessionStateData> {
-  tooltype: 'save_session_state';
-}
-
-/** restoreSessionState 结果 */
-export interface RestoreSessionStateResult extends PageResult<RestoreSessionStateData> {
-  tooltype: 'restore_session_state';
-}
-
-/** listSessionStates 结果 */
-export interface ListSessionStatesResult extends PageResult<ListSessionStatesData> {
-  tooltype: 'list_session_states';
-}
-
-/** deleteSessionState 结果 */
-export interface DeleteSessionStateResult extends PageResult<DeleteSessionStateData> {
-  tooltype: 'delete_session_state';
-}
-
-/** dumpSessionState 结果 */
-export interface DumpSessionStateResult extends PageResult<DumpSessionStateData> {
-  tooltype: 'dump_session_state';
-}
-
-/** loadSessionState 结果 */
-export interface LoadSessionStateResult extends PageResult<LoadSessionStateData> {
-  tooltype: 'load_session_state';
 }
 
 /** checkBrowserHealth 结果 */

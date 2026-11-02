@@ -10,7 +10,6 @@ import {ToolCategory, labels} from '../build/src/tools/categories.js';
 import {GENERATED_TOOL_REGISTRY} from '../build/src/tools/generated-tools-index.js';
 
 const OUTPUT_PATH = './docs/reference/tool-reference.md';
-const README_PATH = './README.md';
 
 interface ToolDef {
   name: string;
@@ -45,25 +44,6 @@ function uniqueToolsByName(tools: ToolDef[]): ToolDef[] {
     deduped.push(item);
   }
   return deduped;
-}
-
-function updateReadmeBlock(
-  beginMarker: string,
-  endMarker: string,
-  content: string,
-): void {
-  const readmeContent = fs.readFileSync(README_PATH, 'utf8');
-  const beginIndex = readmeContent.indexOf(beginMarker);
-  const endIndex = readmeContent.indexOf(endMarker);
-
-  if (beginIndex === -1 || endIndex === -1) {
-    return;
-  }
-
-  const before = readmeContent.substring(0, beginIndex + beginMarker.length);
-  const after = readmeContent.substring(endIndex);
-  const updated = `${before}\n\n${content}\n\n${after}`;
-  fs.writeFileSync(README_PATH, updated);
 }
 
 async function generateDocs(): Promise<void> {
@@ -115,25 +95,6 @@ async function generateDocs(): Promise<void> {
 
   fs.writeFileSync(OUTPUT_PATH, `${markdown.trimEnd()}\n`);
 
-  const toolsTOC = Array.from(categories.entries())
-    .map(([category, categoryTools]) => {
-      const lines = [
-        `- **${labels[category as ToolCategory]}** (${categoryTools.length} tools)`,
-      ];
-      for (const tool of categoryTools) {
-        lines.push(
-          `  - [\`${tool.name}\`](docs/reference/tool-reference.md#${tool.name.toLowerCase()})`,
-        );
-      }
-      return lines.join('\n');
-    })
-    .join('\n');
-
-  updateReadmeBlock(
-    '<!-- BEGIN AUTO GENERATED TOOLS -->',
-    '<!-- END AUTO GENERATED TOOLS -->',
-    toolsTOC,
-  );
   console.log(`Generated ${OUTPUT_PATH} with ${tools.length} tools.`);
 }
 

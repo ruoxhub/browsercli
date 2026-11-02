@@ -37,7 +37,6 @@ describe('config schema validation', {concurrency: false}, () => {
         enabled: 'true',
         outputDir: '~/.jsreverse/tool-results',
       },
-      sessionStateTtlMs: '60000',
     });
 
     assert.strictEqual(config.browser?.remoteDebuggingPort, 9222);
@@ -52,7 +51,6 @@ describe('config schema validation', {concurrency: false}, () => {
       config.toolResultRecording?.outputDir,
       '~/.jsreverse/tool-results',
     );
-    assert.strictEqual(config.sessionStateTtlMs, 60000);
   });
 
   it('rejects invalid browser port with readable path details', () => {

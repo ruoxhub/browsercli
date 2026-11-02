@@ -112,7 +112,7 @@ js-reverse call list_hooks
 ### 解决方案
 
 1. **注入脚本触发行为**：`evaluate_script` 执行 `video.play()` 等直接操作
-2. **预加载脚本**：在页面加载前用 `inject_preload_script` 提前挂 Hook，确保不漏首屏请求
+2. **持久化 Hook**：在页面加载前用 `inject_hook(persistent=true)` 提前挂 Hook，确保不漏首屏请求
 3. **建议 `wait_for_request` 增加轮询模式**（见改进建议）
 
 ---

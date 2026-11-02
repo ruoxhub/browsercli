@@ -121,16 +121,9 @@
 
 用于对比两次采样差异，并把关键结论写入 task artifact。
 
-## 9) 登录态复用（需登录站点建议）
+## 9) 浏览器状态自检
 
-- `save_session_state`
-- `restore_session_state`
-- `list_session_states`
-- `dump_session_state`
-- `load_session_state`
 - `check_browser_health`
-
-适合“必须登录后才能访问”的目标站，减少重复扫码/验证码成本。
 
 ## 10) 典型最小链路
 

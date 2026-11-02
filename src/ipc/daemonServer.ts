@@ -19,6 +19,8 @@ import {
   connectBrowser,
   disconnectBrowser,
   getBrowserConnectionStatus,
+  getInFlightBrowserConnectTarget,
+  isSameBrowserTarget,
 } from '../worker/BrowserConnectionManager.js';
 import {
   BrowserConfigRequestError,
@@ -349,8 +351,16 @@ export async function startDaemonServer(
       if (error instanceof BrowserConfigRequestError) throw error;
       throw error;
     }
-    rejectIfBusy('browser', getActiveJob());
     const {commit, config} = candidateBrowserConfig(patch);
+    const inFlightTarget = getInFlightBrowserConnectTarget();
+    const isConnectingSameTarget =
+      !force &&
+      inFlightTarget !== null &&
+      isSameBrowserTarget(inFlightTarget, config);
+
+    if (!isConnectingSameTarget) {
+      rejectIfBusy('browser', getActiveJob());
+    }
     try {
       commit();
     } catch (error) {

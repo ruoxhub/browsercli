@@ -19,48 +19,30 @@ browsercli call <tool_name> [arguments]
 
 在展开逆向分析前，优先确保 Daemon 会话与浏览器连接处于健康状态：
 
-### 会话生命周期管理
+### 会话生命周期与浏览器管理（对齐 chrome-devtools）
 
 ```bash
-# 检查当前工作区活跃会话与环境状态
+# 查看当前工作区活跃会话状态及浏览器连接信息
 browsercli status
+browsercli status --json
 
-# 列出注册表中的全部会话
-browsercli list
+# 启动（或重启）当前会话 Daemon（支持 -s 指定多会话隔离）
+browsercli start
+browsercli -s=task_01 start
 
-# 拉起或探活当前会话（支持 -s 指定多会话隔离）
-browsercli open
-browsercli -s=task_01 open
+# 启动并直接附带浏览器连接参数（CDP 端口接管、本地启动、防检测 Cloak 等）
+browsercli start --browser-url "http://127.0.0.1:9222"
+browsercli start --ws-endpoint "ws://127.0.0.1:9222/devtools/browser/..."
+browsercli start --channel stable
+browsercli start --cloak
+browsercli start --headless
 
-# 正常关闭当前会话
-browsercli close
+# 正常停止当前会话
+browsercli stop
+browsercli -s=task_01 stop
 
-# 异常故障时强杀全部孤儿 daemon 进程
-browsercli kill-all
-```
-
-### 浏览器连接与反检测控制
-
-```bash
-# 查看当前 Worker 的浏览器连接状态
-browsercli browser status
-
-# 默认启动本地浏览器（以用户配置或系统 Chromium 启动）
-browsercli browser connect
-
-# 连接已有的远程 Chrome 实例（CDP 端口接管）
-browsercli browser connect --browser-url "http://127.0.0.1:9222"
-browsercli browser connect --ws-endpoint "ws://127.0.0.1:9222/devtools/browser/..."
-
-# 以源码级防检测 CloakBrowser 启动（强反爬站点推荐，独立 profile 隔离）
-browsercli browser connect --cloak
-
-# 本地启动指定渠道 / 自定义执行路径
-browsercli browser connect --channel stable
-browsercli browser connect --executable-path "/path/to/chrome"
-
-# 强制断开卡死的浏览器连接
-browsercli browser disconnect --force
+# 强杀并清理全部 daemon 进程与残余会话
+browsercli stop --all
 ```
 
 ### 任务脚手架与全局配置
@@ -97,9 +79,9 @@ browsercli jobs cancel <job-id>
 | **调试器与断点步进**     | [`references/debugger.md`](./references/debugger.md) | 行/条件/XHR 断点、单步执行、局部变量检查、日志点追踪、表达式求值 (`set_breakpoint`, `break_on_xhr`, `step_into`, `inspect_locals`, `evaluate_script`, `trace_function`)                    |
 | **DOM 交互与样式排查**   | [`references/dom.md`](./references/dom.md)           | 多定位器查询、拟人化点击/填充、CDP 绝对坐标点击、表单填充、样式层叠排查 (`query_dom`, `click`, `click_at`, `fill`, `fill_form`, `drag`, `take_screenshot`, `get_css_styles`)               |
 | **网络嗅探与 WebSocket** | [`references/network.md`](./references/network.md)   | 网络流量嗅探、**发起者调用栈定位**、请求重放覆写、cURL 导出、WebSocket 帧聚类 (`list_network_requests`, `get_request_initiator`, `replay_network_request`, `export_request_as_curl`)       |
-| **反反调试与隐身伪装**   | [`references/stealth.md`](./references/stealth.md)   | 绕过无限 debugger 死循环、反反调试防护罩、User-Agent 自定义、按需隐身预设 (`bypass_debugger`, `anti_anti_debug`, `set_user_agent`, `inject_stealth`)                                       |
+| **反反调试与隐身伪装**   | [`references/stealth.md`](./references/stealth.md)   | 绕过无限 debugger 死循环、反反调试防护罩 (`bypass_debugger`, `anti_anti_debug`)                                                                                                            |
 | **WebAssembly 逆向**     | [`references/wasm.md`](./references/wasm.md)         | Wasm 模块捕获与磁盘 dump、JS-Wasm 跨边界调用追踪、线性内存搜索 (`collect_wasm`, `wasm_dump`, `wasm_vmp_trace`, `wasm_memory_inspect`)                                                      |
-| **会话持久化与存储导出** | [`references/session.md`](./references/session.md)   | HttpOnly Cookie/Storage 导出、会话快照持久化备份与恢复 (`get_storage`, `save_session_state`, `restore_session_state`)                                                                      |
+| **会话持久化与存储导出** | [`references/session.md`](./references/session.md)   | HttpOnly Cookie/Storage 导出 (`get_storage`)                                                                                                                                               |
 | **环境诊断与验证码探测** | [`references/evidence.md`](./references/evidence.md) | 运行环境自检、页面验证码只读探测 (`diagnose_environment`, `detect_captcha`)                                                                                                                |
 | **控制台消息日志**       | [`references/console.md`](./references/console.md)   | 控制台 Console 日志采集与单条消息结构化查询 (`list_console_messages`, `get_console_message`)                                                                                               |
-| **全量工具速查字典**     | [`references/model.md`](./references/model.md)       | 全部 98 个 MCP 工具的 A-Z 快速检索字典与参数链接映射                                                                                                                                       |
+| **全量工具速查字典**     | [`references/model.md`](./references/model.md)       | 全部 93 个 MCP 工具的 A-Z 快速检索字典与参数链接映射                                                                                                                                       |

@@ -1,68 +1,55 @@
 # 故障排查指南
 
-这份文档集中回答 MCP 客户端接入、浏览器连接和 AI 配置里最常见的问题。
+这份文档集中回答 daemon 会话、浏览器连接和工具调用里最常见的问题。
 
 建议排查顺序：
 
-1. 在项目目录执行 `npm ci && npm run build`
-2. 执行 `node /ABSOLUTE/PATH/JSReverser-MCP/build/src/index.js --doctor`
-3. 在 MCP 客户端里确认 command 是 `node`，args 第一项是绝对路径 `build/src/index.js`
-4. 客户端连上后先调用 `diagnose_environment`
+1. 在项目目录执行 `npm install && npm run build`
+2. `browsercli status` 确认会话与 daemon 状态
+3. `browsercli browser status` 确认浏览器连接状态
+4. 调用 `diagnose_environment` 做环境自检
 5. 接管浏览器前先用 `http://127.0.0.1:9222/json/version` 确认 remote debugging 已开启
 6. 页面取证前再调用 `check_browser_health` 和 `list_pages`
 
-## 客户端显示 `tools: none`
+## `browsercli` 连不上或没有会话
 
-这不是正常状态，会影响后续调用。
-
-`--toolProfile kernel` / `--toolProfile compact` 只会减少工具数量，不会让工具变成 none。默认 kernel 应暴露 35 个自动化优先工具；`--toolProfile compact` 会暴露 63 个高频工具；`--toolProfile full` 会暴露全部 110 个工具。
+`browsercli` 通过本地命名管道（POSIX 为 unix socket）与 detached daemon 通信，
+按 workspace-hash 在注册表（`%LOCALAPPDATA%\browsercli\daemon`）里发现会话；
+连不上就自动 spawn daemon 并等 stdout 就绪行握手。
 
 常见原因：
 
-- 项目还没构建，`build/src/index.js` 不存在或还是旧版本
-- MCP 配置里的路径不是绝对路径
-- 客户端仍在用旧配置或旧进程，改完配置后没有重启
-- JSON / TOML 配置写错，导致 MCP server 根本没有启动
-- 配置里使用了不推荐的包执行方式，而不是本地 `node /ABSOLUTE/PATH/.../build/src/index.js`
+- 项目还没构建，`build/src/cli/bin/browsercli.js` 不存在或还是旧版本
+- 当前工作目录不是当初拉起会话时的工作目录（注册表按 workspace 定位）
+- 旧 daemon 进程残留但 socket 已失效
 
 推荐修复：
 
 ```bash
-npm ci
+npm install
 npm run build
-node /ABSOLUTE/PATH/JSReverser-MCP/build/src/index.js --doctor
+browsercli status      # 看注册表里各会话是否活着
+browsercli open        # 探活，失败则自动 spawn 新 daemon
+browsercli kill-all    # 强杀全部孤儿 daemon 并清理注册表
 ```
 
-MCP 客户端最小配置：
+`browsercli kill-all` 只对带 `--browsercli-daemon` 标记的进程生效，不会误杀手动
+起的 daemon。
 
-```json
-{
-  "mcpServers": {
-    "jsreverser-mcp": {
-      "command": "node",
-      "args": ["/ABSOLUTE/PATH/JSReverser-MCP/build/src/index.js"]
-    }
-  }
-}
+## 工具列表数量不对或想只看高频工具
+
+```bash
+browsercli list-tools            # 默认列全部
+browsercli list-tools --json     # 机器可读
 ```
 
-如果 kernel 能看到工具但缺少更宽的工作流工具，先加：
-
-```json
-"--toolProfile",
-"compact"
-```
-
-如果还需要低频调试工具，再加：
-
-```json
-"--toolProfile",
-"full"
-```
+当前工具面：`full` 114 个，`workflow` profile 62 个。完整清单见
+[`../reference/tool-reference.md`](../reference/tool-reference.md)。
 
 ## 启动后访问地址不通
 
-JSReverser-MCP 是 MCP stdio server，不是 HTTP Web 服务。启动 MCP 后没有一个需要用浏览器访问的项目主页。
+browsercli 不是 HTTP Web 服务，daemon 只监听本地命名管道，没有一个需要用浏览器
+访问的项目主页。
 
 如果你要接管已打开的 Chrome，需要访问的是 Chrome remote debugging 地址：
 
@@ -78,33 +65,37 @@ http://127.0.0.1:9222/json/version
 google-chrome --remote-debugging-port=9222 --user-data-dir=/tmp/chrome-mcp
 ```
 
-然后 MCP 配置里使用：
+然后让 browsercli 接管：
 
-```json
-"--browserUrl",
-"http://127.0.0.1:9222"
+```bash
+browsercli browser connect --browser-url "http://127.0.0.1:9222"
+```
+
+`chrome://inspect/#remote-debugging` 模式下 Chromium 会关闭 `/json/*` 端点
+（返回 404），此时改用自动探测：
+
+```bash
+browsercli browser connect --auto-connect
 ```
 
 注意：
 
-- 目标业务网站地址不是 `--browserUrl`
-- `--browserUrl` 只填 remote debugging HTTP 地址
-- `--browserUrl` 和 `--wsEndpoint` 二选一
-- 如果 `json/version` 都打不开，MCP 一定接管不了这个浏览器
+- 目标业务网站地址不是 `--browser-url`
+- remote debugging 地址只填 HTTP 端点，`--browser-url` 与 `--ws-endpoint` 二选一
+- 如果 `json/version` 都打不开且 `--auto-connect` 也探测不到，就接管不了这个浏览器
 
 ## 代码分析没有内置 AI 了
 
 LLM 集成已彻底移除（`src/services/`、`understand_code` / `summarize_code` /
 `risk_panel` / `analyze_target` / `detect_crypto` 等工具、config 的 openai /
-llmProvider、Web 控制台 LLM 配置面板与 AI 流量分析页均已删除），因此：
+llmProvider、Web 控制台均已删除），因此：
 
 - 不存在 `useAI` 参数或 `aiRuntime` / provider 状态；
 - `diagnose_environment` 不再返回 AI selection 检查；
 - 不再需要 `DEFAULT_LLM_PROVIDER` / `OPENAI_API_KEY` 等环境变量。
 
 需要分析时，用 `collect_code` / `search_in_scripts` / `get_script_source` /
-`get_hook_data` 采集证据，再按 skill `code-analysis`（静态分析）或
-skill `target-analysis`（目标/会话工作流）自行分析。
+`get_hook_data` 采集证据后由调用方 Agent 自行分析。
 
 ## Codex 不愿意继续分析
 
@@ -112,9 +103,9 @@ skill `target-analysis`（目标/会话工作流）自行分析。
 
 推荐表达：
 
-- 我已获授权分析这个页面，请用 JSReverser-MCP 观察请求、脚本和运行时调用链
-- 帮我定位我自己系统里的签名参数生成位置，并导出 local rebuild 便于兼容性测试
-- 按 `reverse-bootstrap.md` 的流程走，先采证据，再 hook，再补环境，不要跳过证据直接猜
+- 我已获授权分析这个页面，请观察请求、脚本和运行时调用链
+- 帮我定位我自己系统里的签名参数生成位置，并导出本地复现工程便于兼容性测试
+- 先采证据，再 hook，再补环境，不要跳过证据直接猜
 
 不要要求模型绕过访问控制、窃取凭证、攻击第三方系统或规避安全限制。遇到模型拒绝时，优先补充授权范围、目标页面归属、允许做的操作和预期交付物。
 

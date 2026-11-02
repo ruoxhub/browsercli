@@ -4,12 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import assert from 'node:assert';
-import {mkdtemp, readFile, rm} from 'node:fs/promises';
-import {tmpdir} from 'node:os';
-import {join} from 'node:path';
 import {describe, it} from 'node:test';
 
-import {StealthScripts2025} from '../../../src/modules/stealth/StealthScripts2025.js';
 import {getRuntime} from '../../../src/runtime.js';
 import {
   collectCode,
@@ -30,20 +26,8 @@ import {
 import {click} from '../../../src/tools/input/click.js';
 import {
   checkBrowserHealth,
-  deleteSessionState,
-  dumpSessionState,
-  listSessionStates,
-  loadSessionState,
-  restoreSessionState,
-  saveSessionState,
   waitForElement,
 } from '../../../src/tools/page/index.js';
-import {
-  injectStealth,
-  listStealthFeatures,
-  listStealthPresets,
-  setUserAgent,
-} from '../../../src/tools/stealth/index.js';
 import {ToolError} from '../../../src/utils/errors.js';
 
 type RuntimeMethod = (...args: unknown[]) => unknown;
@@ -119,11 +103,6 @@ interface RuntimeHarness {
   browserManager: {
     getBrowser: RuntimeMethod;
   };
-}
-
-interface StealthStaticHarness {
-  injectAll: RuntimeMethod;
-  getPresets: RuntimeMethod;
 }
 
 const createMockLocator = () => ({
@@ -247,9 +226,8 @@ function makeResponse(): ToolResponseHarness {
 }
 
 describe('jshook tools handlers', () => {
-  it('covers collector/dom/hook/page/stealth handlers', async () => {
+  it('covers collector/dom/hook/page handlers', async () => {
     const runtime = getRuntime() as unknown as RuntimeHarness;
-    const stealth = StealthScripts2025 as unknown as StealthStaticHarness;
 
     const originals = {
       collect: runtime.collector.collect,
@@ -289,8 +267,6 @@ describe('jshook tools handlers', () => {
       getActivePage: runtime.collector.getActivePage,
       getStatus: runtime.collector.getStatus,
       getBrowser: runtime.browserManager.getBrowser,
-      injectAll: stealth.injectAll,
-      getPresets: stealth.getPresets,
     };
 
     runtime.collector.collect = async () => ({
@@ -493,9 +469,6 @@ describe('jshook tools handlers', () => {
     runtime.pageController.getPage = async () => activePage;
     runtime.collector.getActivePage = async () => activePage;
 
-    stealth.injectAll = async () => undefined;
-    stealth.getPresets = () => ({'windows-chrome': {preset: 'windows-chrome'}});
-
     try {
       const res = makeResponse();
 
@@ -669,198 +642,6 @@ describe('jshook tools handlers', () => {
         runtime,
       );
       await invokeTool(
-        saveSessionState as unknown as ToolDefinitionHarness,
-        {sessionId: 's1'},
-        res,
-        runtime,
-      );
-      await invokeTool(
-        saveSessionState as unknown as ToolDefinitionHarness,
-        {
-          sessionId: 's-empty',
-          includeCookies: false,
-          includeLocalStorage: false,
-          includeSessionStorage: false,
-        },
-        res,
-        runtime,
-      );
-      await invokeTool(
-        restoreSessionState as unknown as ToolDefinitionHarness,
-        {sessionId: 's1', clearStorageBeforeRestore: true},
-        res,
-        runtime,
-      );
-      await invokeTool(
-        restoreSessionState as unknown as ToolDefinitionHarness,
-        {sessionId: 's1', navigateToSavedUrl: false},
-        res,
-        runtime,
-      );
-      await invokeTool(
-        listSessionStates as unknown as ToolDefinitionHarness,
-        {},
-        res,
-        runtime,
-      );
-      await invokeTool(
-        dumpSessionState as unknown as ToolDefinitionHarness,
-        {sessionId: 's1', pretty: false},
-        res,
-        runtime,
-      );
-      const tempDir = await mkdtemp(join(tmpdir(), 'js-reverse-mcp-'));
-      const snapshotPath = join(tempDir, 'session-s1.json');
-      const encryptedSnapshotPath = join(tempDir, 'session-s1.encrypted.json');
-      const originalEncryptionKey = process.env.SESSION_STATE_ENCRYPTION_KEY;
-      try {
-        await invokeTool(
-          dumpSessionState as unknown as ToolDefinitionHarness,
-          {sessionId: 's1', path: snapshotPath},
-          res,
-          runtime,
-        );
-        const snapshotJson = await readFile(snapshotPath, 'utf8');
-        process.env.SESSION_STATE_ENCRYPTION_KEY = 'unit-test-session-key';
-        await invokeTool(
-          dumpSessionState as unknown as ToolDefinitionHarness,
-          {
-            sessionId: 's1',
-            path: encryptedSnapshotPath,
-            encrypt: true,
-          },
-          res,
-          runtime,
-        );
-        await invokeTool(
-          loadSessionState as unknown as ToolDefinitionHarness,
-          {
-            path: encryptedSnapshotPath,
-            sessionId: 's1-encrypted',
-            overwrite: true,
-          },
-          res,
-          runtime,
-        );
-        process.env.SESSION_STATE_ENCRYPTION_KEY = '';
-        await assert.rejects(async () => {
-          await invokeTool(
-            dumpSessionState as unknown as ToolDefinitionHarness,
-            {
-              sessionId: 's1',
-              path: encryptedSnapshotPath,
-              encrypt: true,
-            },
-            res,
-            runtime,
-          );
-        });
-        await assert.rejects(async () => {
-          await invokeTool(
-            loadSessionState as unknown as ToolDefinitionHarness,
-            {
-              path: encryptedSnapshotPath,
-              sessionId: 's1-encrypted-2',
-              overwrite: true,
-            },
-            res,
-            runtime,
-          );
-        });
-        await invokeTool(
-          deleteSessionState as unknown as ToolDefinitionHarness,
-          {sessionId: 's1'},
-          res,
-          runtime,
-        );
-        await invokeTool(
-          loadSessionState as unknown as ToolDefinitionHarness,
-          {snapshotJson, sessionId: 's1'},
-          res,
-          runtime,
-        );
-        await assert.rejects(async () => {
-          await invokeTool(
-            loadSessionState as unknown as ToolDefinitionHarness,
-            {snapshotJson, sessionId: 's1'},
-            res,
-            runtime,
-          );
-        });
-        await invokeTool(
-          loadSessionState as unknown as ToolDefinitionHarness,
-          {path: snapshotPath, sessionId: 's1', overwrite: true},
-          res,
-          runtime,
-        );
-
-        const expiredSnapshotJson = JSON.stringify({
-          id: 'expired-one',
-          savedAt: new Date().toISOString(),
-          expiresAt: new Date(Date.now() - 5_000).toISOString(),
-          url: 'https://expired.example.com',
-          title: 'expired',
-          cookies: [],
-          localStorage: {},
-          sessionStorage: {},
-        });
-        await invokeTool(
-          loadSessionState as unknown as ToolDefinitionHarness,
-          {snapshotJson: expiredSnapshotJson, overwrite: true},
-          res,
-          runtime,
-        );
-        await invokeTool(
-          listSessionStates as unknown as ToolDefinitionHarness,
-          {},
-          res,
-          runtime,
-        );
-      } finally {
-        process.env.SESSION_STATE_ENCRYPTION_KEY = originalEncryptionKey;
-        await rm(tempDir, {recursive: true, force: true});
-      }
-      await assert.rejects(async () => {
-        await invokeTool(
-          restoreSessionState as unknown as ToolDefinitionHarness,
-          {sessionId: 'missing-session'},
-          res,
-          runtime,
-        );
-      });
-      await assert.rejects(async () => {
-        await invokeTool(
-          dumpSessionState as unknown as ToolDefinitionHarness,
-          {sessionId: 'missing-session'},
-          res,
-          runtime,
-        );
-      });
-      await assert.rejects(async () => {
-        await invokeTool(
-          loadSessionState as unknown as ToolDefinitionHarness,
-          {},
-          res,
-          runtime,
-        );
-      });
-      await assert.rejects(async () => {
-        await invokeTool(
-          loadSessionState as unknown as ToolDefinitionHarness,
-          {snapshotJson: '{bad json}, res, runtime'},
-          res,
-          runtime,
-        );
-      });
-      await assert.rejects(async () => {
-        await invokeTool(
-          loadSessionState as unknown as ToolDefinitionHarness,
-          {snapshotJson: '1'},
-          res,
-          runtime,
-        );
-      });
-      await invokeTool(
         checkBrowserHealth as unknown as ToolDefinitionHarness,
         {},
         res,
@@ -905,31 +686,6 @@ describe('jshook tools handlers', () => {
       );
       runtime.pageController.getPage = async () => activePage;
 
-      await invokeTool(
-        injectStealth as unknown as ToolDefinitionHarness,
-        {preset: 'windows-chrome'},
-        res,
-        runtime,
-      );
-      await invokeTool(
-        listStealthPresets as unknown as ToolDefinitionHarness,
-        {},
-        res,
-        runtime,
-      );
-      await invokeTool(
-        listStealthFeatures as unknown as ToolDefinitionHarness,
-        {},
-        res,
-        runtime,
-      );
-      await invokeTool(
-        setUserAgent as unknown as ToolDefinitionHarness,
-        {userAgent: 'ua-test'},
-        res,
-        runtime,
-      );
-
       await assert.rejects(
         () =>
           invokeTool(
@@ -947,7 +703,6 @@ describe('jshook tools handlers', () => {
           line.includes('Successfully clicked on element'),
         ),
       );
-      assert.ok(res.lines.some(line => line.includes('User-Agent updated.')));
       assert.ok(res.lines.some(line => line.includes('"healthy"')));
       assert.ok(res.lines.some(line => line.includes('BROWSER_DISCONNECTED')));
       assert.ok(res.lines.some(line => line.includes('"unique"')));
@@ -1002,8 +757,6 @@ describe('jshook tools handlers', () => {
       runtime.collector.getActivePage = originals.getActivePage;
       runtime.collector.getStatus = originals.getStatus;
       runtime.browserManager.getBrowser = originals.getBrowser;
-      stealth.injectAll = originals.injectAll;
-      stealth.getPresets = originals.getPresets;
     }
   });
 });

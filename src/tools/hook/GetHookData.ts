@@ -194,7 +194,7 @@ function buildHookDiagnostics(
       ],
       nextSteps: [
         '触发登录、下单、分页等目标业务动作后重新读取 get_hook_data',
-        '使用 inject_preload_script 或在页面加载前安装 Hook',
+        '在页面加载前安装 Hook',
         '用 list_frames / select_frame 确认 Hook 注入到正确 Frame',
         '升级到 break_on_xhr、get_paused_info、evaluate_on_callframe 调试链路',
       ],

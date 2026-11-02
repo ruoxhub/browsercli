@@ -35,3 +35,15 @@ _Avoid_: Debug port file entry, port record, DevTools port snapshot, active port
 **Auto-Connect Probe**:
 The automatic discovery mechanism that locates and attaches to an active, running Chromium instance via its `Active Port Record` (specifically for `chrome://inspect/#remote-debugging` mode where HTTP discovery endpoints return 404), bypassing explicit host and port specification.
 _Avoid_: Automatic debugger scan, background browser hook, port sniffer, auto-attacher
+
+**Tool**:
+A single capability exposed to callers through the daemon's `tool.invoke` IPC request, defined via `defineTool()` with a name, description, Zod schema, category annotation, and handler. Tools are invoked as `browsercli call <tool_name>`; they are not CLI subcommands and carry no shell-level flag surface of their own.
+_Avoid_: Command, CLI command, endpoint, API route
+
+**Daemon Session**:
+A detached worker process bound to one workspace directory and identified by a workspace hash in the session registry. A session owns exactly one IPC socket, may host zero or more browser connections, and is discovered, spawned, and managed on demand by the `browsercli` client through the standard lifecycle commands (`start`, `stop`, `status`).
+_Avoid_: Workspace, server instance, background job, worker thread
+
+**Lifecycle Commands**:
+The triad of CLI commands (`start`, `stop`, `status`) modeled after `chrome-devtools` for managing daemon sessions and inspecting browser connections.
+_Avoid_: Session commands, daemon controls, process managers

@@ -32,13 +32,12 @@
   - [`list_websocket_connections`](#list_websocket_connections)
   - [`replay_network_request`](#replay_network_request)
   - [`replay_network_request_batch`](#replay_network_request_batch)
-- **[Debugging](#debugging)** (20 tools)
+- **[Debugging](#debugging)** (19 tools)
   - [`evaluate_on_callframe`](#evaluate_on_callframe)
   - [`evaluate_script`](#evaluate_script)
   - [`get_console_message`](#get_console_message)
   - [`get_css_styles`](#get_css_styles)
   - [`get_paused_info`](#get_paused_info)
-  - [`inject_preload_script`](#inject_preload_script)
   - [`inspect_locals`](#inspect_locals)
   - [`list_breakpoints`](#list_breakpoints)
   - [`list_console_messages`](#list_console_messages)
@@ -53,7 +52,7 @@
   - [`step_out`](#step_out)
   - [`step_over`](#step_over)
   - [`take_screenshot`](#take_screenshot)
-- **[JS Reverse Engineering](#js-reverse-engineering)** (37 tools)
+- **[JS Reverse Engineering](#js-reverse-engineering)** (33 tools)
   - [`anti_anti_debug`](#anti_anti_debug)
   - [`break_on_xhr`](#break_on_xhr)
   - [`bypass_debugger`](#bypass_debugger)
@@ -69,14 +68,11 @@
   - [`get_storage`](#get_storage)
   - [`hook_function`](#hook_function)
   - [`inject_hook`](#inject_hook)
-  - [`inject_stealth`](#inject_stealth)
   - [`inspect_object`](#inspect_object)
   - [`list_created_hooks`](#list_created_hooks)
   - [`list_hooks`](#list_hooks)
   - [`list_persistent_hooks`](#list_persistent_hooks)
   - [`list_scripts`](#list_scripts)
-  - [`list_stealth_features`](#list_stealth_features)
-  - [`list_stealth_presets`](#list_stealth_presets)
   - [`list_targets`](#list_targets)
   - [`monitor_events`](#monitor_events)
   - [`remove_hook`](#remove_hook)
@@ -84,7 +80,6 @@
   - [`search_in_scripts`](#search_in_scripts)
   - [`search_in_sources`](#search_in_sources)
   - [`set_breakpoint_on_text`](#set_breakpoint_on_text)
-  - [`set_user_agent`](#set_user_agent)
   - [`stop_monitor`](#stop_monitor)
   - [`trace_function`](#trace_function)
   - [`unhook_function`](#unhook_function)
@@ -98,16 +93,10 @@
   - [`emulate_mobile`](#emulate_mobile)
   - [`emulate_network`](#emulate_network)
   - [`resize_page`](#resize_page)
-- **[Pages](#pages)** (9 tools)
+- **[Pages](#pages)** (3 tools)
   - [`check_browser_health`](#check_browser_health)
-  - [`delete_session_state`](#delete_session_state)
   - [`detect_captcha`](#detect_captcha)
-  - [`dump_session_state`](#dump_session_state)
   - [`handle_dialog`](#handle_dialog)
-  - [`list_session_states`](#list_session_states)
-  - [`load_session_state`](#load_session_state)
-  - [`restore_session_state`](#restore_session_state)
-  - [`save_session_state`](#save_session_state)
 - **[Diagnostics](#diagnostics)** (1 tools)
   - [`diagnose_environment`](#diagnose_environment)
 
@@ -432,15 +421,6 @@
 
 - `includeScopes`
 
-### `inject_preload_script` — inject_preload_script
-
-**Description:** 为当前页面/上下文的后续文档注册预加载脚本
-
-**Parameters:**
-
-- `script`
-- `preset`
-
 ### `inspect_locals` — 检查局部变量
 
 **Description:** 检查当前暂停栈所有帧的局部变量摘要。
@@ -716,14 +696,6 @@
 - `persistent`
 - `world`
 
-### `inject_stealth` — inject_stealth
-
-**Description:** 注入反检测隐身脚本（隐藏 webdriver、伪装 chrome、canvas 噪点等）
-
-**Parameters:**
-
-- `preset`
-
 ### `inspect_object` — 检查对象
 
 **Description:** 深度检查一个 JavaScript 对象，展示其属性、原型链与方法，便于理解对象结构。
@@ -763,14 +735,6 @@
 **Parameters:**
 
 - `filter`
-
-### `list_stealth_features` — list_stealth_features
-
-**Description:** 列出可用的隐身特性开关
-
-### `list_stealth_presets` — list_stealth_presets
-
-**Description:** 列出可用的隐身预设
 
 ### `list_targets` — list_targets
 
@@ -838,14 +802,6 @@
 - `urlFilter`
 - `occurrence`
 - `condition`
-
-### `set_user_agent` — set_user_agent
-
-**Description:** 通过 CDP 为当前页面设置自定义 User-Agent
-
-**Parameters:**
-
-- `userAgent`
 
 ### `stop_monitor` — 停止监控
 
@@ -960,14 +916,6 @@
 
 **Description:** 检查浏览器连接健康状态与页面可用性。
 
-### `delete_session_state` — delete_session_state
-
-**Description:** 删除会话状态
-
-**Parameters:**
-
-- `sessionId`
-
 ### `detect_captcha` — detect_captcha
 
 **Description:** 只读评估当前页面是否存在 CAPTCHA，并可等待挑战稳定清除；不会自动求解或操作页面。
@@ -977,17 +925,6 @@
 - `action`
 - `timeout`
 
-### `dump_session_state` — dump_session_state
-
-**Description:** 导出会话状态
-
-**Parameters:**
-
-- `sessionId`
-- `path`
-- `pretty`
-- `encrypt`
-
 ### `handle_dialog` — handle_dialog
 
 **Description:** 处理浏览器弹窗（alert/confirm/prompt），可接收或取消。
@@ -996,42 +933,6 @@
 
 - `action`
 - `promptText`
-
-### `list_session_states` — list_session_states
-
-**Description:** 列出会话状态
-
-### `load_session_state` — load_session_state
-
-**Description:** 加载会话状态
-
-**Parameters:**
-
-- `sessionId`
-- `path`
-- `snapshotJson`
-- `overwrite`
-
-### `restore_session_state` — restore_session_state
-
-**Description:** 恢复会话状态
-
-**Parameters:**
-
-- `sessionId`
-- `navigateToSavedUrl`
-- `clearStorageBeforeRestore`
-
-### `save_session_state` — save_session_state
-
-**Description:** 保存会话状态
-
-**Parameters:**
-
-- `sessionId`
-- `includeCookies`
-- `includeLocalStorage`
-- `includeSessionStorage`
 
 ## Diagnostics
 
