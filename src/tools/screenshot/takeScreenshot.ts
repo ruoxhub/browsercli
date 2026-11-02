@@ -7,6 +7,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
+import {preparePageForLongScreenshot} from '../../modules/screenshot/LongScreenshotEngine.js';
 import {zod} from '../../third_party/index.js';
 import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
@@ -87,21 +88,34 @@ export const takeScreenshot = defineTool({
         fs.mkdirSync(dir, {recursive: true});
       }
 
-      const screenshot = await withDebuggerTrapBypass(
-        context,
-        async () =>
-          await withOperationTimeout(
-            page.screenshot({
-              type: format as 'png' | 'jpeg',
-              fullPage: request.params.fullPage,
-              quality,
-              path: resolvedFilePath,
-              timeout: timeoutMs,
-            }),
-            '执行截图',
-            timeoutMs,
-          ),
-      );
+      let cleanupSticky: (() => Promise<void>) | undefined;
+      if (request.params.fullPage) {
+        const prep = await preparePageForLongScreenshot(page);
+        cleanupSticky = prep.restore;
+      }
+
+      let screenshot: Buffer | Uint8Array;
+      try {
+        screenshot = await withDebuggerTrapBypass(
+          context,
+          async () =>
+            await withOperationTimeout(
+              page.screenshot({
+                type: format as 'png' | 'jpeg',
+                fullPage: request.params.fullPage,
+                quality,
+                path: resolvedFilePath,
+                timeout: timeoutMs,
+              }),
+              '执行截图',
+              timeoutMs,
+            ),
+        );
+      } finally {
+        if (cleanupSticky) {
+          await cleanupSticky();
+        }
+      }
 
       const screenshotBuffer = Buffer.isBuffer(screenshot)
         ? screenshot
