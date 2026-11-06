@@ -8,6 +8,7 @@ import {getRuntime} from '../../runtime.js';
 import {zod} from '../../third_party/index.js';
 import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
+import {evaluateInPageRuntime} from '../debugger/evaluateInPageRuntime.js';
 import {getErrorMessage} from '../shared/pageResponse.js';
 import {defineTool} from '../ToolDefinition.js';
 
@@ -71,7 +72,9 @@ export const injectHook = defineTool({
 
     try {
       if (!persistent) {
-        await context.getSelectedFrame().evaluate(script);
+        // 必须走页面默认 world：frame.evaluate 落在 Playwright 隔离 world，
+        // 注入的 Hook 读不到也改不了页面自己的 window。
+        await evaluateInPageRuntime(context.getSelectedFrame(), script);
         const data = {...base, ranOnCurrentFrame: true};
         response.setStructuredContent({
           success: true,

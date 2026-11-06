@@ -9,6 +9,7 @@ import {createHash} from 'node:crypto';
 import type {BrowserContext, Disposable} from 'patchright';
 
 import {createToolError, ErrorCodes} from '../../utils/errors.js';
+import {evaluateInPageRuntime} from '../debugger/evaluateInPageRuntime.js';
 
 export interface PersistentHookEntry {
   hookId: string;
@@ -242,7 +243,9 @@ export class PersistentHookRegistry {
     for (const page of pages) {
       for (const frame of page.frames()) {
         try {
-          await frame.evaluate(request.script);
+          // 必须走页面默认 world：addInitScript 之后回填已存在 Frame 时，
+          // frame.evaluate 会落到 Playwright 隔离 world，页面主 world 仍然没有 Hook。
+          await evaluateInPageRuntime(frame, request.script);
           appliedFrames += 1;
         } catch (error) {
           failedFrames.push({

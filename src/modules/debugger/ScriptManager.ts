@@ -116,6 +116,8 @@ const MATCH_CONTEXT_MAX_CHARS = 2000;
 const KEYWORD_CONTEXT_MAX_CHARS = 1000;
 /** 上下文截断时围绕 match 提取的窗口大小。 */
 const CONTEXT_SNIPPET_WINDOW = 100;
+/** 脚本磁盘缓存文件的过期阈值，超过才允许被实例化时清理。 */
+const STALE_CACHE_FILE_AGE_MS = 24 * 60 * 60 * 1000;
 
 export class ScriptManager {
   private scripts = new Map<string, ScriptInfo>();
@@ -133,17 +135,23 @@ export class ScriptManager {
     this.purgeCache();
   }
 
-  /** 实例化时清空缓存目录,防止上次异常退出后残留文件堆积。 */
+  /** 实例化时清理过期缓存文件，防止上次异常退出后残留堆积。 */
   private purgeCache(): void {
     const dir = path.join(os.tmpdir(), 'browsercli-scripts');
     if (!fs.existsSync(dir)) return;
 
+    const cutoff = Date.now() - STALE_CACHE_FILE_AGE_MS;
     let removed = 0;
     try {
       for (const entry of fs.readdirSync(dir)) {
         if (!entry.endsWith('.js')) continue;
+        const filePath = path.join(dir, entry);
         try {
-          fs.unlinkSync(path.join(dir, entry));
+          // 只删过期文件：缓存文件名按 URL 派生，会被同一进程内的多个
+          // ScriptManager（多页面/重连）共享，无条件删除会让存活实例的
+          // sourcePath 变成悬空路径，之后读取源码就报 "file missing"。
+          if (fs.statSync(filePath).mtimeMs > cutoff) continue;
+          fs.unlinkSync(filePath);
           removed++;
         } catch {
           // 单文件删除失败不影响其他文件清理
@@ -380,7 +388,9 @@ export class ScriptManager {
       return null;
     }
 
-    if (!targetScript.sourcePath) {
+    if (!targetScript.sourcePath || !fs.existsSync(targetScript.sourcePath)) {
+      // 缓存文件可能已被过期清理或其他 ScriptManager 删除，重置后从 CDP 重拉。
+      targetScript.sourcePath = undefined;
       const loaded = await this.loadScriptSource(targetScript);
       if (!loaded) return null;
     }
@@ -419,9 +429,10 @@ export class ScriptManager {
     script: ScriptInfo,
     session: CDPSession,
   ): Promise<boolean> {
-    if (script.sourcePath) {
+    if (script.sourcePath && fs.existsSync(script.sourcePath)) {
       return true;
     }
+    script.sourcePath = undefined;
 
     try {
       const {scriptSource} = await session.send('Debugger.getScriptSource', {
@@ -1005,18 +1016,8 @@ export class ScriptManager {
     return extracted;
   }
 
-  /** 清除所有数据(换网站时调用) */
+  /** 清除所有内存数据（换网站时调用）。磁盘缓存文件保留，由过期清理机制回收。 */
   clear(): void {
-    // 删除所有脚本临时文件
-    for (const script of this.scripts.values()) {
-      if (script.sourcePath) {
-        try {
-          fs.unlinkSync(script.sourcePath);
-        } catch {
-          // 忽略文件不存在或权限错误
-        }
-      }
-    }
     this.scripts.clear();
     this.scriptsByUrl.clear();
     this.keywordIndex.clear();

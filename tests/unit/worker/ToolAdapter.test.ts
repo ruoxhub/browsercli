@@ -371,7 +371,8 @@ describe('ToolAdapter', () => {
         }
 
         evaluateCalls.push({kind: 'cleanup', script: String(arg)});
-        return undefined;
+        // 模拟页面主 world 里确实删到了该 hook 的条目
+        return true;
       },
     };
     const page = {

@@ -152,7 +152,14 @@ const defaultMockPage = {
     clearCookies: async () => undefined,
     addCookies: async () => undefined,
     newCDPSession: async () => ({
-      send: async () => ({}),
+      on: () => undefined,
+      off: () => undefined,
+      send: async (method: string) => {
+        if (method === 'Runtime.evaluate') {
+          return {result: {value: undefined}};
+        }
+        return {};
+      },
       detach: async () => undefined,
     }),
   }),
