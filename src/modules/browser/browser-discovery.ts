@@ -33,6 +33,67 @@ export function checkPort(port: number): Promise<boolean> {
   });
 }
 
+const WINDOWS_DEVTOOLS_REL_PATHS = [
+  'Citro Labs/ego lite/User Data/DevToolsActivePort',
+  'Citro Labs/ego/User Data/DevToolsActivePort',
+  'Google/Chrome/User Data/DevToolsActivePort',
+  'Google/Chrome SxS/User Data/DevToolsActivePort',
+  'Chromium/User Data/DevToolsActivePort',
+  'Microsoft/Edge/User Data/DevToolsActivePort',
+  'Microsoft/Edge Beta/User Data/DevToolsActivePort',
+  'Microsoft/Edge Dev/User Data/DevToolsActivePort',
+  'Microsoft/Edge SxS/User Data/DevToolsActivePort',
+  'BraveSoftware/Brave-Browser/User Data/DevToolsActivePort',
+];
+
+/**
+ * 在 WSL (Linux) 环境下探测 Windows 宿主机的 AppData/Local 目录
+ */
+function getWslLocalAppDataDirs(): string[] {
+  const dirs: string[] = [];
+  const envLocal = process.env.LOCALAPPDATA;
+  if (envLocal) {
+    if (envLocal.startsWith('/')) {
+      dirs.push(envLocal);
+    } else {
+      const match = envLocal.match(/^([A-Za-z]):[/\\](.*)/);
+      if (match) {
+        dirs.push(
+          `/mnt/${match[1].toLowerCase()}/${match[2].replaceAll('\\', '/')}`,
+        );
+      }
+    }
+  }
+  try {
+    const drives = ['c', 'd', 'e'];
+    for (const drive of drives) {
+      const usersRoot = `/mnt/${drive}/Users`;
+      if (fs.existsSync(usersRoot)) {
+        for (const entry of fs.readdirSync(usersRoot)) {
+          if (
+            [
+              'Default',
+              'Default User',
+              'All Users',
+              'Public',
+              'desktop.ini',
+            ].includes(entry)
+          ) {
+            continue;
+          }
+          const candidate = path.join(usersRoot, entry, 'AppData', 'Local');
+          if (fs.existsSync(candidate) && !dirs.includes(candidate)) {
+            dirs.push(candidate);
+          }
+        }
+      }
+    }
+  } catch {
+    // 忽略文件系统权限或异常
+  }
+  return dirs;
+}
+
 /**
  * 获取 DevToolsActivePort 文件的可能路径列表（跨平台）
  */
@@ -74,43 +135,25 @@ export function getDevToolsActivePortPaths(userDataDir?: string): string[] {
   }
 
   if (platform === 'linux') {
-    return [
+    const paths = [
       path.join(home, '.config/citro-labs/ego-lite/DevToolsActivePort'),
       path.join(home, '.config/citro-labs/ego/DevToolsActivePort'),
       path.join(home, '.config/google-chrome/DevToolsActivePort'),
       path.join(home, '.config/chromium/DevToolsActivePort'),
       path.join(home, '.config/microsoft-edge/DevToolsActivePort'),
     ];
+    // WSL 兼容：如果运行在 WSL 环境中，Windows 侧的浏览器会将 DevToolsActivePort
+    // 写入 Windows 用户的 AppData/Local 目录（如 /mnt/c/Users/<user>/AppData/Local/...）
+    for (const wslLocal of getWslLocalAppDataDirs()) {
+      for (const rel of WINDOWS_DEVTOOLS_REL_PATHS) {
+        paths.push(path.join(wslLocal, rel));
+      }
+    }
+    return paths;
   }
 
   if (platform === 'win32') {
-    return [
-      path.join(
-        localAppData,
-        'Citro Labs/ego lite/User Data/DevToolsActivePort',
-      ),
-      path.join(localAppData, 'Citro Labs/ego/User Data/DevToolsActivePort'),
-      path.join(localAppData, 'Google/Chrome/User Data/DevToolsActivePort'),
-      path.join(localAppData, 'Google/Chrome SxS/User Data/DevToolsActivePort'),
-      path.join(localAppData, 'Chromium/User Data/DevToolsActivePort'),
-      path.join(localAppData, 'Microsoft/Edge/User Data/DevToolsActivePort'),
-      path.join(
-        localAppData,
-        'Microsoft/Edge Beta/User Data/DevToolsActivePort',
-      ),
-      path.join(
-        localAppData,
-        'Microsoft/Edge Dev/User Data/DevToolsActivePort',
-      ),
-      path.join(
-        localAppData,
-        'Microsoft/Edge SxS/User Data/DevToolsActivePort',
-      ),
-      path.join(
-        localAppData,
-        'BraveSoftware/Brave-Browser/User Data/DevToolsActivePort',
-      ),
-    ];
+    return WINDOWS_DEVTOOLS_REL_PATHS.map(rel => path.join(localAppData, rel));
   }
 
   return [];

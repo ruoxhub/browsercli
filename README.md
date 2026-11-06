@@ -23,13 +23,13 @@
 
 ## 1. 项目概览与架构
 
-**Browser-CLI** 是面向现代 Web 前端逆向工程、安全分析与自动化调试的专业工具集。
+**Browser-CLI** 是面向现代 Web 前端逆向工程、安全分析与自动化调试的工具集。
 
-不同于传统的单一爬虫框架或通用浏览器自动化测试工具，Browser-CLI 将**“页面观察 → 运行时采样 → 本地复现 → 补环境 → 证据沉淀”**串联为一套标准化的闭环工程工作流。
+不同于传统的单一爬虫框架或通用浏览器自动化测试工具，Browser-CLI 将**“页面观察 → 运行时采样 → 本地复现 → 补环境 → 证据沉淀”**串联为一套标准化的工作流。
 
 ### 架构设计：Daemon + CLI 模式
 
-系统采用**常驻守护进程（Daemon）+ CLI 客户端（`browsercli`）**的分离架构，二者通过本地命名管道（POSIX 下为 Unix Domain Socket，Windows 下为 Named Pipe）基于 NDJSON 帧协议进行低延迟通信：
+系统采用**常驻守护进程（Daemon）+ CLI 客户端（`browsercli`）**的分离架构，二者通过本地命名管道（POSIX 下为 Unix Domain Socket，Windows 下为 Named Pipe）基于 NDJSON 帧协议低延迟通信：
 
 ```
 ┌───────────────────────────────────────────────────────────────┐
@@ -52,15 +52,15 @@
 └───────────────────────────────────────────────────────────────┘
 ```
 
-- **纯本地 IPC 通信**：根据 [ADR 0006](docs/adr/0006-remove-mcp-entry-and-position-as-daemon-cli.md)，彻底移除了多余的 MCP stdio 与 HTTP 传输层，专注于高响应度、多会话隔离、支持打断与流式监听的守护进程架构。
-- **生命周期对齐**：根据 [ADR 0007](docs/adr/0007-align-lifecycle-commands-with-chrome-devtools.md)，全面对齐 `chrome-devtools` 交互标准，通过 `start`、`stop`、`status` 三大核心命令实现进程与浏览器的平滑管控。
-- **丰富的逆向工具面**：内置 90 个针对 JS 逆向深度定制的标准化工具（Covering Hook、网络、DOM、断点调试、WASM、反反调试等）。
+- **纯本地 IPC 通信**：根据 [ADR 0006](docs/adr/0006-remove-mcp-entry-and-position-as-daemon-cli.md)，移除了多余的 MCP stdio 与 HTTP 传输层，专注于高响应度、多会话隔离、支持打断与流式监听的守护进程架构。
+- **生命周期对齐**：根据 [ADR 0007](docs/adr/0007-align-lifecycle-commands-with-chrome-devtools.md)，对齐 `chrome-devtools` 交互标准，通过 `start`、`stop`、`status` 三个命令管理进程与浏览器。
+- **逆向工具面**：内置 90 个针对 JS 逆向深度定制的标准化工具（Covering Hook、网络、DOM、断点调试、WASM、反反调试等）。
 
 ---
 
 ## 2. 核心逆向方法论
 
-项目在开发与逆向实践中严格遵循以下六大方法论原则：
+项目在开发与逆向实践中遵循以下六大方法论原则：
 
 | 原则                                           | 含义与执行准则                                                                                                                          |
 | ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
@@ -75,9 +75,9 @@
 
 ## 3. 反检测哲学（Anti-Detection）
 
-Browser-CLI 与兄弟项目 [jshookmcp](https://github.com/zhizhuodemao/js-reverse-mcp) 秉承同一套反检测哲学：**默认零 JS 注入，反检测深度下沉至协议层与源码层**。
+Browser-CLI 与兄弟项目 [jshookmcp](https://github.com/zhizhuodemao/js-reverse-mcp) 采用同一套反检测思路：**默认零 JS 注入，反检测深度下沉至协议层与源码层**。
 
-> **核心认知**：粗暴的 `Object.defineProperty` 原型链覆盖本身就是现代反爬系统的关键检测特征。一旦页面扫描到 `navigator`、`canvas`、`WebGL` 存在 Proxy 或被篡改，自动化指纹即刻暴露。
+> 粗暴的 `Object.defineProperty` 原型链覆盖本身就是现代反爬系统的关键检测特征。一旦页面扫描到 `navigator`、`canvas`、`WebGL` 存在 Proxy 或被篡改，自动化指纹即刻暴露。
 
 ### 多层防护体系
 
@@ -124,7 +124,7 @@ npm run build
 
 #### 启动并连接浏览器 (`browsercli start`)
 
-`start` 命令负责拉起或重置 Daemon 守护进程。支持直接传递浏览器启动或连接选项，实现“单条命令完成进程启动 + 浏览器就绪”：
+`start` 命令负责拉起或重置 Daemon 守护进程，支持直接传递浏览器启动或连接选项，用一条命令完成进程启动与浏览器就绪：
 
 ```bash
 # 启动 daemon 并自动打开系统 Chrome
@@ -164,7 +164,7 @@ browsercli stop --all
 
 ### 5.1 工具调用规范：`browsercli call`
 
-在 Browser-CLI 中，**Tool 是能力的唯一暴露单元**（定义于 `src/tools/`），通过 `browsercli call <tool_name> [options]` 调用：
+在 Browser-CLI 中，Tool 是能力的唯一暴露单元（定义于 `src/tools/`），通过 `browsercli call <tool_name> [options]` 调用：
 
 ```bash
 # 1. 页面导航
@@ -218,7 +218,7 @@ JS_REVERSE_TOOL_PROFILE=workflow browsercli start --channel chrome
 
 - `browsercli jobs`：查看或取消异步长耗时逆向任务。
 - `browsercli config`：查看、设置或初始化全局与运行时配置。
-- `browsercli scaffold`：快速创建标准化的逆向分析任务目录骨架。
+- `browsercli scaffold`：创建标准化的逆向分析任务目录骨架。
 
 ---
 
@@ -283,7 +283,7 @@ Browser-CLI/
 - **某手 `falcon` 风控参数逆向**：[scripts/cases/ks-hxfalcon-pure-node.mjs](scripts/cases/ks-hxfalcon-pure-node.mjs)
 - **某音 `a-bogus` 算法提取**：[scripts/cases/douyin-a-bogus-pure-node.mjs](scripts/cases/douyin-a-bogus-pure-node.mjs)
 
-> **任务产物规范**：真实的逆向任务过程证据统一沉淀在本地 `artifacts/tasks/<task-id>/` 目录下（遵循 `_TEMPLATE/` 规范，git 默认忽略私有任务内容）。
+> 真实的逆向任务过程证据统一保存在本地 `artifacts/tasks/<task-id>/` 目录下（遵循 `_TEMPLATE/` 规范，git 默认忽略私有任务内容）。
 
 ---
 

@@ -5,7 +5,7 @@
  */
 import assert from 'node:assert';
 import fs from 'node:fs';
-import {afterEach, beforeEach, describe, it} from 'node:test';
+import {afterEach, describe, it} from 'node:test';
 
 import {
   findActiveDevToolsPort,
@@ -38,11 +38,15 @@ describe('browser-discovery DevToolsActivePort probing', () => {
 
     fs.readFileSync = ((filePath: fs.PathOrFileDescriptor) => {
       const p = String(filePath);
-      for (const [key, val] of Object.entries(files)) {
+      for (const [_key, _val] of Object.entries(files)) {
         if (p.endsWith('DevToolsActivePort')) {
           if (p.includes('Chrome'))
             return files['C:\\mock\\Chrome\\DevToolsActivePort'];
-          if (p.includes('Ego') || p.includes('Citro Labs'))
+          if (
+            p.includes('Ego') ||
+            p.includes('Citro Labs') ||
+            p.includes('ego')
+          )
             return files['C:\\mock\\Ego\\DevToolsActivePort'];
         }
       }
@@ -76,5 +80,15 @@ describe('browser-discovery DevToolsActivePort probing', () => {
     assert.ok(matched);
     assert.strictEqual(matched.port, 9222);
     assert.strictEqual(matched.wsPath, '/devtools/browser/ego-uuid');
+  });
+
+  it('getDevToolsActivePortPaths includes WSL Windows AppData paths on Linux', () => {
+    if (process.platform !== 'linux') return;
+    const paths = getDevToolsActivePortPaths();
+    assert.ok(paths.length > 5);
+    const hasWslPath = paths.some(
+      p => p.includes('Citro Labs') || p.includes('Google'),
+    );
+    assert.ok(hasWslPath, 'should include Windows browser paths on WSL Linux');
   });
 });

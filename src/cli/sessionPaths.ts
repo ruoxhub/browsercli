@@ -77,11 +77,13 @@ export function cliConfigPath(): string {
   const custom =
     process.env.BROWSERCLI_CONFIG_DIR ?? process.env.PROXYCLI_CONFIG_DIR;
   if (custom) return path.join(custom, 'config.json');
-  const browserDir = path.join(os.homedir(), '.browsercli');
-  if (fs.existsSync(browserDir)) return path.join(browserDir, 'config.json');
-  const proxyDir = path.join(os.homedir(), '.proxycli');
-  if (fs.existsSync(proxyDir)) return path.join(proxyDir, 'config.json');
-  return path.join(browserDir, 'config.json');
+  // 按配置文件是否存在来选路径，而不是按目录：~/.browsercli 会因日志等副作用被创建，
+  // 若以目录存在为判据，新目录建好但还没 config.json 时会静默丢弃旧目录里的配置。
+  const browserConfig = path.join(os.homedir(), '.browsercli', 'config.json');
+  if (fs.existsSync(browserConfig)) return browserConfig;
+  const proxyConfig = path.join(os.homedir(), '.proxycli', 'config.json');
+  if (fs.existsSync(proxyConfig)) return proxyConfig;
+  return browserConfig;
 }
 
 export interface CliConfig {

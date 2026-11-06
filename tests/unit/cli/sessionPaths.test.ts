@@ -13,6 +13,7 @@ import test from 'node:test';
 
 import {
   assertValidSessionName,
+  cliConfigPath,
   computeClientInfo,
   computeWorkspaceDir,
   deleteSession,
@@ -236,5 +237,47 @@ test('loadSession/listSessions/deleteSession 往返并忽略非 .session 文件'
     assert.ok(fs.existsSync(path.join(dir, 's1.err')), '非 session 文件不动');
   } finally {
     fs.rmSync(dir, {recursive: true, force: true});
+  }
+});
+
+test('cliConfigPath 按配置文件存在性选择目录，~/.browsercli 仅有日志目录时不丢弃旧配置', () => {
+  const home = makeTempDir();
+  const prevHome = process.env.HOME;
+  const prevUserProfile = process.env.USERPROFILE;
+  const prevBrowserConfigDir = process.env.BROWSERCLI_CONFIG_DIR;
+  const prevProxyConfigDir = process.env.PROXYCLI_CONFIG_DIR;
+  try {
+    delete process.env.BROWSERCLI_CONFIG_DIR;
+    delete process.env.PROXYCLI_CONFIG_DIR;
+    process.env.HOME = home;
+    process.env.USERPROFILE = home;
+
+    // 新目录已被日志副作用创建，但还没有 config.json
+    fs.mkdirSync(path.join(home, '.browsercli', 'log'), {recursive: true});
+    const legacyConfig = path.join(home, '.proxycli', 'config.json');
+    fs.mkdirSync(path.dirname(legacyConfig), {recursive: true});
+    fs.writeFileSync(
+      legacyConfig,
+      JSON.stringify({workerEntry: '/x'}),
+      'utf-8',
+    );
+    assert.strictEqual(cliConfigPath(), legacyConfig);
+
+    // 新目录一旦有 config.json 就优先
+    const currentConfig = path.join(home, '.browsercli', 'config.json');
+    fs.writeFileSync(currentConfig, '{}', 'utf-8');
+    assert.strictEqual(cliConfigPath(), currentConfig);
+  } finally {
+    if (prevHome === undefined) delete process.env.HOME;
+    else process.env.HOME = prevHome;
+    if (prevUserProfile === undefined) delete process.env.USERPROFILE;
+    else process.env.USERPROFILE = prevUserProfile;
+    if (prevBrowserConfigDir === undefined)
+      delete process.env.BROWSERCLI_CONFIG_DIR;
+    else process.env.BROWSERCLI_CONFIG_DIR = prevBrowserConfigDir;
+    if (prevProxyConfigDir === undefined)
+      delete process.env.PROXYCLI_CONFIG_DIR;
+    else process.env.PROXYCLI_CONFIG_DIR = prevProxyConfigDir;
+    fs.rmSync(home, {recursive: true, force: true});
   }
 });
