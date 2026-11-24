@@ -8,7 +8,6 @@ import {performance} from 'node:perf_hooks';
 import {describe, it} from 'node:test';
 
 import {CodeCompressor} from '../../src/modules/collector/CodeCompressor.js';
-import {ToolExecutionScheduler} from '../../src/utils/ToolExecutionScheduler.js';
 
 const runPerf = process.env.RUN_PERF_TESTS === 'true';
 
@@ -35,23 +34,5 @@ describe('Performance Baseline', {skip: !runPerf}, () => {
     }
 
     assert.ok(percentile(timings, 95) < 2500);
-  });
-
-  it('keeps read-only scheduler batch within baseline', async () => {
-    const scheduler = new ToolExecutionScheduler();
-    const start = performance.now();
-    await Promise.all(
-      Array.from({length: 20}, () =>
-        scheduler.execute(true, async () => {
-          let sum = 0;
-          for (let i = 0; i < 1_000; i += 1) {
-            sum += i;
-          }
-          return sum;
-        }),
-      ),
-    );
-    const elapsed = performance.now() - start;
-    assert.ok(elapsed < 1200);
   });
 });

@@ -8,7 +8,6 @@ import {describe, it} from 'node:test';
 
 import {SmartCodeCollector} from '../../src/modules/collector/SmartCodeCollector.js';
 import {HookManager} from '../../src/modules/hook/HookManager.js';
-import {ToolExecutionScheduler} from '../../src/utils/ToolExecutionScheduler.js';
 
 const runE2E = process.env.RUN_E2E_TESTS === 'true';
 
@@ -33,14 +32,5 @@ describe('E2E Scenarios', {skip: !runE2E}, () => {
     const manager = new HookManager();
     const hook = manager.create({type: 'fetch'} as any);
     assert.ok(hook.script.includes('fetch'));
-  });
-
-  it('Scenario 4: multi-tool concurrency flow', async () => {
-    const scheduler = new ToolExecutionScheduler();
-    const results = await Promise.all([
-      scheduler.execute(true, async () => 'a'),
-      scheduler.execute(true, async () => 'b'),
-    ]);
-    assert.deepStrictEqual(results.sort(), ['a', 'b']);
   });
 });

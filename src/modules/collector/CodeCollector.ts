@@ -44,7 +44,6 @@ import {
   type CodeSummary,
   type SmartCollectOptions,
 } from './SmartCodeCollector.js';
-// import { StreamingCollector } from './StreamingCollector.js'; // 暂不使用
 
 export class CodeCollector {
   private config: BrowserManagerConfig;
