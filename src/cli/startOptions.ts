@@ -13,7 +13,7 @@ import type {Options} from 'yargs';
 
 import {parseEnvBoolean} from '../config/browserInvariants.js';
 import {CHANNELS} from '../config/constants.js';
-import {toKebabCase} from '../config/options.js';
+import {getCliOptions, toKebabCase} from '../config/server-options.js';
 
 import type {CliConfig} from './sessionPaths.js';
 import type {BrowserConnectOptions} from './types.js';
@@ -22,110 +22,35 @@ export {CHANNELS};
 
 const CHANNEL_SET = new Set<string>(CHANNELS);
 
-export const START_YARGS_OPTIONS: Record<string, Options> = {
-  // 连接与目标（互斥）
-  browserUrl: {
-    alias: 'u',
-    type: 'string',
-    describe: '连接运行中的 Chrome 远程调试地址（如 http://127.0.0.1:9222）',
-  },
-  wsEndpoint: {
-    alias: 'w',
-    type: 'string',
-    describe: 'WebSocket 端点地址（如 ws://127.0.0.1:9222/devtools/browser/...）',
-  },
-  wsHeaders: {
-    type: 'string',
-    describe: 'WebSocket 连接自定义请求头（JSON 对象）',
-  },
-  autoConnect: {
-    type: 'boolean',
-    describe: '自动连接到本地运行中的 Chrome 实例 (Chrome 144+)',
-  },
-  channel: {
-    type: 'string',
-    describe: '本地启动浏览器渠道（stable, beta, dev, canary, chrome, firefox 等）',
-  },
-  executablePath: {
-    alias: 'e',
-    type: 'string',
-    describe: '本地自定义浏览器可执行文件路径',
-  },
+function buildStartYargsOptions(): Record<string, Options> {
+  const derived: Record<string, Options> = {};
+  const deferredCoerceKeys = new Set([
+    'browserUrl',
+    'wsEndpoint',
+    'wsHeaders',
+    'viewport',
+  ]);
+  for (const [key, opt] of Object.entries(getCliOptions())) {
+    if (!opt) continue;
+    const copy: Options = {...opt};
+    if (deferredCoerceKeys.has(key)) {
+      delete copy.coerce;
+    }
+    derived[key] = copy;
+  }
 
-  // 浏览器运行与网络
-  headless: {type: 'boolean', describe: '以无头模式运行浏览器'},
-  isolated: {type: 'boolean', describe: '创建临时 user-data-dir，退出后清理'},
-  userDataDir: {type: 'string', describe: '指定 Chrome 用户数据目录'},
-  proxyServer: {type: 'string', describe: '代理服务器配置'},
-  chromeArg: {type: 'array', describe: '传递给 Chrome 启动进程的附加参数'},
-  ignoreDefaultChromeArg: {type: 'array', describe: '禁用指定的 Chrome 默认参数'},
-  acceptInsecureCerts: {type: 'boolean', describe: '忽略自签名和过期证书错误'},
-  viewport: {type: 'string', describe: '窗口视口尺寸（如 1280x720）'},
+  return {
+    ...derived,
+    noConsole: {type: 'boolean', hidden: true},
+    consolePort: {type: 'number', hidden: true},
+    // 控制与输出
+    force: {type: 'boolean', describe: '强制重新连接浏览器'},
+    json: {type: 'boolean', describe: '以 JSON 格式输出结果'},
+  };
+}
 
-  // 反检测（BrowserCLI）
-  cloak: {type: 'boolean', describe: '启用 CloakBrowser 源码级反检测二进制'},
-  minimalStealth: {type: 'boolean', describe: '启用最小反检测启动参数'},
-  fullStealthArgs: {type: 'boolean', describe: '启用全量隐身启动参数'},
-  jsStealth: {type: 'boolean', describe: '注入 StealthScripts2025 JS 脚本'},
-
-  // 工具分类开关
-  categoryInput: {type: 'boolean', describe: '启用/禁用输入相关工具'},
-  categoryNavigation: {type: 'boolean', describe: '启用/禁用导航相关工具'},
-  categoryEmulation: {type: 'boolean', describe: '启用/禁用仿真相关工具'},
-  categoryPerformance: {type: 'boolean', describe: '启用/禁用性能相关工具'},
-  categoryNetwork: {type: 'boolean', describe: '启用/禁用网络相关工具'},
-  categoryDebugging: {type: 'boolean', describe: '启用/禁用调试相关工具'},
-  categoryExtensions: {type: 'boolean', describe: '启用/禁用扩展相关工具'},
-  categoryExperimentalThirdParty: {type: 'boolean', hidden: true},
-  categoryMemory: {type: 'boolean', hidden: true},
-  categoryExperimentalWebmcp: {type: 'boolean', hidden: true},
-  categoryPwa: {type: 'boolean', hidden: true},
-
-  // 截图与视觉
-  screenshotFormat: {
-    type: 'string',
-    choices: ['jpeg', 'png', 'webp'],
-    describe: '默认截图格式',
-  },
-  screenshotQuality: {type: 'number', describe: '截图压缩质量（0-100）'},
-  screenshotMaxWidth: {type: 'number', describe: '截图最大宽度（px）'},
-  screenshotMaxHeight: {type: 'number', describe: '截图最大高度（px）'},
-  experimentalVision: {type: 'boolean', describe: '启用基于坐标的视觉工具'},
-
-  // 网络限制、调试与工作区
-  blockedUrlPattern: {type: 'array', describe: '阻止指定 URL Pattern'},
-  allowedUrlPattern: {type: 'array', describe: '仅允许指定 URL Pattern'},
-  redactNetworkHeaders: {type: 'boolean', describe: '脱敏敏感网络请求头'},
-  maxNavigationSaved: {type: 'number', describe: '每个页面保留日志的导航次数'},
-  logFile: {type: 'string', describe: '调试日志写入文件路径'},
-  experimentalDevtools: {type: 'boolean', describe: '启用 DevTools Target 操作'},
-  memoryDebugging: {type: 'boolean', hidden: true},
-  experimentalMemory: {type: 'boolean', hidden: true},
-  experimentalIncludeAllPages: {type: 'boolean', describe: '包含全部页面/webview'},
-  experimentalScreencast: {type: 'boolean', describe: '启用录屏功能'},
-  experimentalFfmpegPath: {type: 'string', hidden: true},
-  screencastFps: {type: 'number', describe: '录屏帧率'},
-  experimentalScreencastFps: {type: 'number', hidden: true},
-  performanceCrux: {type: 'boolean', hidden: true},
-  usageStatistics: {type: 'boolean', hidden: true},
-  javascriptEvaluation: {type: 'boolean', describe: '允许执行自定义 JS'},
-  fileNavigations: {type: 'boolean', describe: '允许导航到 file: URL'},
-  sourceMaps: {type: 'boolean', describe: '启用 DevTools source maps'},
-  workspace: {
-    alias: 'filesystemRoot',
-    type: 'array',
-    describe: '允许文件系统工具访问的目录',
-  },
-  allowUnrestrictedPaths: {type: 'boolean', describe: '解除受限工作区路径限制'},
-  config: {type: 'string', describe: '指定 JSON 配置文件路径'},
-  watchConfig: {type: 'boolean', describe: '监听配置文件变更并热重载'},
-  noConsole: {type: 'boolean', hidden: true},
-  consolePort: {type: 'number', hidden: true},
-
-  // 控制与输出
-  force: {type: 'boolean', describe: '强制重新连接浏览器'},
-  json: {type: 'boolean', describe: '以 JSON 格式输出结果'},
-};
+export const START_YARGS_OPTIONS: Record<string, Options> =
+  buildStartYargsOptions();
 
 const BROWSER_CONNECT_KEYS = new Set([
   'browserUrl',
@@ -234,7 +159,9 @@ export function serializeStartFlags(
         args.push(`--${kebab}=${String(item)}`);
       }
     } else {
-      args.push(`--${kebab}=${String(value)}`);
+      const serialized =
+        typeof value === 'object' ? JSON.stringify(value) : String(value);
+      args.push(`--${kebab}=${serialized}`);
     }
   }
 
@@ -344,7 +271,9 @@ export function buildBrowserConnectOptions(
   }
 
   const remote =
-    browserURL !== undefined || wsEndpoint !== undefined || autoConnect === true;
+    browserURL !== undefined ||
+    wsEndpoint !== undefined ||
+    autoConnect === true;
   const local = channel !== undefined || executablePath !== undefined;
   if (
     (browserURL !== undefined && wsEndpoint !== undefined) ||
@@ -415,7 +344,8 @@ export function buildBrowserConnectOptions(
     (nested?.userDataDir as string | undefined) ??
     rawConfig.userDataDir;
   if (userDataDir !== undefined) options.userDataDir = userDataDir;
-  if (typeof argv.proxyServer === 'string') options.proxyServer = argv.proxyServer;
+  if (typeof argv.proxyServer === 'string')
+    options.proxyServer = argv.proxyServer;
 
   const chromeArg = parseStringArray(argv.chromeArg);
   if (chromeArg !== undefined) options.chromeArg = chromeArg;

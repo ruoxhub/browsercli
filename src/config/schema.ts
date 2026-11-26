@@ -60,6 +60,17 @@ const ViewportSchema: zodType.ZodType<{width: number; height: number}> = zod
   })
   .strip() as zodType.ZodType<{width: number; height: number}>;
 
+const TopLevelViewportSchema = zod.preprocess(value => {
+  if (typeof value === 'string') {
+    const parts = value.split('x');
+    if (parts.length === 2) {
+      const [width, height] = parts.map(Number);
+      return {width, height};
+    }
+  }
+  return value;
+}, ViewportSchema);
+
 export const BrowserConfigSchema = zod
   .object({
     headless: booleanSchema.optional(),
@@ -122,7 +133,7 @@ export const BrowserConfigSchema = zod
     maxNavigationSaved: zod.coerce.number().int().min(1).max(25).optional(),
 
     screenshotFormat: screenshotFormatSchema.optional(),
-    screenshotQuality: zod.coerce.number().min(0).max(100).optional(),
+    screenshotQuality: zod.coerce.number().int().min(0).max(100).optional(),
     screenshotMaxWidth: positiveIntSchema.optional(),
     screenshotMaxHeight: positiveIntSchema.optional(),
 
@@ -188,17 +199,20 @@ export const GlobalConfigSchema = zod
     categoryEmulation: booleanSchema.optional(),
     categoryPerformance: booleanSchema.optional(),
     categoryNetwork: booleanSchema.optional(),
+    categoryNetworkMocks: booleanSchema.optional(),
     categoryDebugging: booleanSchema.optional(),
     categoryExtensions: booleanSchema.optional(),
     categoryExperimentalThirdParty: booleanSchema.optional(),
     categoryMemory: booleanSchema.optional(),
     categoryExperimentalWebmcp: booleanSchema.optional(),
     categoryPwa: booleanSchema.optional(),
+    categoryWebauthn: booleanSchema.optional(),
 
     // 浏览器启动与网络连接扩展
     channel: optionalStringSchema.optional(),
     isolated: booleanSchema.optional(),
     acceptInsecureCerts: booleanSchema.optional(),
+    viewport: TopLevelViewportSchema.optional(),
     wsHeaders: zod.preprocess(value => {
       if (typeof value === 'string') {
         try {
@@ -219,13 +233,14 @@ export const GlobalConfigSchema = zod
 
     // 截图与视觉
     screenshotFormat: screenshotFormatSchema.optional(),
-    screenshotQuality: zod.coerce.number().min(0).max(100).optional(),
+    screenshotQuality: zod.coerce.number().int().min(0).max(100).optional(),
     screenshotMaxWidth: positiveIntSchema.optional(),
     screenshotMaxHeight: positiveIntSchema.optional(),
     experimentalVision: booleanSchema.optional(),
 
     // 调试、日志与实验特性
     logFile: optionalStringSchema.optional(),
+    pageIdRouting: booleanSchema.optional(),
     experimentalDevtools: booleanSchema.optional(),
     memoryDebugging: booleanSchema.optional(),
     experimentalMemory: booleanSchema.optional(),
@@ -244,6 +259,7 @@ export const GlobalConfigSchema = zod
     allowUnrestrictedPaths: booleanSchema.optional(),
     workspace: stringArraySchema.optional(),
     filesystemRoot: stringArraySchema.optional(),
+    viaCli: booleanSchema.optional(),
 
     // 配置文件与监听
     config: optionalStringSchema.optional(),

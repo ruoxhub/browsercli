@@ -33,6 +33,7 @@ import {
   USER_CONFIG_FILENAME,
 } from './constants.js';
 
+export const CONFIG_FILE_NAME = PLUGIN_CONFIG_FILENAME;
 export const NO_CONFIG_DISCOVERY_ENV = 'BROWSERCLI_NO_CONFIG_DISCOVERY';
 
 function isFile(filePath: string): boolean {
@@ -52,7 +53,8 @@ export class ConfigLocator {
     env: NodeJS.ProcessEnv = process.env,
     homedir: string = os.homedir(),
   ): string {
-    const customDir = env['BROWSERCLI_CONFIG_DIR'] ?? env['PROXYCLI_CONFIG_DIR'];
+    const customDir =
+      env['BROWSERCLI_CONFIG_DIR'] ?? env['PROXYCLI_CONFIG_DIR'];
     if (customDir) {
       return path.join(customDir, USER_CONFIG_FILENAME);
     }
@@ -78,7 +80,23 @@ export class ConfigLocator {
         return path.join(xdgConfigHome, RUNTIME_DIR_NAME, USER_CONFIG_FILENAME);
       }
     }
-    return path.join(homedir, '.config', RUNTIME_DIR_NAME, USER_CONFIG_FILENAME);
+    return path.join(
+      homedir,
+      '.config',
+      RUNTIME_DIR_NAME,
+      USER_CONFIG_FILENAME,
+    );
+  }
+
+  /**
+   * 对齐 chrome-devtools-mcp 命名：`getPlatformConfigPath` 的别名。
+   */
+  getGlobalConfigPath(
+    env: NodeJS.ProcessEnv = process.env,
+    platform: NodeJS.Platform = process.platform,
+    homedir: string = os.homedir(),
+  ): string {
+    return this.getPlatformConfigPath(env, platform, homedir);
   }
 
   /**
@@ -89,7 +107,8 @@ export class ConfigLocator {
     platform: NodeJS.Platform = process.platform,
     homedir: string = os.homedir(),
   ): string[] {
-    const customDir = env['BROWSERCLI_CONFIG_DIR'] ?? env['PROXYCLI_CONFIG_DIR'];
+    const customDir =
+      env['BROWSERCLI_CONFIG_DIR'] ?? env['PROXYCLI_CONFIG_DIR'];
     if (customDir) {
       return [path.join(customDir, USER_CONFIG_FILENAME)];
     }

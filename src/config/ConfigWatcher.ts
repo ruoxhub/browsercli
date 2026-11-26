@@ -36,13 +36,15 @@ function getErrorMessage(error: unknown): string {
 export interface ConfigWatcherOptions {
   debounceMs?: number;
   onError?: (message: string, err: unknown) => void;
+  logger?: (message: string) => void;
 }
 
-export class ConfigWatcher {
+export class ConfigWatcher implements Disposable {
   readonly #configPath: string;
   readonly #onChange: (content: string) => Promise<void>;
   readonly #debounceMs: number;
   readonly #onError: (message: string, err: unknown) => void;
+  readonly #logger?: (message: string) => void;
   #watcher?: fs.FSWatcher;
   #timer?: ReturnType<typeof setTimeout>;
   #content?: string;
@@ -62,6 +64,7 @@ export class ConfigWatcher {
       ((message, err) => {
         console.error(message, err);
       });
+    this.#logger = options.logger;
   }
 
   get isWatching(): boolean {
@@ -120,6 +123,7 @@ export class ConfigWatcher {
       );
       this.dispose();
     });
+    this.#logger?.(`Watching ${realPath} for config changes`);
   }
 
   dispose(): void {
@@ -130,5 +134,9 @@ export class ConfigWatcher {
     }
     this.#watcher?.close();
     this.#watcher = undefined;
+  }
+
+  [Symbol.dispose](): void {
+    this.dispose();
   }
 }

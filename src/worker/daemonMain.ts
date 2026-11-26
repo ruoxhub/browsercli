@@ -15,10 +15,7 @@ import net from 'node:net';
 import path from 'node:path';
 
 import {defaultConfigLocator} from '../config/ConfigLocator.js';
-import {
-  loadUserConfigFile,
-  parseConfigFile,
-} from '../config/ConfigParser.js';
+import {loadUserConfigFile, parseConfigFile} from '../config/ConfigParser.js';
 import {ConfigWatcher} from '../config/ConfigWatcher.js';
 import {loadCachedRuntimeConfig} from '../config/runtimeConfigPersistence.js';
 import {getRuntimeConfigStore} from '../config/RuntimeConfigStore.js';
@@ -68,7 +65,10 @@ export interface DaemonRunResult {
 export function seedConfig(plan: DaemonPlan): GlobalConfig {
   const cachedArgs = loadCachedRuntimeConfig() ?? {};
   const cliConfig = parseWorkerArgs(plan.spawnFlags);
-  const cliSeed: GlobalConfig = {...cliConfig};
+  const cliSeed: GlobalConfig = {
+    viaCli: true,
+    ...cliConfig,
+  };
   if (plan.minimalStealth) {
     cliSeed.browser = {...(cliSeed.browser ?? {}), minimalStealth: true};
   }
@@ -88,6 +88,8 @@ export function seedConfig(plan: DaemonPlan): GlobalConfig {
     fileArgs,
     cachedArgs,
     configPath,
+    env: process.env,
+    suppressUsageStatisticsNotice: true,
     validate: Boolean(explicitConfigPath),
   });
   getRuntimeConfigStore().setServerConfig(serverConfig);
@@ -97,6 +99,7 @@ export function seedConfig(plan: DaemonPlan): GlobalConfig {
 /**
  * 若启用 `--watch-config` 且存在已定位的配置文件，启动热重载监听：
  * - 仅应用 `reloadable: true` 的配置变更，保留 CLI 高优先级覆盖；
+ * - 对无效配置变更保留旧配置并输出清晰错误；
  * - 对需重启才能生效的变更打印告警日志。
  */
 export function startDaemonConfigWatcher(
@@ -107,17 +110,27 @@ export function startDaemonConfigWatcher(
   }
   const watchPath = serverConfig.configPath;
   const watcher = new ConfigWatcher(watchPath, async content => {
-    const nextFileArgs = parseConfigFile(watchPath, content, {strict: true});
-    const candidate = serverConfig.withFileArgs(nextFileArgs);
-    const restartRequired = serverConfig.getRestartRequiredChanges(candidate);
-    if (restartRequired.length > 0) {
-      console.warn(
-        `[Daemon] 配置项 ${restartRequired.join(', ')} 的变更需要重启 daemon 后生效`,
+    let candidate: ServerConfig;
+    let merged: ServerConfig;
+    try {
+      const nextFileArgs = parseConfigFile(watchPath, content, {strict: true});
+      candidate = serverConfig.withFileArgs(nextFileArgs);
+      merged = serverConfig.mergeReloadable(candidate);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(
+        `[Daemon] 保持旧配置，热重载 ${watchPath} 失败: ${message}`,
       );
+      return;
     }
-    const merged = serverConfig.mergeReloadable(candidate);
+    const restartRequired = serverConfig.getRestartRequiredChanges(candidate);
     serverConfig.commit(merged);
     getRuntimeConfigStore().setServerConfig(serverConfig);
+    if (restartRequired.length > 0) {
+      console.warn(
+        `[Daemon] 配置项 ${restartRequired.map(name => `--${String(name)}`).join(', ')} 的变更需要重启 daemon 后生效`,
+      );
+    }
   });
   try {
     watcher.start();

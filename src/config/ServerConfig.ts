@@ -8,11 +8,12 @@
  * 分层配置容器（参考 chrome-devtools-mcp/src/config/ServerConfig.ts）。
  *
  * 将各配置来源独立分层保存，合并优先级（高 → 低）：
- *   `CLI > 环境变量 > 配置文件 > 持久化运行缓存 (runtime-config.json)`
+ *   `CLI > 环境变量 > 配置文件 > 持久化运行缓存 (runtime-config.json) > 默认值`
  *
  * 核心能力：
  * - `validateConflicts` / `validateImplications`：仅对显式输入做冲突与依赖检查，默认值绝不误报冲突
- * - `withFileArgs(nextFileArgs)`：用新配置文件重算候选配置，同时严格保留 CLI / env 高优先级覆盖
+ * - `applyDefaults`：基于 `viaCli` 与环境变量填充默认值，并处理衍生默认值（如 `channel`、`isolated`、`filesystemRoot`）
+ * - `withFileArgs(nextFileArgs)`：用新配置文件重算候选配置，同时严格保留 CLI / env / cached 层
  * - `mergeReloadable(next)`：仅合并支持热重载（`reloadable: true`）的字段，保持需重启字段不变并重新校验冲突
  * - `getRestartRequiredChanges(next)`：找出已变更且需重启 daemon 才能生效的选项清单
  * - `commit(next)`：原地原子提交，使所有持有 `ReadonlyServerConfig` 引用的组件立即可见新快照
@@ -20,25 +21,28 @@
 
 import {isDeepStrictEqual} from 'node:util';
 
+import {yargs} from '../third_party/index.js';
+
+import {type GlobalConfig, validateGlobalConfig} from './schema.js';
 import {
-  CONFIG_OPTIONS,
+  DEFAULT_FILESYSTEM_ROOT,
   isReloadableOption,
+  type ServerOptions,
+  serverOptions,
+  serverOptionsForViaCli,
+  stripYargsPositionalArgs,
   validateConfigConflicts,
   validateConfigImplications,
-} from './options.js';
-import {
-  type GlobalConfig,
-  validateGlobalConfig,
-} from './schema.js';
+} from './server-options.js';
 
 const DEEP_MERGE_KEYS = new Set<keyof GlobalConfig>([
   'browser',
   'toolResultRecording',
 ]);
 
-const KNOWN_CONFIG_KEYS = new Set<string>(Object.keys(CONFIG_OPTIONS));
+const KNOWN_CONFIG_KEYS = new Set<string>(Object.keys(serverOptions));
 
-function isKnownConfigKey(key: string): key is keyof GlobalConfig {
+function isKnownConfigKey(key: string): key is keyof ServerOptions {
   return KNOWN_CONFIG_KEYS.has(key);
 }
 
@@ -54,17 +58,56 @@ function copyOption<K extends keyof GlobalConfig>(
   }
 }
 
+function filterExplicitArgs(
+  args: Partial<GlobalConfig>,
+  baseOptions: ServerOptions,
+): Partial<GlobalConfig> {
+  const filtered: Partial<GlobalConfig> = {};
+  for (const key of Object.keys(args)) {
+    if (!isKnownConfigKey(key)) {
+      continue;
+    }
+    const typedKey = key as keyof GlobalConfig;
+    const option = baseOptions[key];
+    if (
+      args[typedKey] === undefined &&
+      option !== undefined &&
+      'default' in option
+    ) {
+      continue;
+    }
+    copyOption(filtered, args, typedKey);
+  }
+  return filtered;
+}
+
 function mergeReloadableLayer(
   previous: Readonly<Partial<GlobalConfig>>,
   next: Readonly<Partial<GlobalConfig>>,
 ): Partial<GlobalConfig> {
   const merged: Partial<GlobalConfig> = {...previous};
-  for (const name of Object.keys(CONFIG_OPTIONS)) {
+  for (const name of Object.keys(serverOptions)) {
     if (isKnownConfigKey(name) && isReloadableOption(name)) {
-      copyOption(merged, next, name);
+      copyOption(merged, next, name as keyof GlobalConfig);
     }
   }
   return merged;
+}
+
+function parseDefaultArgs(options: ServerOptions): GlobalConfig {
+  const parsed = yargs([])
+    .parserConfiguration({
+      'strip-aliased': true,
+      'camel-case-expansion': false,
+    })
+    .options(options)
+    .parseSync([]);
+  return {
+    ...(stripYargsPositionalArgs(parsed) as Partial<GlobalConfig>),
+    // yargs copies array defaults, so restore the shared reference that the
+    // `viaCli` check in `applyDefaults()` compares with `===`.
+    filesystemRoot: DEFAULT_FILESYSTEM_ROOT,
+  };
 }
 
 /**
@@ -107,10 +150,11 @@ export interface ReadonlyServerConfig {
 
 export interface ServerConfigInit {
   cliArgs: Partial<GlobalConfig>;
-  envArgs: Partial<GlobalConfig>;
+  envArgs?: Partial<GlobalConfig>;
   fileArgs: Partial<GlobalConfig>;
-  cachedArgs: Partial<GlobalConfig>;
+  cachedArgs?: Partial<GlobalConfig>;
   configPath?: string;
+  env?: NodeJS.ProcessEnv;
   resolved: GlobalConfig;
 }
 
@@ -120,8 +164,12 @@ export interface ServerConfigCreateOptions {
   fileArgs?: Partial<GlobalConfig>;
   cachedArgs?: Partial<GlobalConfig>;
   configPath?: string;
+  env?: NodeJS.ProcessEnv;
+  suppressUsageStatisticsNotice?: boolean;
   /** 是否执行互斥与依赖蕴含校验（默认 true）。 */
   validate?: boolean;
+  /** 是否填充默认值（默认 true）。 */
+  applyDefaults?: boolean;
 }
 
 export class ServerConfig implements ReadonlyServerConfig {
@@ -130,27 +178,127 @@ export class ServerConfig implements ReadonlyServerConfig {
   #fileArgs: Readonly<Partial<GlobalConfig>>;
   #cachedArgs: Readonly<Partial<GlobalConfig>>;
   readonly #configPath?: string;
+  readonly #env: NodeJS.ProcessEnv;
   #resolved: Readonly<GlobalConfig>;
 
   constructor(init: ServerConfigInit) {
     this.#cliArgs = {...init.cliArgs};
-    this.#envArgs = {...init.envArgs};
+    this.#envArgs = {...(init.envArgs ?? {})};
     this.#fileArgs = {...init.fileArgs};
-    this.#cachedArgs = {...init.cachedArgs};
+    this.#cachedArgs = {...(init.cachedArgs ?? {})};
     this.#configPath = init.configPath;
+    this.#env = init.env ?? process.env;
     this.#resolved = {...init.resolved};
   }
 
+  /**
+   * Step 4a: 拒绝互斥输入。仅检查显式传入的激活值，默认值不会触发冲突。
+   */
   static validateConflicts(explicitArgs: Partial<GlobalConfig>): void {
     validateConfigConflicts(explicitArgs);
   }
 
+  /**
+   * Step 4b: 校验依赖蕴含规则（例如 `wsHeaders -> wsEndpoint`）。
+   */
   static validateImplications(explicitArgs: Partial<GlobalConfig>): void {
     validateConfigImplications(explicitArgs);
   }
 
   /**
-   * 合并分层输入（`CLI > env > file > cached`），校验冲突与依赖，并通过 zod 归一化。
+   * Step 5: 为所有未显式设置的选项填充默认值。
+   * `viaCli` 作为显式输入决定默认选项集与上下文衍生规则。
+   */
+  static applyDefaults(
+    explicitArgs: Partial<GlobalConfig>,
+    options?: {
+      env?: NodeJS.ProcessEnv;
+      suppressUsageStatisticsNotice?: boolean;
+    },
+  ): GlobalConfig {
+    const env = options?.env ?? process.env;
+    const isViaCli = explicitArgs.viaCli === true;
+    const baseOptions = isViaCli ? serverOptionsForViaCli : serverOptions;
+    const resolvedArgs = mergeConfigLayers(
+      parseDefaultArgs(baseOptions),
+      filterExplicitArgs(explicitArgs, baseOptions),
+    );
+
+    // `channel` 仅在按渠道启动本地浏览器时保留默认值，其余连接模式下删除以便于遥测/diff。
+    const launchesByChannel =
+      !resolvedArgs.browserUrl &&
+      !resolvedArgs.wsEndpoint &&
+      !resolvedArgs.executablePath &&
+      !resolvedArgs.browser?.browserURL &&
+      !resolvedArgs.browser?.wsEndpoint &&
+      !resolvedArgs.browser?.executablePath;
+    if (
+      !launchesByChannel &&
+      explicitArgs.channel === undefined &&
+      explicitArgs.browser?.channel === undefined
+    ) {
+      delete resolvedArgs.channel;
+    }
+
+    if (isViaCli) {
+      resolvedArgs.pageIdRouting = true;
+      if (
+        resolvedArgs.filesystemRoot === DEFAULT_FILESYSTEM_ROOT &&
+        explicitArgs.allowUnrestrictedPaths !== false
+      ) {
+        resolvedArgs.allowUnrestrictedPaths = true;
+        resolvedArgs.filesystemRoot = undefined;
+      }
+      const connectsToExistingBrowser = Boolean(
+        resolvedArgs.autoConnect ||
+        resolvedArgs.browserUrl ||
+        resolvedArgs.wsEndpoint ||
+        resolvedArgs.browser?.autoConnect ||
+        resolvedArgs.browser?.browserURL ||
+        resolvedArgs.browser?.wsEndpoint,
+      );
+      if (
+        explicitArgs.isolated === undefined &&
+        resolvedArgs.userDataDir === undefined &&
+        !connectsToExistingBrowser
+      ) {
+        resolvedArgs.isolated = true;
+      }
+      if (
+        resolvedArgs.categoryExtensions === undefined &&
+        !connectsToExistingBrowser
+      ) {
+        resolvedArgs.categoryExtensions = true;
+      }
+    }
+
+    if (env['CI'] || env['BROWSERCLI_NO_USAGE_STATISTICS']) {
+      if (!options?.suppressUsageStatisticsNotice) {
+        console.error(
+          "turning off usage statistics. process.env['CI'] || process.env['BROWSERCLI_NO_USAGE_STATISTICS'] is set.",
+        );
+      }
+      resolvedArgs.usageStatistics = false;
+    }
+
+    if (
+      resolvedArgs.categoryExperimentalThirdParty === undefined &&
+      env['BROWSERCLI_CATEGORY_EXPERIMENTAL_THIRD_PARTY']
+    ) {
+      resolvedArgs.categoryExperimentalThirdParty = true;
+    }
+
+    const keepDefaultFilesystemRootRef =
+      resolvedArgs.filesystemRoot === DEFAULT_FILESYSTEM_ROOT;
+    const validated = validateGlobalConfig(resolvedArgs);
+    if (keepDefaultFilesystemRootRef) {
+      validated.filesystemRoot = DEFAULT_FILESYSTEM_ROOT;
+    }
+    return validated;
+  }
+
+  /**
+   * Step 3–5: 合并分层输入（`CLI > env > file > cached`），校验冲突与依赖，并应用默认值。
    * 注意：`cachedArgs` 属于历史运行态回填缓存，不参与用户显式输入冲突校验。
    */
   static create(options: ServerConfigCreateOptions = {}): ServerConfig {
@@ -172,7 +320,14 @@ export class ServerConfig implements ReadonlyServerConfig {
     }
 
     const combined = mergeConfigLayers(cachedArgs, explicitMerged);
-    const resolved = validateGlobalConfig(combined);
+    const resolved =
+      options.applyDefaults === false
+        ? validateGlobalConfig(combined)
+        : ServerConfig.applyDefaults(combined, {
+            env: options.env,
+            suppressUsageStatisticsNotice:
+              options.suppressUsageStatisticsNotice,
+          });
 
     return new ServerConfig({
       cliArgs,
@@ -180,6 +335,7 @@ export class ServerConfig implements ReadonlyServerConfig {
       fileArgs,
       cachedArgs,
       configPath: options.configPath,
+      env: options.env,
       resolved,
     });
   }
@@ -209,7 +365,7 @@ export class ServerConfig implements ReadonlyServerConfig {
   }
 
   /**
-   * 基于新的配置文件内容生成候选 `ServerConfig`，完整保留原有的 CLI、env 与 cached 层。
+   * 基于新的配置文件内容生成候选 `ServerConfig`，完整保留原有的 CLI、env、cached 层与环境变量。
    */
   withFileArgs(fileArgs: Partial<GlobalConfig>): ServerConfig {
     return ServerConfig.create({
@@ -218,14 +374,19 @@ export class ServerConfig implements ReadonlyServerConfig {
       fileArgs,
       cachedArgs: {...this.#cachedArgs},
       configPath: this.#configPath,
+      env: this.#env,
+      suppressUsageStatisticsNotice: true,
     });
   }
 
   /**
    * 仅从 `next` 吸收支持热重载（`reloadable: true`）的选项，保持需重启选项来自当前配置，
-   * 并在合并后重新执行冲突与依赖校验，始终维护 `CLI > env > file > cached` 优先级。
+   * 并在合并后重新执行冲突与依赖校验，始终维护 `CLI > env > file > cached > defaults` 优先级。
    */
-  mergeReloadable(next: ServerConfig): ServerConfig {
+  mergeReloadable(
+    next: ServerConfig,
+    options?: {env?: NodeJS.ProcessEnv},
+  ): ServerConfig {
     const mergedFileArgs = mergeReloadableLayer(this.#fileArgs, next.#fileArgs);
     const mergedEnvArgs = mergeReloadableLayer(this.#envArgs, next.#envArgs);
     const mergedCliArgs = mergeReloadableLayer(this.#cliArgs, next.#cliArgs);
@@ -235,6 +396,8 @@ export class ServerConfig implements ReadonlyServerConfig {
       fileArgs: mergedFileArgs,
       cachedArgs: {...this.#cachedArgs},
       configPath: this.#configPath,
+      env: options?.env ?? this.#env,
+      suppressUsageStatisticsNotice: true,
     });
   }
 
@@ -243,16 +406,27 @@ export class ServerConfig implements ReadonlyServerConfig {
    */
   getRestartRequiredChanges(next: ServerConfig): Array<keyof GlobalConfig> {
     const changed: Array<keyof GlobalConfig> = [];
-    for (const name of Object.keys(CONFIG_OPTIONS)) {
+    for (const name of Object.keys(serverOptions)) {
+      if (!isKnownConfigKey(name) || isReloadableOption(name)) {
+        continue;
+      }
+      const typedName = name as keyof GlobalConfig;
       if (
-        isKnownConfigKey(name) &&
-        !isReloadableOption(name) &&
-        (!isDeepStrictEqual(this.#fileArgs[name], next.#fileArgs[name]) ||
-          !isDeepStrictEqual(this.#envArgs[name], next.#envArgs[name]) ||
-          !isDeepStrictEqual(this.#cliArgs[name], next.#cliArgs[name])) &&
-        !isDeepStrictEqual(this.#resolved[name], next.#resolved[name])
+        (!isDeepStrictEqual(
+          this.#fileArgs[typedName],
+          next.#fileArgs[typedName],
+        ) ||
+          !isDeepStrictEqual(
+            this.#envArgs[typedName],
+            next.#envArgs[typedName],
+          ) ||
+          !isDeepStrictEqual(
+            this.#cliArgs[typedName],
+            next.#cliArgs[typedName],
+          )) &&
+        !isDeepStrictEqual(this.#resolved[typedName], next.#resolved[typedName])
       ) {
-        changed.push(name);
+        changed.push(typedName);
       }
     }
     return changed.sort();

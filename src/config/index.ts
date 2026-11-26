@@ -14,3 +14,4 @@ export * from './resolver.js';
 export * from './RuntimeConfigStore.js';
 export * from './schema.js';
 export * from './ServerConfig.js';
+export * from './urlPattern.js';

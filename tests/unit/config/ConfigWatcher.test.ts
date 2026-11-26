@@ -155,4 +155,28 @@ describe('ConfigWatcher', () => {
       fs.rmSync(dir, {recursive: true, force: true});
     }
   });
+
+  it('supports Symbol.dispose and logger callback', () => {
+    const dir = createTempDir();
+    const configPath = path.join(dir, 'config.json');
+    fs.writeFileSync(configPath, '{}', 'utf8');
+    const logs: string[] = [];
+    const watcher = new ConfigWatcher(configPath, async () => undefined, {
+      debounceMs: DEBOUNCE_MS,
+      logger: msg => {
+        logs.push(msg);
+      },
+    });
+
+    try {
+      watcher.start();
+      assert.equal(logs.length, 1);
+      assert.match(logs[0], /^Watching .* for config changes$/);
+      watcher[Symbol.dispose]();
+      assert.equal(watcher.isWatching, false);
+    } finally {
+      watcher.dispose();
+      fs.rmSync(dir, {recursive: true, force: true});
+    }
+  });
 });

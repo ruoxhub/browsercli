@@ -5,9 +5,17 @@
  */
 
 import assert from 'node:assert/strict';
-import {describe, it} from 'node:test';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import {afterEach, describe, it, mock} from 'node:test';
 
-import {isReloadableOption} from '../../../src/config/options.js';
+import {ConfigLocator} from '../../../src/config/ConfigLocator.js';
+import {ConfigParser} from '../../../src/config/ConfigParser.js';
+import {
+  DEFAULT_FILESYSTEM_ROOT,
+  isReloadableOption,
+} from '../../../src/config/options.js';
 import {
   type ReadonlyServerConfig,
   ServerConfig,
@@ -223,6 +231,148 @@ describe('ServerConfig', () => {
 
       assert.equal(readonlyView.resolved.screenshotFormat, 'webp');
       assert.equal(readonlyView.resolved.headless, true);
+    });
+  });
+
+  describe('applyDefaults and ConfigParser integration', () => {
+    afterEach(() => {
+      mock.restoreAll();
+    });
+
+    function parseWithArgs(argv: string[] = [], env: NodeJS.ProcessEnv = {}) {
+      const locator = new ConfigLocator();
+      mock.method(locator, 'locate', () => undefined);
+      return new ConfigParser(
+        '0.0.0',
+        ['node', 'main.js', ...argv],
+        env,
+        false,
+        locator,
+      ).parseConfig();
+    }
+
+    it('keeps explicit values and fills in defaults', () => {
+      const args = ServerConfig.applyDefaults({headless: true}, {env: {}});
+      assert.equal(args.headless, true);
+      assert.equal(args.isolated, false);
+      assert.equal(args.channel, 'stable');
+      assert.equal(args.categoryExtensions, undefined);
+    });
+
+    it('drops unknown CLI keys that are not in serverOptions', () => {
+      mock.method(console, 'error', () => undefined);
+      const config = parseWithArgs(['--unknownFlag=value']);
+      assert.equal('unknownFlag' in config.resolved, false);
+    });
+
+    for (const explicitArgs of [
+      {browserUrl: 'http://127.0.0.1:9222'},
+      {wsEndpoint: 'ws://127.0.0.1:9222'},
+      {executablePath: '/tmp/chrome'},
+    ]) {
+      it(`does not default channel with ${Object.keys(explicitArgs)[0]}`, () => {
+        assert.equal(
+          ServerConfig.applyDefaults(explicitArgs, {env: {}}).channel,
+          undefined,
+        );
+      });
+    }
+
+    it('applies viaCli defaults when launching a browser', () => {
+      const args = ServerConfig.applyDefaults(
+        {
+          viaCli: true,
+          filesystemRoot: DEFAULT_FILESYSTEM_ROOT,
+        },
+        {env: {}},
+      );
+      assert.equal(args.headless, true);
+      assert.equal(args.isolated, true);
+      assert.equal(args.categoryExtensions, true);
+      assert.equal(args.allowUnrestrictedPaths, true);
+      assert.equal(args.filesystemRoot, undefined);
+      assert.equal(args.pageIdRouting, true);
+    });
+
+    it('keeps default filesystemRoot for viaCli with explicit allowUnrestrictedPaths=false', () => {
+      const args = ServerConfig.applyDefaults(
+        {
+          viaCli: true,
+          allowUnrestrictedPaths: false,
+        },
+        {env: {}},
+      );
+      assert.equal(args.allowUnrestrictedPaths, false);
+      assert.deepEqual(args.filesystemRoot, DEFAULT_FILESYSTEM_ROOT);
+    });
+
+    it('does not enable isolated or extensions for viaCli with browserUrl', () => {
+      const args = ServerConfig.applyDefaults(
+        {
+          viaCli: true,
+          browserUrl: 'http://127.0.0.1:9222',
+        },
+        {env: {}},
+      );
+      assert.equal(args.isolated, false);
+      assert.equal(args.categoryExtensions, undefined);
+    });
+
+    it('turns off usage statistics in CI and prints notice once across reloads', () => {
+      const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'bcli-ci-'));
+      try {
+        const configPath = path.join(tmpDir, 'config.json');
+        fs.writeFileSync(configPath, JSON.stringify({headless: true}), 'utf-8');
+        const consoleError = mock.method(console, 'error', () => undefined);
+        const locator = new ConfigLocator();
+        mock.method(locator, 'locate', () => configPath);
+        const ciParser = new ConfigParser(
+          '0.0.0',
+          ['node', 'main.js'],
+          {CI: 'true'},
+          false,
+          locator,
+        );
+
+        ciParser.parseConfig();
+        const reloaded = ciParser.reloadConfig();
+
+        assert.equal(reloaded.resolved.usageStatistics, false);
+        assert.equal(consoleError.mock.callCount(), 1);
+      } finally {
+        fs.rmSync(tmpDir, {recursive: true, force: true});
+      }
+    });
+
+    it('applies env overrides when merging reloadable options', () => {
+      const initial = parseWithArgs();
+      const next = parseWithArgs();
+
+      const mergedWithCi = initial.mergeReloadable(next, {
+        env: {CI: 'true'},
+      }).resolved;
+      const mergedWithoutCi = initial.mergeReloadable(next).resolved;
+
+      assert.equal(mergedWithCi.usageStatistics, false);
+      assert.equal(mergedWithoutCi.usageStatistics, true);
+    });
+
+    it('ignores restart-required options whose defaults are derived from other options', () => {
+      const previous = parseWithArgs(['--viaCli']);
+      const next = parseWithArgs([
+        '--viaCli',
+        '--browserUrl=http://127.0.0.1:9222',
+      ]);
+
+      assert.equal(previous.resolved.categoryExtensions, true);
+      assert.equal(next.resolved.categoryExtensions, undefined);
+      assert.equal(previous.resolved.isolated, true);
+      assert.equal(next.resolved.isolated, false);
+      assert.equal(previous.resolved.channel, 'stable');
+      assert.equal(next.resolved.channel, undefined);
+      assert.deepEqual(previous.getRestartRequiredChanges(next), [
+        'browserUrl',
+      ]);
     });
   });
 });

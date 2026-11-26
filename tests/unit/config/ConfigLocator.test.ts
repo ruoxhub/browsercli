@@ -9,6 +9,7 @@ import path from 'node:path';
 import {describe, it} from 'node:test';
 
 import {
+  CONFIG_FILE_NAME,
   ConfigLocator,
   NO_CONFIG_DISCOVERY_ENV,
 } from '../../../src/config/ConfigLocator.js';
@@ -88,6 +89,14 @@ describe('ConfigLocator', () => {
       assert.equal(
         locator.getPlatformConfigPath({}, 'win32', HOME),
         FALLBACK_CONFIG,
+      );
+    });
+
+    it('exposes CONFIG_FILE_NAME and getGlobalConfigPath parity alias', () => {
+      assert.equal(CONFIG_FILE_NAME, 'browsercli.config.json');
+      assert.equal(
+        locator.getGlobalConfigPath({XDG_CONFIG_HOME}, 'linux', HOME),
+        XDG_CONFIG,
       );
     });
   });
