@@ -52,14 +52,14 @@ describe('reverse workflow docs', () => {
       .map(entry => entry.name)
       .sort();
 
-    assert.ok(readme.includes('核心方法论'));
-    assert.ok(readme.includes('已沉淀链路'));
-    assert.ok(readme.includes('文档入口'));
-    assert.ok(readme.includes('某东 `h5st` 参数'));
+    assert.ok(readme.includes('核心逆向方法论'));
+    assert.ok(readme.includes('公开逆向实战链路'));
+    assert.ok(readme.includes('文档索引'));
+    assert.ok(readme.includes('某东 `h5st` 签名参数复现'));
     assert.ok(
       readme.includes('[scripts/cases/README.md](scripts/cases/README.md)'),
     );
-    assert.ok(readme.includes('Git 默认只提交 `artifacts/tasks/_TEMPLATE/`'));
+    assert.ok(readme.includes('artifacts/tasks/<task-id>'));
     // docs 目录允许存在参考文档，但不应有过多杂乱文件
     assert.ok(docsRootFiles.length >= 0); // 不强制要求空目录
     assert.ok(caseIndex.includes('某东 `h5st` 参数'));

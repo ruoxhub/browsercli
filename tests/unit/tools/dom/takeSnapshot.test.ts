@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import {describe, it} from 'node:test';
 
 import {globalPageSnapshotManager} from '../../../../src/modules/snapshot/PageSnapshotManager.js';
-import {takeSnapshot} from '../../../../src/tools/dom/takeSnapshot.js';
+import {takeSnapshot} from '../../../../src/tools/dom.js';
 
 function createMockContext(mockPage: any) {
   return {

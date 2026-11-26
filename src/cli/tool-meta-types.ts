@@ -40,6 +40,7 @@ export interface ToolRuntimeRequirements {
 
 export interface ToolMeta {
   name: string;
+  aliases?: string[];
   description: string;
   /** 简化类型映射 (key → 'string'|'number'|'boolean'|'string[]') */
   schema: Record<string, string>;

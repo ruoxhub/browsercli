@@ -7,7 +7,7 @@
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
-import {buildPausedInfoData} from '../../../../src/tools/debugger/index.js';
+import {buildPausedInfoData} from '../../../../src/tools/debugger.js';
 
 interface MockScope {
   type: string;
@@ -36,12 +36,14 @@ function createDebugger(opts: {
   scopeVariables?: Record<string, Array<{name: string; value: unknown}>>;
 }): any {
   return {
-    getPausedState: () => opts.pausedState,
+    // 未暂停时 DebuggerManager.getPausedState() 返回 null
+    getPausedState: () => (opts.pausedState.isPaused ? opts.pausedState : null),
     getScriptById: (scriptId: string) => {
       const url = opts.scriptUrl?.(scriptId);
       return url !== undefined ? {scriptId, url} : undefined;
     },
-    getScopeVariables: async (objectId: string) => {
+    // PausedStateBuilder 走低层级 API：getScopeVariablesForObjectId(objectId)
+    getScopeVariablesForObjectId: async (objectId: string) => {
       return opts.scopeVariables?.[objectId] ?? [];
     },
   };
@@ -235,7 +237,7 @@ describe('buildPausedInfoData', () => {
         ],
       }),
       getScriptById: () => undefined,
-      getScopeVariables: async (id: string) => {
+      getScopeVariablesForObjectId: async (id: string) => {
         if (id === 'broken') {
           throw new Error('CDP error');
         }
@@ -268,7 +270,7 @@ describe('buildPausedInfoData', () => {
         ],
       }),
       getScriptById: () => undefined,
-      getScopeVariables: async () => {
+      getScopeVariablesForObjectId: async () => {
         getScopeVariablesCalled = true;
         return [];
       },

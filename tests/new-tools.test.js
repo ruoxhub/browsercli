@@ -38,7 +38,6 @@ async function runTests() {
       'fill_form',
       'upload_file',
       'press_key',
-      'emulate_network',
       'resize_page',
       'handle_dialog',
     ].includes(t.name),
@@ -102,18 +101,6 @@ async function runTests() {
     console.log(`✗ 调整失败：${err.message}\n`);
   }
 
-  // 测试 5: 网络节流仿真
-  console.log('=== 测试 5: emulate_network 工具 - 网络节流 ===');
-  try {
-    await client.callTool({
-      name: 'emulate_network',
-      arguments: {throttlingOption: 'Fast 4G'},
-    });
-    console.log('✓ 成功设置网络仿真为 Fast 4G\n');
-  } catch (err) {
-    console.log(`✗ 网络仿真失败：${err.message}\n`);
-  }
-
   // 测试 6: 点击搜索按钮
   console.log('=== 测试 6: click 工具 - 点击搜索按钮 ===');
   try {
@@ -175,18 +162,6 @@ async function runTests() {
     console.log('✓ 成功批量填充表单\n');
   } catch (err) {
     console.log(`✗ 批量填充失败：${err.message}\n`);
-  }
-
-  // 禁用所有仿真
-  console.log('=== 禁用所有仿真 ===');
-  try {
-    await client.callTool({
-      name: 'emulate_network',
-      arguments: {throttlingOption: 'No emulation'},
-    });
-    console.log('✓ 已禁用所有仿真\n');
-  } catch (err) {
-    console.log(`✗ 禁用失败：${err.message}\n`);
   }
 
   console.log('=== 测试完成 ===');

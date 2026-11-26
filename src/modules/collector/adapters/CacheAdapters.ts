@@ -13,7 +13,10 @@
  */
 
 import type {DetailedDataManager} from '../../../utils/detailedDataManager.js';
-import type {CacheInstance, CacheStats} from '../../../utils/UnifiedCacheManager.js';
+import type {
+  CacheInstance,
+  CacheStats,
+} from '../../../utils/UnifiedCacheManager.js';
 import type {CodeCache} from '../CodeCache.js';
 import type {CodeCompressor} from '../CodeCompressor.js';
 

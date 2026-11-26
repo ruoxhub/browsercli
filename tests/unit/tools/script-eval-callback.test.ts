@@ -10,7 +10,7 @@ import {getRuntime} from '../../../src/runtime.js';
 import {
   evaluateScript as evaluateScriptTool,
   evaluateScriptFn,
-} from '../../../src/tools/script/script.js';
+} from '../../../src/tools/script.js';
 import {ToolError} from '../../../src/utils/errors.js';
 
 async function evaluateScript(runtime: any, params: any): Promise<any> {

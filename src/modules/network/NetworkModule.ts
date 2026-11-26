@@ -7,7 +7,7 @@
 /**
  * NetworkModule — 网络领域门面。
  *
- * 协调网络请求查询、重放、curl 导出、WebSocket 检查等操作。
+ * 协调网络请求查询、WebSocket 检查等操作。
  * 方法签名统一为 `(services: NetworkServices, params: P) => Promise<NetworkMethodResult<T>>`，
  * 调用方（tool handler）负责传入 `ToolContextProvider`（结构化满足 `NetworkServices`）。
  *
@@ -19,7 +19,8 @@
  * - 不 import `worker/` 或 `tools/`，避免循环依赖。
  */
 
-import {writeFile} from 'node:fs/promises';
+import {mkdir, writeFile} from 'node:fs/promises';
+import {dirname} from 'node:path';
 
 import {
   analyzeWebSocketFramesV2,
@@ -37,11 +38,8 @@ import {isTextualContentType} from './contentType.js';
 import type {
   AnalyzeWebSocketMessagesData,
   AnalyzeWebSocketMessagesParams,
-  BatchVariantResult,
   ClearNetworkRequestsData,
   ClearNetworkRequestsParams,
-  ExportRequestAsCurlData,
-  ExportRequestAsCurlParams,
   GetNetworkRequestData,
   GetNetworkRequestParams,
   GetWebSocketMessageData,
@@ -55,26 +53,13 @@ import type {
   NetworkMethodResult,
   NetworkRequestData,
   NetworkServices,
-  ReplayNetworkRequestBatchData,
-  ReplayNetworkRequestBatchParams,
-  ReplayNetworkRequestData,
-  ReplayNetworkRequestParams,
-  ReplayOverride,
   WebSocketFrame,
 } from './NetworkTypes.js';
-import {
-  buildReplayRequest,
-  emptyReplayResponse,
-  executeReplay,
-  formatCurl,
-} from './replayEngine.js';
 import {buildEvidenceCorrelations} from './signatureDetector.js';
 
 const DEFAULT_WAIT_TIMEOUT_MS = 5000;
 const WAIT_POLL_INTERVAL_MS = 50;
 const DEFAULT_GET_BODY_LENGTH = 300;
-const DEFAULT_REPLAY_BODY_LENGTH = 2000;
-const DEFAULT_BATCH_MAX_BODY_LENGTH = 500;
 
 const NO_ACTIVE_PAGE_MESSAGE =
   '当前无活跃页面，请先通过 new_page 或 select_page 创建/选择页面';
@@ -142,45 +127,6 @@ function emptyPageData(
     timedOut: false,
     ...extra,
   };
-}
-
-/** 构建 replay/exportCurl/batch 共用的原始请求数据快照。 */
-function buildOriginalData(
-  reqid: number,
-  networkRequest: {
-    url(): string;
-    method(): string;
-    postData(): string | null;
-    resourceType(): string;
-    headers(): Record<string, string>;
-  },
-  httpResponse: {
-    status(): number;
-    statusText?(): string;
-    headers(): Record<string, string>;
-  } | null,
-): GetNetworkRequestData {
-  return {
-    reqid,
-    url: networkRequest.url(),
-    method: networkRequest.method(),
-    resourceType: networkRequest.resourceType(),
-    statusCode: httpResponse?.status() ?? 0,
-    statusText: httpResponse?.statusText?.(),
-    requestHeaders: networkRequest.headers(),
-    responseHeaders: httpResponse?.headers() ?? {},
-    postData: networkRequest.postData() ?? undefined,
-    isTruncated: false,
-    totalBodyLength: 0,
-    previewLength: 0,
-  };
-}
-
-/** Cookie 域匹配：host 等于 domain，或 host 以 "." + domain 结尾。 */
-function cookieMatchesHost(cookieDomain: string, host: string): boolean {
-  const domain = cookieDomain.replace(/^\./, '').toLowerCase();
-  const h = host.toLowerCase();
-  return h === domain || h.endsWith(`.${domain}`);
 }
 
 function buildFrameData(
@@ -449,6 +395,15 @@ export class NetworkModule {
 
       const networkRequest = services.getNetworkRequestById(reqid);
       const httpResponse = await networkRequest.response().catch(() => null);
+      const responseSavePath = params.responseFilePath ?? params.saveTo;
+
+      let requestSavedPath: string | undefined;
+      if (params.requestFilePath) {
+        const postData = networkRequest.postData() ?? '';
+        await mkdir(dirname(params.requestFilePath), {recursive: true});
+        await writeFile(params.requestFilePath, postData, 'utf-8');
+        requestSavedPath = params.requestFilePath;
+      }
 
       const maxBodyLength = params.maxBodyLength ?? DEFAULT_GET_BODY_LENGTH;
       let responseBody: string | undefined;
@@ -462,9 +417,12 @@ export class NetworkModule {
           if (isTextualContentType(contentType)) {
             fullBody = await httpResponse.text();
             totalBodyLength = fullBody.length;
-            if (params.saveTo) {
-              await writeFile(params.saveTo, fullBody, 'utf-8');
-              savedPath = params.saveTo;
+            if (responseSavePath) {
+              if (params.responseFilePath) {
+                await mkdir(dirname(responseSavePath), {recursive: true});
+              }
+              await writeFile(responseSavePath, fullBody, 'utf-8');
+              savedPath = responseSavePath;
             } else if (params.fullBody) {
               responseBody = fullBody;
             } else if (fullBody.length > maxBodyLength) {
@@ -474,12 +432,20 @@ export class NetworkModule {
             } else {
               responseBody = fullBody;
             }
+          } else if (responseSavePath) {
+            const rawBody = await httpResponse.body();
+            totalBodyLength = rawBody.length;
+            if (params.responseFilePath) {
+              await mkdir(dirname(responseSavePath), {recursive: true});
+            }
+            await writeFile(responseSavePath, rawBody);
+            savedPath = responseSavePath;
           }
         } catch (error) {
-          if (params.saveTo) {
+          if (responseSavePath) {
             return {
               success: false,
-              message: `保存响应到 ${params.saveTo} 失败：${error instanceof Error ? error.message : String(error)}`,
+              message: `保存响应到 ${responseSavePath} 失败：${error instanceof Error ? error.message : String(error)}`,
               data: {...EMPTY, reqid: params.reqid ?? 0},
             };
           }
@@ -505,6 +471,10 @@ export class NetworkModule {
         totalBodyLength,
         previewLength: responseBody?.length ?? 0,
         ...(savedPath !== undefined && {savedPath}),
+        ...(requestSavedPath !== undefined && {requestSavedPath}),
+        ...(params.responseFilePath && savedPath !== undefined
+          ? {responseSavedPath: savedPath}
+          : {}),
       };
 
       return {
@@ -558,310 +528,6 @@ export class NetworkModule {
         },
       };
     }
-  }
-
-  /**
-   * 重放单条网络请求，复用浏览器 context 的 cookie/storage/UA。
-   */
-  async replayRequest(
-    services: NetworkServices,
-    params: ReplayNetworkRequestParams,
-  ): Promise<NetworkMethodResult<ReplayNetworkRequestData>> {
-    const reqid = params.reqid;
-    try {
-      const page = services.getSelectedPage();
-      if (!page) {
-        return {
-          success: false,
-          message: NO_ACTIVE_PAGE_MESSAGE,
-          data: {
-            ...emptyReplayResponse(''),
-            originalReqid: reqid,
-            override: null,
-          },
-        };
-      }
-      const networkRequest = services.getNetworkRequestById(reqid);
-      const httpResponse = await networkRequest.response().catch(() => null);
-      const originalData = buildOriginalData(
-        reqid,
-        networkRequest,
-        httpResponse,
-      );
-
-      const override = this.buildOverride(params);
-      const built = buildReplayRequest(originalData, override ?? undefined);
-      const maxBodyLength = params.maxBodyLength ?? DEFAULT_REPLAY_BODY_LENGTH;
-
-      try {
-        const result = await executeReplay(
-          page.context().request,
-          built,
-          maxBodyLength,
-        );
-        return {
-          success: true,
-          message: `请求重放成功：HTTP ${result.status}`,
-          data: {...result, originalReqid: reqid, override},
-        };
-      } catch (execError) {
-        return {
-          success: false,
-          message: `请求重放失败：${execError instanceof Error ? execError.message : String(execError)}`,
-          data: {
-            ...emptyReplayResponse(built.url),
-            originalReqid: reqid,
-            override,
-          },
-        };
-      }
-    } catch (error) {
-      return {
-        success: false,
-        message: `请求重放失败：${error instanceof Error ? error.message : String(error)}`,
-        data: {
-          ...emptyReplayResponse(''),
-          originalReqid: reqid,
-          override: null,
-        },
-      };
-    }
-  }
-
-  /**
-   * 导出请求为 curl 命令。可选嵌入浏览器 cookie。
-   */
-  async exportCurl(
-    services: NetworkServices,
-    params: ExportRequestAsCurlParams,
-  ): Promise<NetworkMethodResult<ExportRequestAsCurlData>> {
-    const reqid = params.reqid;
-    try {
-      const page = services.getSelectedPage();
-      if (!page) {
-        return {
-          success: false,
-          message: NO_ACTIVE_PAGE_MESSAGE,
-          data: {curl: '', originalReqid: reqid, override: null},
-        };
-      }
-      const networkRequest = services.getNetworkRequestById(reqid);
-      const httpResponse = await networkRequest.response().catch(() => null);
-      const originalData = buildOriginalData(
-        reqid,
-        networkRequest,
-        httpResponse,
-      );
-
-      const override = this.buildOverride(params);
-      const built = buildReplayRequest(originalData, override ?? undefined);
-
-      let cookies: Array<{name: string; value: string}> | undefined;
-      let cookieNote = '';
-      if (params.includeCookies === true) {
-        try {
-          const allCookies = await page.context().cookies();
-          let host: string;
-          try {
-            host = new URL(built.url).hostname;
-          } catch {
-            host = '';
-          }
-          cookies = allCookies
-            .filter(c => cookieMatchesHost(c.domain, host))
-            .map(c => ({name: c.name, value: c.value}));
-        } catch {
-          cookieNote = '（Cookie 读取失败，已省略）';
-        }
-      }
-
-      const curl = formatCurl(built, {
-        includeCookies: params.includeCookies === true,
-        cookies,
-      });
-
-      return {
-        success: true,
-        message: `已导出 curl 命令${cookieNote}`,
-        data: {curl, originalReqid: reqid, override},
-      };
-    } catch (error) {
-      return {
-        success: false,
-        message: `导出 curl 失败：${error instanceof Error ? error.message : String(error)}`,
-        data: {curl: '', originalReqid: reqid, override: null},
-      };
-    }
-  }
-
-  /**
-   * 批量重放：以一条请求为模板，应用多个 override variant 分别重放。
-   */
-  async replayBatch(
-    services: NetworkServices,
-    params: ReplayNetworkRequestBatchParams,
-  ): Promise<NetworkMethodResult<ReplayNetworkRequestBatchData>> {
-    const reqid = params.reqid;
-    const variants = params.variants ?? [];
-    const concurrency = params.concurrency ?? 1;
-    const maxBodyLength = params.maxBodyLength ?? DEFAULT_BATCH_MAX_BODY_LENGTH;
-
-    if (variants.length === 0) {
-      return {
-        success: false,
-        message: 'variants 不能为空，请至少提供一个重放变体',
-        data: {
-          total: 0,
-          succeeded: 0,
-          failed: 0,
-          statusCodeDistribution: {},
-          results: [],
-        },
-      };
-    }
-
-    try {
-      const page = services.getSelectedPage();
-      if (!page) {
-        return {
-          success: false,
-          message: NO_ACTIVE_PAGE_MESSAGE,
-          data: {
-            total: variants.length,
-            succeeded: 0,
-            failed: variants.length,
-            statusCodeDistribution: {},
-            results: [],
-          },
-        };
-      }
-      const networkRequest = services.getNetworkRequestById(reqid);
-      const httpResponse = await networkRequest.response().catch(() => null);
-      const originalData = buildOriginalData(
-        reqid,
-        networkRequest,
-        httpResponse,
-      );
-
-      const built: Array<{
-        built: ReturnType<typeof buildReplayRequest>;
-        override: ReplayOverride;
-        buildError?: string;
-      }> = [];
-      for (const override of variants) {
-        try {
-          built.push({
-            built: buildReplayRequest(originalData, override),
-            override,
-          });
-        } catch (e) {
-          built.push({
-            built: {method: '', url: '', headers: {}},
-            override,
-            buildError: e instanceof Error ? e.message : String(e),
-          });
-        }
-      }
-
-      const results: BatchVariantResult[] = new Array(variants.length);
-      const queue = built.map((b, i) => ({...b, i}));
-      const workers = Array.from(
-        {length: Math.min(concurrency, variants.length)},
-        async () => {
-          while (queue.length > 0) {
-            const next = queue.shift()!;
-            if (next.buildError) {
-              results[next.i] = {
-                index: next.i,
-                override: next.override,
-                result: emptyReplayResponse(next.built.url),
-                error: next.buildError,
-              };
-              continue;
-            }
-            try {
-              const r = await executeReplay(
-                page.context().request,
-                next.built,
-                maxBodyLength,
-              );
-              results[next.i] = {
-                index: next.i,
-                override: next.override,
-                result: r,
-              };
-            } catch (e) {
-              results[next.i] = {
-                index: next.i,
-                override: next.override,
-                result: emptyReplayResponse(next.built.url),
-                error: e instanceof Error ? e.message : String(e),
-              };
-            }
-          }
-        },
-      );
-      await Promise.all(workers);
-
-      let succeeded = 0;
-      let failed = 0;
-      const statusCodeDistribution: Record<number, number> = {};
-      for (const r of results) {
-        if (r.error) {
-          failed++;
-        } else {
-          succeeded++;
-        }
-        const status = r.result.status;
-        statusCodeDistribution[status] =
-          (statusCodeDistribution[status] ?? 0) + 1;
-      }
-
-      return {
-        success: failed === 0,
-        message: `批量重放完成：${succeeded}/${variants.length} 成功`,
-        data: {
-          total: variants.length,
-          succeeded,
-          failed,
-          statusCodeDistribution,
-          results,
-        },
-      };
-    } catch (error) {
-      return {
-        success: false,
-        message: `批量重放失败：${error instanceof Error ? error.message : String(error)}`,
-        data: {
-          total: variants.length,
-          succeeded: 0,
-          failed: variants.length,
-          statusCodeDistribution: {},
-          results: [],
-        },
-      };
-    }
-  }
-
-  private buildOverride(
-    params: ReplayNetworkRequestParams | ExportRequestAsCurlParams,
-  ): ReplayOverride | null {
-    const hasOverride =
-      params.method ??
-      params.url ??
-      params.headers ??
-      params.body ??
-      params.replaceHeaders !== undefined;
-    if (!hasOverride) {
-      return null;
-    }
-    return {
-      method: params.method,
-      url: params.url,
-      headers: params.headers,
-      body: params.body,
-      replaceHeaders: params.replaceHeaders,
-    };
   }
 
   // ─── WebSocket ──────────────────────────────────

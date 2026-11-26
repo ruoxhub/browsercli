@@ -7,7 +7,7 @@
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
-import {navigatePage} from '../../../../src/tools/navigation/navigatePage.js';
+import {navigatePage} from '../../../../src/tools/navigation.js';
 import {ToolError} from '../../../../src/utils/errors.js';
 import {ToolResponseAccumulator} from '../../../../src/worker/ToolResponse.js';
 

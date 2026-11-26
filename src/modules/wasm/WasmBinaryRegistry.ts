@@ -207,4 +207,10 @@ export class WasmBinaryRegistry {
     const bytes = this.bytesByModuleId.get(moduleId);
     return bytes ? Uint8Array.from(bytes) : undefined;
   }
+
+  clear(): void {
+    this.modulesById.clear();
+    this.moduleIdsByHash.clear();
+    this.bytesByModuleId.clear();
+  }
 }

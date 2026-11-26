@@ -11,7 +11,6 @@ import {getRuntime as getJSHookRuntime} from '../../../src/runtime.js';
 import {
   listScripts,
   getScriptSource,
-  findInScript,
   searchInSources,
   setBreakpoint,
   removeBreakpoint,
@@ -20,14 +19,9 @@ import {
   getPausedInfo,
   resume,
   pause,
-  stepOver,
-  stepInto,
-  stepOut,
+  debuggerStep,
   evaluateOnCallframe,
   setBreakpointOnText,
-  hookFunction,
-  unhookFunction,
-  listHooks,
   inspectObject,
   getStorage,
   breakOnXhr,
@@ -35,8 +29,8 @@ import {
   monitorEvents,
   stopMonitor,
   traceFunction,
-} from '../../../src/tools/debugger/index.js';
-import {listFrames, selectFrame} from '../../../src/tools/frames/index.js';
+} from '../../../src/tools/debugger.js';
+import {listFrames, selectFrame} from '../../../src/tools/frames.js';
 
 interface DebuggerResponseHarness {
   lines: string[];
@@ -421,7 +415,7 @@ describe('debugger tools extended', () => {
       ],
     });
 
-    await findInScript.handler(
+    await searchInSources.handler(
       {
         params: {
           scriptId: '1',
@@ -431,12 +425,12 @@ describe('debugger tools extended', () => {
           caseSensitive: true,
         },
       },
-      response as unknown as Parameters<typeof findInScript.handler>[1],
-      context as unknown as Parameters<typeof findInScript.handler>[2],
+      response as unknown as Parameters<typeof searchInSources.handler>[1],
+      context as unknown as Parameters<typeof searchInSources.handler>[2],
     );
     await assert.rejects(
       () =>
-        findInScript.handler(
+        searchInSources.handler(
           {
             params: {
               scriptId: '1',
@@ -446,8 +440,8 @@ describe('debugger tools extended', () => {
               caseSensitive: true,
             },
           },
-          response as unknown as Parameters<typeof findInScript.handler>[1],
-          context as unknown as Parameters<typeof findInScript.handler>[2],
+          response as unknown as Parameters<typeof searchInSources.handler>[1],
+          context as unknown as Parameters<typeof searchInSources.handler>[2],
         ),
       (err: unknown) => err instanceof ToolError && err.code === 'NOT_FOUND',
     );
@@ -615,20 +609,20 @@ describe('debugger tools extended', () => {
       response as unknown as Parameters<typeof resume.handler>[1],
       context as unknown as Parameters<typeof resume.handler>[2],
     );
-    await stepOver.handler(
-      {params: {}},
-      response as unknown as Parameters<typeof stepOver.handler>[1],
-      context as unknown as Parameters<typeof stepOver.handler>[2],
+    await debuggerStep.handler(
+      {params: {direction: 'over'}},
+      response as unknown as Parameters<typeof debuggerStep.handler>[1],
+      context as unknown as Parameters<typeof debuggerStep.handler>[2],
     );
-    await stepInto.handler(
-      {params: {}},
-      response as unknown as Parameters<typeof stepInto.handler>[1],
-      context as unknown as Parameters<typeof stepInto.handler>[2],
+    await debuggerStep.handler(
+      {params: {direction: 'into'}},
+      response as unknown as Parameters<typeof debuggerStep.handler>[1],
+      context as unknown as Parameters<typeof debuggerStep.handler>[2],
     );
-    await stepOut.handler(
-      {params: {}},
-      response as unknown as Parameters<typeof stepOut.handler>[1],
-      context as unknown as Parameters<typeof stepOut.handler>[2],
+    await debuggerStep.handler(
+      {params: {direction: 'out'}},
+      response as unknown as Parameters<typeof debuggerStep.handler>[1],
+      context as unknown as Parameters<typeof debuggerStep.handler>[2],
     );
 
     context.debuggerContext.isPaused = () => false;
@@ -648,7 +642,7 @@ describe('debugger tools extended', () => {
     );
     assert.ok(
       response.lines.some(
-        x => x.includes('单步跳过') || x.includes('stepOver'),
+        x => x.includes('单步 over') || x.includes('stepOver'),
       ),
     );
     assert.ok(
@@ -726,7 +720,7 @@ describe('debugger tools extended', () => {
     );
   });
 
-  it('covers page-eval tools: hook/list/unhook/inspect/storage/monitor', async () => {
+  it('covers page-eval tools: inspect/storage/monitor', async () => {
     const response = makeResponse();
     const _runtime = getJSHookRuntime();
     let evalCount = 0;
@@ -737,20 +731,12 @@ describe('debugger tools extended', () => {
         frameEvalCount += 1;
         switch (frameEvalCount) {
           case 1:
-            return {hookId: 'h1'};
-          case 2:
-            return {hookId: 'h2'};
-          case 3:
-            return [{id: 'h1', target: 'Window.fetch'}];
-          case 4:
-            return {};
-          case 5:
             return {type: 'object', constructor: 'Object', value: {a: 1}};
-          case 6:
+          case 2:
             return {localStorage: {token: 'x'}};
-          case 7:
+          case 3:
             return {monitorId: 'm1', eventCount: 2};
-          case 8:
+          case 4:
             return {};
           default:
             return {};
@@ -768,20 +754,12 @@ describe('debugger tools extended', () => {
           evalCount += 1;
           switch (evalCount) {
             case 1:
-              return {hookId: 'h1'};
-            case 2:
-              return {hookId: 'h2'};
-            case 3:
-              return [{id: 'h1', target: 'Window.fetch'}];
-            case 4:
-              return {};
-            case 5:
               return {type: 'object', constructor: 'Object', value: {a: 1}};
-            case 6:
+            case 2:
               return {localStorage: {token: 'x'}};
-            case 7:
+            case 3:
               return {monitorId: 'm1', eventCount: 2};
-            case 8:
+            case 4:
               return {};
             default:
               return {};
@@ -791,37 +769,6 @@ describe('debugger tools extended', () => {
       getSelectedFrame: () => frame,
     });
 
-    await hookFunction.handler(
-      {
-        params: {
-          target: 'window.fetch',
-          logArgs: true,
-          logResult: true,
-          logStack: false,
-        },
-      },
-      response as unknown as Parameters<typeof hookFunction.handler>[1],
-      context as unknown as Parameters<typeof hookFunction.handler>[2],
-    );
-    await hookFunction.handler(
-      {
-        params: {
-          target: 'console.log',
-        },
-      },
-      response as unknown as Parameters<typeof hookFunction.handler>[1],
-      context as unknown as Parameters<typeof hookFunction.handler>[2],
-    );
-    await listHooks.handler(
-      {params: {}},
-      response as unknown as Parameters<typeof listHooks.handler>[1],
-      context as unknown as Parameters<typeof listHooks.handler>[2],
-    );
-    await unhookFunction.handler(
-      {params: {hookId: 'h1'}},
-      response as unknown as Parameters<typeof unhookFunction.handler>[1],
-      context as unknown as Parameters<typeof unhookFunction.handler>[2],
-    );
     await inspectObject.handler(
       {
         params: {
@@ -858,21 +805,6 @@ describe('debugger tools extended', () => {
 
     assert.ok(
       response.lines.some(
-        x =>
-          x.includes('Hook installed successfully') ||
-          x.includes('Hook 已安装'),
-      ),
-    );
-    assert.ok(
-      response.lines.some(
-        x =>
-          x.includes('Active hooks') ||
-          x.includes('活跃 Hook') ||
-          x.includes('已安装'),
-      ),
-    );
-    assert.ok(
-      response.lines.some(
         x => x.includes('Storage data') || x.includes('存储数据'),
       ),
     );
@@ -887,8 +819,10 @@ describe('debugger tools extended', () => {
         x => x.includes('Monitor "m1" stopped') || x.includes('已停止'),
       ),
     );
-    assert.strictEqual(pageEvalCount, 0);
-    assert.strictEqual(frameEvalCount, 8);
+    // page.evaluate 只用于 document.cookie 降级补充（CDP cookies 为空时触发 1 次）
+    assert.strictEqual(pageEvalCount, 1);
+    // inspectObject / getStorage / monitorEvents / stopMonitor 各走一次 frame.evaluate
+    assert.strictEqual(frameEvalCount, 4);
   });
 
   it('lists frames and switches execution context', async () => {

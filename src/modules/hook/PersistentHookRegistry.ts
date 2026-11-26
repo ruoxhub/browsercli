@@ -17,7 +17,7 @@ export interface PersistentHookEntry {
   scriptSize: number;
   scriptPreview: string;
   registeredAt: number;
-  source: 'inject_hook';
+  source: 'inject_hook' | 'create_hook';
   requestedWorld: 'main' | 'isolated';
   effectiveWorld: 'main';
   applyMode: 'existing-and-future' | 'future-only';

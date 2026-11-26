@@ -58,15 +58,7 @@ describe('ToolContextProvider', () => {
 
   it('keeps the debugger disabled when selecting pages and frames', () => {
     const runtime = new ToolContextProvider();
-    let debuggerWarmups = 0;
-    const debuggerContext = (
-      runtime as unknown as {
-        _debuggerContext: {ensureForPage: () => Promise<unknown>};
-      }
-    )._debuggerContext;
-    debuggerContext.ensureForPage = async () => {
-      debuggerWarmups += 1;
-    };
+    const cdpSessionPurposes: string[] = [];
 
     const frame = {name: 'main-frame'};
     const page = {
@@ -76,12 +68,31 @@ describe('ToolContextProvider', () => {
       once: () => undefined,
       setDefaultTimeout: () => undefined,
       setDefaultNavigationTimeout: () => undefined,
+      context: () => ({
+        newCDPSession: async () => {
+          const purpose = 'focus-emulation';
+          cdpSessionPurposes.push(purpose);
+          return {
+            send: async (method: string) => {
+              assert.equal(
+                method,
+                'Emulation.setFocusEmulationEnabled',
+                `selectPage 不应创建非焦点模拟的 CDP 会话，实际: ${method}`,
+              );
+              return undefined;
+            },
+            detach: async () => undefined,
+          };
+        },
+      }),
     };
 
     runtime.selectPage(page as never);
     runtime.selectFrameByIdx(0);
 
-    assert.equal(debuggerWarmups, 0);
+    // selectPage 允许为焦点模拟创建一个 CDP 会话，但 debugger 不得自动 attach
+    assert.ok(cdpSessionPurposes.length <= 1);
+    assert.equal(runtime.getExistingDebuggerContext(), undefined);
   });
 
   it('reads network requests from the requested page index', () => {

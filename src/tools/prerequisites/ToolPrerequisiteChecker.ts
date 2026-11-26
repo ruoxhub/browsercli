@@ -31,6 +31,17 @@ export interface ToolPrerequisiteContext {
   getDebuggerContext?: () => Promise<unknown>;
 }
 
+export interface ToolPrerequisiteTargetPage {
+  readonly id: string;
+  readonly rawPage: unknown;
+  getSelectedFrameOrNull?(): unknown | null;
+  getSelectedFrame?(): unknown | null;
+  getExistingDebugger?():
+    | DebuggerManager
+    | {isPaused?(): boolean; getPausedState?(): unknown | null}
+    | undefined;
+}
+
 export class ToolPrerequisiteChecker {
   constructor(
     private readonly context: ToolPrerequisiteContext,
@@ -43,6 +54,7 @@ export class ToolPrerequisiteChecker {
       | ToolRuntimeRequirements
       | readonly ToolPrerequisite[],
     legacyPrerequisites?: readonly ToolPrerequisite[],
+    targetPage?: ToolPrerequisiteTargetPage,
   ): void {
     let requirements: ToolRuntimeRequirements | undefined;
     let prerequisites: readonly ToolPrerequisite[] | undefined;
@@ -56,6 +68,8 @@ export class ToolPrerequisiteChecker {
       requirements = requirementsOrPrerequisites as ToolRuntimeRequirements;
       prerequisites = legacyPrerequisites;
     }
+
+    const effectivePage = targetPage?.rawPage ?? this.context.getSelectedPage();
 
     if (requirements) {
       // 1. Browser connection check
@@ -86,8 +100,7 @@ export class ToolPrerequisiteChecker {
 
       // 2. Page selection check
       if (requirements.page === 'selected') {
-        const page = this.context.getSelectedPage();
-        if (!page) {
+        if (!effectivePage) {
           throw createToolError(
             ErrorCodes.PAGE_REQUIRED,
             `Tool "${toolName}" requires an active page.`,
@@ -99,8 +112,11 @@ export class ToolPrerequisiteChecker {
 
       // 3. Frame selection check
       if (requirements.frame === 'selected') {
-        const frame =
-          typeof this.context.getSelectedFrame === 'function'
+        const frame = targetPage
+          ? (targetPage.getSelectedFrameOrNull?.() ??
+            targetPage.getSelectedFrame?.() ??
+            null)
+          : typeof this.context.getSelectedFrame === 'function'
             ? this.context.getSelectedFrame()
             : null;
         if (!frame) {
@@ -116,14 +132,14 @@ export class ToolPrerequisiteChecker {
 
     // 4. Page health check (unresponsive guard, bypassed when recovery is true)
     if (requirements?.recovery !== true) {
-      const page = this.context.getSelectedPage();
-      if (page) {
+      if (effectivePage) {
         let pageId: string | undefined;
         try {
           pageId =
-            typeof this.context.getPageId === 'function'
-              ? this.context.getPageId(page)
-              : this.context.getSelectedPageId?.();
+            targetPage?.id ??
+            (typeof this.context.getPageId === 'function'
+              ? this.context.getPageId(effectivePage)
+              : this.context.getSelectedPageId?.());
         } catch {
           pageId = undefined;
         }
@@ -146,11 +162,13 @@ export class ToolPrerequisiteChecker {
         requirements.debugger === 'running' ||
         requirements.debugger === 'paused'
       ) {
-        const page = this.context.getSelectedPage();
         const debuggerManager =
-          typeof this.context.getExistingDebuggerContext === 'function'
-            ? this.context.getExistingDebuggerContext(page ?? undefined)
-            : undefined;
+          targetPage?.getExistingDebugger?.() ??
+          (typeof this.context.getExistingDebuggerContext === 'function'
+            ? this.context.getExistingDebuggerContext(
+                effectivePage ?? undefined,
+              )
+            : undefined);
 
         let isPaused = false;
         if (debuggerManager) {
@@ -170,7 +188,7 @@ export class ToolPrerequisiteChecker {
               retryable: true,
               recovery: {
                 tool: 'resume',
-                command: 'browsercli call resume',
+                command: 'browsercli resume',
                 reason: 'Resume execution or evaluate the current call frame.',
               },
             },
@@ -186,7 +204,7 @@ export class ToolPrerequisiteChecker {
               retryable: false,
               recovery: {
                 tool: 'pause',
-                command: 'browsercli call pause',
+                command: 'browsercli pause',
                 reason: 'Pause page execution before inspecting call frames.',
               },
             },
@@ -198,10 +216,7 @@ export class ToolPrerequisiteChecker {
     // 6. Legacy prerequisites check
     if (prerequisites && Array.isArray(prerequisites)) {
       for (const prerequisite of prerequisites) {
-        if (
-          prerequisite.condition === 'requiresPage' &&
-          !this.context.getSelectedPage()
-        ) {
+        if (prerequisite.condition === 'requiresPage' && !effectivePage) {
           throw createToolError(
             ErrorCodes.PREREQUISITE,
             `Tool "${toolName}" requires an active page.`,

@@ -17,7 +17,7 @@ import type {
   RequestInitiator,
   WebSocketData,
 } from '../modules/network/NetworkTypes.js';
-import type {ConsoleMessageEntry} from '../tools/console/types.js';
+import type {ConsoleMessageEntry} from '../tools/console.js';
 
 // ─── 辅助函数 ────────────────────────────────────────
 

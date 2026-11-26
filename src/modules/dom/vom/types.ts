@@ -1,3 +1,8 @@
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
 /** Viewport-relative layout box, CSS pixels. */
 export interface Rect {
   x: number;
@@ -11,7 +16,7 @@ export interface Viewport {
   height: number;
 }
 
-export type LayerKind = "page" | "modal" | "mask";
+export type LayerKind = 'page' | 'modal' | 'mask';
 
 /**
  * CDP-free data slice consumed by packages/vom.
@@ -33,14 +38,14 @@ export interface VomNode {
   name?: string;
   value?: string;
   /** Checked state is separate from the control's submitted value. */
-  checked?: boolean | "mixed";
+  checked?: boolean | 'mixed';
   /** Browser accessibility focus, used to protect implicit keyboard recipients. */
   focused?: boolean;
   placeholder?: string;
   /** Native form ownership, or raw DOM form containment for custom widgets.
    * Absence means unknown, never proof that a control is outside a form. */
   inForm?: boolean;
-  inputState?: "empty" | "filled" | "default" | "unknown";
+  inputState?: 'empty' | 'filled' | 'default' | 'unknown';
   href?: string; // hostname of external link target; omitted for same-origin links
   text?: string;
   nearbyText?: string;
@@ -52,7 +57,7 @@ export interface VomNode {
   pointerEvents: string;
   cursor?: string;
   /** Derived interaction hint; false suppresses an inherited cursor hint. */
-  dragHint?: "draggable" | "drag-handle" | "drop-target" | false;
+  dragHint?: 'draggable' | 'drag-handle' | 'drop-target' | false;
   /** Browser-reported clickability, independent of role and inline attributes. */
   clickable?: boolean;
   attrs?: Record<string, string>;
@@ -108,7 +113,7 @@ export interface VomOptions {
 
 export interface CondSurface {
   triggerId: number;
-  triggerAction: "hover" | "focus" | string;
+  triggerAction: 'hover' | 'focus' | string;
   subItems: string[];
 }
 
@@ -141,7 +146,7 @@ export interface VomResult {
 
 export interface BlockingLayer {
   rootId: number;
-  kind: Exclude<LayerKind, "page">;
+  kind: Exclude<LayerKind, 'page'>;
   coverage: number;
   members: Set<number>;
 }

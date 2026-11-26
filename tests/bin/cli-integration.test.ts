@@ -34,11 +34,6 @@ describe('CLI Integration', () => {
     assert.ok(output.includes('status'), 'Should include status command');
     assert.ok(output.includes('repl'), 'Should include repl command');
     assert.ok(output.includes('scaffold'), 'Should include scaffold command');
-    assert.ok(output.includes('call'), 'Should include call command');
-    assert.ok(
-      output.includes('list-tools'),
-      'Should include list-tools command',
-    );
     assert.ok(
       !output.includes('call-skill'),
       'Should not include call-skill command',
@@ -56,41 +51,6 @@ describe('CLI Integration', () => {
     assert.ok(typeof data.pid === 'number', 'Should have pid');
     assert.ok(typeof data.socketPath === 'string', 'Should have socketPath');
     assert.ok(typeof data.startDate === 'string', 'Should have startDate');
-  });
-
-  it.skip('list-tools includes three legacy skills', () => {
-    const output = runCli('list-tools');
-    assert.ok(
-      output.includes('observe-flow'),
-      'Should have observe-flow skill',
-    );
-    assert.ok(output.includes('auto-hook'), 'Should have auto-hook skill');
-    assert.ok(
-      output.includes('rebuild-bundle'),
-      'Should have rebuild-bundle skill',
-    );
-  });
-
-  it.skip('call observe-flow executes successfully', () => {
-    const output = runCli('call observe-flow --url https://example.com');
-    assert.ok(output.includes('observe_flow'), 'Should execute successfully');
-    assert.ok(output.includes('observe-flow'), 'Should mention skill name');
-  });
-
-  it.skip('call auto-hook executes successfully', () => {
-    const output = runCli('call auto-hook --url https://example.com');
-    assert.ok(output.includes('auto_hook'), 'Should execute successfully');
-    assert.ok(output.includes('auto-hook'), 'Should mention skill name');
-  });
-
-  it.skip('call rebuild-bundle executes successfully', () => {
-    const output = runCli('call rebuild-bundle --url https://example.com');
-    assert.ok(output.includes('rebuild_bundle'), 'Should execute successfully');
-    assert.ok(output.includes('rebuild-bundle'), 'Should mention skill name');
-    assert.ok(
-      output.includes('bundlePath'),
-      'Should have bundlePath in response',
-    );
   });
 
   it('scaffold command shows help without args', () => {
@@ -126,20 +86,6 @@ describe('CLI Integration', () => {
     );
   });
 
-  it('call without tool name exits with code 2', () => {
-    try {
-      runCli('call 2>&1');
-      assert.fail('Should reject missing tool name');
-    } catch (error) {
-      const e = asCliExecError(error);
-      assert.ok(e.status === 2, `Should exit with code 2, got ${e.status}`);
-      assert.ok(
-        e.stdout.includes('VALIDATION_ERROR'),
-        'Should include VALIDATION_ERROR',
-      );
-    }
-  });
-
   it('scaffold without name exits with code 2', () => {
     try {
       runCli('scaffold 2>&1');
@@ -150,49 +96,6 @@ describe('CLI Integration', () => {
       assert.ok(
         e.stdout.includes('VALIDATION_ERROR'),
         'Should include VALIDATION_ERROR',
-      );
-    }
-  });
-
-  it('call with unknown tool exits with code 1', () => {
-    try {
-      runCli('call nonexistent-tool-xyz 2>&1');
-      assert.fail('Should reject unknown tool');
-    } catch (error) {
-      const e = asCliExecError(error);
-      assert.ok(e.status === 1, `Should exit with code 1, got ${e.status}`);
-      assert.ok(
-        e.stdout.includes('UNKNOWN_TOOL'),
-        'Should include UNKNOWN_TOOL',
-      );
-    }
-  });
-
-  it('call with daemon not running exits with code 1', () => {
-    try {
-      runCli('call query_dom 2>&1');
-      assert.fail('Should fail when daemon not running');
-    } catch (error) {
-      const e = asCliExecError(error);
-      assert.ok(e.status === 1, `Should exit with code 1, got ${e.status}`);
-      assert.ok(
-        e.stdout.includes('TOOL_INVOCATION_ERROR') ||
-          e.stdout.includes('DAEMON_ERROR'),
-        'Should include daemon error',
-      );
-    }
-  });
-
-  it('call legacy skill with daemon not running exits with code 1', () => {
-    try {
-      runCli('call observe-flow 2>&1');
-      assert.fail('Should fail when daemon not running');
-    } catch (error) {
-      const e = asCliExecError(error);
-      assert.ok(e.status === 1, `Should exit with code 1, got ${e.status}`);
-      assert.ok(
-        e.stdout.includes('DAEMON_ERROR'),
-        'Should include DAEMON_ERROR',
       );
     }
   });

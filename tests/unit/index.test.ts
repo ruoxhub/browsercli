@@ -7,6 +7,7 @@
 import assert from 'node:assert';
 import {afterEach, beforeEach, describe, it} from 'node:test';
 
+import {NO_CONFIG_DISCOVERY_ENV} from '../../src/config/ConfigLocator.js';
 import {
   getRuntimeConfigStore,
   resetRuntimeConfigStore,
@@ -18,6 +19,7 @@ describe('Worker main() startup', () => {
 
   beforeEach(() => {
     delete process.env.BROWSER_URL;
+    process.env[NO_CONFIG_DISCOVERY_ENV] = 'true';
   });
 
   afterEach(() => {

@@ -20,7 +20,7 @@ import {after, before, describe, it} from 'node:test';
 
 import {ScriptManager} from '../../../../src/modules/debugger/ScriptManager.js';
 import type {CDPSession} from '../../../../src/third_party/index.js';
-import {getScriptSource} from '../../../../src/tools/debugger/index.js';
+import {getScriptSource} from '../../../../src/tools/debugger.js';
 
 interface CapturedResponse {
   lines: string[];

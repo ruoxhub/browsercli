@@ -7,9 +7,9 @@
 import assert from 'node:assert/strict';
 import {describe, it} from 'node:test';
 
-import {fill} from '../../../../src/tools/input/fill.js';
-import {fillElement} from '../../../../src/tools/input/fillElement.js';
-import {fillForm} from '../../../../src/tools/input/fillForm.js';
+import {fill} from '../../../../src/tools/input.js';
+import {fillElement} from '../../../../src/tools/input.js';
+import {fillForm} from '../../../../src/tools/input.js';
 import {ToolError} from '../../../../src/utils/errors.js';
 
 function captureResponse() {

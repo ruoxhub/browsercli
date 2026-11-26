@@ -8,9 +8,9 @@ import assert from 'node:assert/strict';
 import {describe, it} from 'node:test';
 
 import {globalPageSnapshotManager} from '../../../../src/modules/snapshot/PageSnapshotManager.js';
-import {click} from '../../../../src/tools/input/click.js';
-import {fill} from '../../../../src/tools/input/fill.js';
-import {hover} from '../../../../src/tools/input/hover.js';
+import {click} from '../../../../src/tools/input.js';
+import {fill} from '../../../../src/tools/input.js';
+import {hover} from '../../../../src/tools/input.js';
 
 function createMockPageAndFrame() {
   const actions: Array<{action: string; target: string; value?: unknown}> = [];

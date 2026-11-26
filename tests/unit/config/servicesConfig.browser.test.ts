@@ -51,6 +51,14 @@ test('buildBrowserManagerConfig respects top-level flat config and overrides def
       executablePath: 'C:\\Test\\chrome.exe',
       cloak: true,
       jsStealth: true,
+      channel: 'beta',
+      isolated: false,
+      userDataDir: '/tmp/profile',
+      acceptInsecureCerts: true,
+      proxyServer: 'http://127.0.0.1:8080',
+      chromeArg: ['--no-sandbox'],
+      ignoreDefaultChromeArg: ['--disable-extensions'],
+      wsHeaders: {Authorization: 'Bearer test'},
     });
 
     const config = buildBrowserManagerConfig();
@@ -59,6 +67,16 @@ test('buildBrowserManagerConfig respects top-level flat config and overrides def
     assert.strictEqual(config.executablePath, 'C:\\Test\\chrome.exe');
     assert.strictEqual(config.cloak, true);
     assert.strictEqual(config.jsStealth, true);
+    assert.strictEqual(config.channel, 'beta');
+    assert.strictEqual(config.isolated, false);
+    assert.strictEqual(config.userDataDir, '/tmp/profile');
+    assert.strictEqual(config.acceptInsecureCerts, true);
+    assert.strictEqual(config.proxyServer, 'http://127.0.0.1:8080');
+    assert.deepStrictEqual(config.chromeArg, ['--no-sandbox']);
+    assert.deepStrictEqual(config.ignoreDefaultChromeArg, [
+      '--disable-extensions',
+    ]);
+    assert.deepStrictEqual(config.wsHeaders, {Authorization: 'Bearer test'});
   } finally {
     resetRuntimeConfigStore({});
   }

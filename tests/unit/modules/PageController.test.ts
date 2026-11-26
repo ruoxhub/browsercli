@@ -9,6 +9,15 @@ import {describe, it} from 'node:test';
 import {PageController} from '../../../src/modules/collector/PageController.js';
 
 function makePage() {
+  const context = {
+    addCookies: async () => undefined,
+    cookies: async () => [{name: 'sid', value: '1'}],
+    clearCookies: async () => undefined,
+    newCDPSession: async () => ({
+      send: async () => undefined,
+      detach: async () => undefined,
+    }),
+  };
   const page: Record<string, unknown> = {
     goto: async () => undefined,
     title: async () => 'Example',
@@ -18,25 +27,22 @@ function makePage() {
     goForward: async () => undefined,
     click: async () => undefined,
     type: async () => undefined,
-    select: async () => undefined,
+    selectOption: async () => undefined,
     hover: async () => undefined,
     evaluate: async () => ({}),
-    evaluateOnNewDocument: async () => undefined,
+    addInitScript: async () => undefined,
     waitForSelector: async () => undefined,
     waitForNavigation: async () => undefined,
+    waitForURL: async () => undefined,
     content: async () => '<html></html>',
     screenshot: async () => Buffer.from('img'),
-    setCookie: async () => undefined,
-    cookies: async () => [{name: 'sid', value: '1'}],
-    deleteCookie: async () => undefined,
-    setViewport: async () => undefined,
-    setUserAgent: async () => undefined,
-    waitForNetworkIdle: async () => undefined,
+    setViewportSize: async () => undefined,
+    context: () => context,
     keyboard: {
       press: async () => undefined,
     },
     $: async () => ({
-      uploadFile: async () => undefined,
+      setInputFiles: async () => undefined,
     }),
   };
   return page;
@@ -82,16 +88,17 @@ describe('PageController', () => {
     const page = makePage();
     let preloadCallback: ((script: string) => void) | undefined;
     let preloadScriptArg: string | undefined;
-    page.evaluateOnNewDocument = async (
+    page.addInitScript = async (
       callback: (script: string) => void,
       script: string,
     ) => {
       preloadCallback = callback;
       preloadScriptArg = script;
     };
-    let deleteCookieArgsLen = 0;
-    page.deleteCookie = async (...args: unknown[]) => {
-      deleteCookieArgsLen = args.length;
+    let clearCookiesCalled = 0;
+    const pageContext = (page as any).context();
+    pageContext.clearCookies = async () => {
+      clearCookiesCalled += 1;
     };
     const evaluateResults: unknown[] = [
       {
@@ -139,7 +146,7 @@ describe('PageController', () => {
     const cookies = await controller.getCookies();
     assert.strictEqual(cookies.length, 1);
     await controller.clearCookies();
-    assert.strictEqual(deleteCookieArgsLen, 1);
+    assert.strictEqual(clearCookiesCalled, 1);
 
     await controller.setViewport(800, 600);
     await controller.emulateDevice('iPhone');

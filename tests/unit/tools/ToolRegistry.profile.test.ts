@@ -9,7 +9,7 @@ import {describe, it} from 'node:test';
 
 import type {DomainManifest} from '../../../src/tools/manifest.js';
 import {ToolRegistry} from '../../../src/tools/registry/ToolRegistry.js';
-import {manifest as wasmManifest} from '../../../src/tools/wasm/manifest.js';
+import {manifest as wasmManifest} from '../../../src/tools/wasm.js';
 
 describe('ToolRegistry profile filtering', () => {
   it('includes workflow tools in workflow profile', () => {
@@ -143,7 +143,7 @@ describe('ToolRegistry profile filtering', () => {
     assert.deepStrictEqual(registry.listTools('workflow'), []);
     assert.deepStrictEqual(
       registry.listTools('full').map(tool => tool.handlerName),
-      ['collectWasm', 'wasmDump', 'wasmVmpTrace', 'wasmMemoryInspect'],
+      ['collectWasm', 'wasmDump', 'wasmVmpTrace'],
     );
   });
 });

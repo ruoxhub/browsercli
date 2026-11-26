@@ -11,11 +11,11 @@ import type {Frame} from '../../../src/third_party/index.js';
 import {
   bypassDebugger as toolBypassDebugger,
   antiAntiDebug as toolAntiAntiDebug,
-} from '../../../src/tools/anti-debug/index.js';
+} from '../../../src/tools/anti-debug.js';
 import type {
   BypassTarget,
   AntiAntiDebugFeature,
-} from '../../../src/tools/anti-debug/types.js';
+} from '../../../src/tools/anti-debug.js';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 function wrapAntiDebugTool(tool: any, paramNames: string[]) {

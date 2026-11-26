@@ -7,7 +7,7 @@
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
-import {listPages} from '../../../src/tools/navigation/listPages.js';
+import {listPages} from '../../../src/tools/navigation.js';
 import {
   ToolContextProvider,
   DefineToolContextFactory,
@@ -31,7 +31,6 @@ describe('listPages tool local verification', () => {
       tooltype: string;
       data: {
         pageInfos: unknown[];
-        selectedIndex: number;
         selectedPageId: string | null;
       };
     };

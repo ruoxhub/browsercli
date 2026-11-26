@@ -1,5 +1,10 @@
-import { coverage, detectBlockingLayer, spansViewport } from './layers.js';
-import { estimateLineTokens, estimateTokens } from './tokens.js';
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+import {coverage, detectBlockingLayer, spansViewport} from './layers.js';
+import {estimateLineTokens, estimateTokens} from './tokens.js';
 import type {
   ActiveScopeBlock,
   BlockingLayer,
@@ -12,76 +17,81 @@ import type {
   VomScene,
 } from './types.js';
 
-const SKIP_ROLES = new Set(["generic", "none", "presentation", "inlinetextbox"]);
+const SKIP_ROLES = new Set([
+  'generic',
+  'none',
+  'presentation',
+  'inlinetextbox',
+]);
 
 const INTERACTIVE_ROLES = new Set([
-  "button",
-  "checkbox",
-  "combobox",
-  "listbox",
-  "link",
-  "menuitem",
-  "menuitemcheckbox",
-  "menuitemradio",
-  "option",
-  "radio",
-  "scrollbar",
-  "searchbox",
-  "slider",
-  "spinbutton",
-  "switch",
-  "tab",
-  "textbox",
-  "treeitem",
+  'button',
+  'checkbox',
+  'combobox',
+  'listbox',
+  'link',
+  'menuitem',
+  'menuitemcheckbox',
+  'menuitemradio',
+  'option',
+  'radio',
+  'scrollbar',
+  'searchbox',
+  'slider',
+  'spinbutton',
+  'switch',
+  'tab',
+  'textbox',
+  'treeitem',
 ]);
 
 const STRUCTURAL_ROLES = new Set([
-  "alert",
-  "alertdialog",
-  "article",
-  "banner",
-  "cell",
-  "columnheader",
-  "complementary",
-  "contentinfo",
-  "definition",
-  "dialog",
-  "directory",
-  "document",
-  "feed",
-  "figure",
-  "form",
-  "grid",
-  "gridcell",
-  "group",
-  "heading",
-  "iframe",
-  "img",
-  "list",
-  "listitem",
-  "main",
-  "navigation",
-  "paragraph",
-  "region",
-  "rootwebarea",
-  "row",
-  "rowgroup",
-  "rowheader",
-  "search",
-  "section",
-  "status",
-  "table",
-  "term",
-  "toolbar",
-  "tree",
-  "webarea",
+  'alert',
+  'alertdialog',
+  'article',
+  'banner',
+  'cell',
+  'columnheader',
+  'complementary',
+  'contentinfo',
+  'definition',
+  'dialog',
+  'directory',
+  'document',
+  'feed',
+  'figure',
+  'form',
+  'grid',
+  'gridcell',
+  'group',
+  'heading',
+  'iframe',
+  'img',
+  'list',
+  'listitem',
+  'main',
+  'navigation',
+  'paragraph',
+  'region',
+  'rootwebarea',
+  'row',
+  'rowgroup',
+  'rowheader',
+  'search',
+  'section',
+  'status',
+  'table',
+  'term',
+  'toolbar',
+  'tree',
+  'webarea',
 ]);
 
 export function isVomStructuralRole(role: string | undefined): boolean {
-  return STRUCTURAL_ROLES.has(role?.toLowerCase() ?? "");
+  return STRUCTURAL_ROLES.has(role?.toLowerCase() ?? '');
 }
 
-const SENSITIVE_MASK = "•••";
+const SENSITIVE_MASK = '•••';
 const DEFAULT_MAX_DEPTH = Number.POSITIVE_INFINITY;
 const DEFAULT_MAX_TOKENS = Number.POSITIVE_INFINITY;
 const MAX_VALUE_LENGTH = 200;
@@ -90,42 +100,48 @@ const MAX_RECOVERABLE_SINGLE_INTENT_AREA = 360_000;
 const MAX_HANDLE_CONTEXT_ITEMS = 3;
 const MAX_SURFACE_ITEMS = 12;
 const MAX_SCOPE_LINES = 40;
-const RECOVERY_HANDLER_ATTRS = ["onclick", "onmousedown", "onkeydown", "onkeyup", "onkeypress"];
-const NATIVE_TAGS = new Set(["button", "input", "select", "textarea"]);
-const GRAPHIC_ONLY_TAGS = new Set(["svg", "use", "path", "g", "symbol"]);
+const RECOVERY_HANDLER_ATTRS = [
+  'onclick',
+  'onmousedown',
+  'onkeydown',
+  'onkeyup',
+  'onkeypress',
+];
+const NATIVE_TAGS = new Set(['button', 'input', 'select', 'textarea']);
+const GRAPHIC_ONLY_TAGS = new Set(['svg', 'use', 'path', 'g', 'symbol']);
 const EXPLICIT_RECOVERY_ROLES = new Set([
-  "button",
-  "menuitem",
-  "switch",
-  "tab",
-  "checkbox",
-  "radio",
+  'button',
+  'menuitem',
+  'switch',
+  'tab',
+  'checkbox',
+  'radio',
 ]);
 const WEAK_ACTION_LABELS = new Set([
-  "add",
-  "apply",
-  "cancel",
-  "delete",
-  "edit",
-  "go",
-  "more",
-  "open",
-  "remove",
-  "reset",
-  "save",
-  "select",
-  "submit",
-  "suspend",
-  "view",
-  "close",
-  "confirm",
-  "continue",
+  'add',
+  'apply',
+  'cancel',
+  'delete',
+  'edit',
+  'go',
+  'more',
+  'open',
+  'remove',
+  'reset',
+  'save',
+  'select',
+  'submit',
+  'suspend',
+  'view',
+  'close',
+  'confirm',
+  'continue',
 ]);
 
-const ACTIVE_REGION_POSITIONS = new Set(["fixed", "absolute", "sticky"]);
+const ACTIVE_REGION_POSITIONS = new Set(['fixed', 'absolute', 'sticky']);
 
 function cleaned(value: string | undefined): string | undefined {
-  const trimmed = value?.replace(/\s+/g, " ").trim();
+  const trimmed = value?.replace(/\s+/g, ' ').trim();
   return trimmed ? trimmed : undefined;
 }
 
@@ -133,18 +149,33 @@ function isNoisyText(value: string): boolean {
   const clean = value.trim();
   const key = clean.toLowerCase();
   if (!clean) return true;
-  if (clean.includes("<![endif]") || clean.includes("<!--") || clean.includes("-->")) return true;
+  if (
+    clean.includes('<![endif]') ||
+    clean.includes('<!--') ||
+    clean.includes('-->')
+  )
+    return true;
   if (/<\/?[a-z][^>]*>/i.test(clean)) return true;
-  if (/\$\(function|document\.|window\.|\.onclick\s*=|function\s*\(|var\s+\w+\s*=/.test(clean)) {
+  if (
+    /\$\(function|document\.|window\.|\.onclick\s*=|function\s*\(|var\s+\w+\s*=/.test(
+      clean,
+    )
+  ) {
     return true;
   }
-  if (/(https?:\/\/|encodeURIComponent|site_code|target="_blank")/.test(clean)) return true;
+  if (/(https?:\/\/|encodeURIComponent|site_code|target="_blank")/.test(clean))
+    return true;
   if (/^\[?if\s+[^\]]+\]?>?$/i.test(clean)) return true;
   if (/^<!\[endif\]?>$/i.test(clean)) return true;
-  if (/^(top|header|footer|nav|bigpic|login|登录|开始|结束)[、,\s]*(开始|结束)?$/i.test(clean)) {
+  if (
+    /^(top|header|footer|nav|bigpic|login|登录|开始|结束)[、,\s]*(开始|结束)?$/i.test(
+      clean,
+    )
+  ) {
     return true;
   }
-  if (/(^|[、,\s])(top|bigpic|登录)\s*(开始|结束)($|[、,\s])/.test(key)) return true;
+  if (/(^|[、,\s])(top|bigpic|登录)\s*(开始|结束)($|[、,\s])/.test(key))
+    return true;
   return false;
 }
 
@@ -157,16 +188,19 @@ function cleanSemanticText(value: string | undefined): string | undefined {
 function isLowValueContext(value: string): boolean {
   const clean = value.trim();
   const key = clean.toLowerCase();
-  if (clean === "欢迎") return true;
-  if (key.includes("icp") || key.includes("备案")) return true;
-  if (clean.includes("联系方式") || clean.includes("政府网站标识")) return true;
+  if (clean === '欢迎') return true;
+  if (key.includes('icp') || key.includes('备案')) return true;
+  if (clean.includes('联系方式') || clean.includes('政府网站标识')) return true;
   if (/^\d{5,}$/.test(clean)) return true;
-  if (/北京市小客车指标调控管理信息系统|beijing municipal commission/i.test(clean)) return true;
+  if (
+    /北京市小客车指标调控管理信息系统|beijing municipal commission/i.test(clean)
+  )
+    return true;
   return false;
 }
 
 function normalizedRole(node: VomNode): string {
-  return node.role?.toLowerCase() ?? "";
+  return node.role?.toLowerCase() ?? '';
 }
 
 function normalizedTag(node: VomNode): string {
@@ -174,17 +208,18 @@ function normalizedTag(node: VomNode): string {
 }
 
 function normalizeContextKey(s: string): string {
-  return s.split(/\s+/).join(" ").toLowerCase();
+  return s.split(/\s+/).join(' ').toLowerCase();
 }
 
 function isProbableNavigationTarget(value: string): boolean {
   const trimmed = value.trim();
-  return trimmed.startsWith("http://") || trimmed.startsWith("https://");
+  return trimmed.startsWith('http://') || trimmed.startsWith('https://');
 }
 
 function isUrlBearingStructuralAction(node: VomNode): boolean {
   const role = normalizedRole(node);
-  if (!["row", "cell", "gridcell", "listitem", "rowheader"].includes(role)) return false;
+  if (!['row', 'cell', 'gridcell', 'listitem', 'rowheader'].includes(role))
+    return false;
   const name = cleaned(node.name);
   return name !== undefined && isProbableNavigationTarget(name);
 }
@@ -194,38 +229,52 @@ function dragHint(node: VomNode): string | undefined {
   if (
     node.disabled ||
     node.inert ||
-    node.pointerEvents === "none" ||
-    ["statictext", "inlinetextbox"].includes(normalizedRole(node))
+    node.pointerEvents === 'none' ||
+    ['statictext', 'inlinetextbox'].includes(normalizedRole(node))
   )
     return undefined;
   if (node.dragHint !== undefined) return node.dragHint || undefined;
-  if (node.attrs?.draggable?.toLowerCase() === "true") return "draggable";
+  if (node.attrs?.draggable?.toLowerCase() === 'true') return 'draggable';
   if (node.attrs?.ondrop !== undefined || node.attrs?.ondragover !== undefined)
-    return "drop-target";
-  if (["grab", "grabbing", "move"].includes(node.cursor ?? "") || node.cursor?.endsWith("-resize"))
-    return "drag-handle";
+    return 'drop-target';
+  if (
+    ['grab', 'grabbing', 'move'].includes(node.cursor ?? '') ||
+    node.cursor?.endsWith('-resize')
+  )
+    return 'drag-handle';
   return undefined;
 }
 
 /** Selection evidence shared by rendered hints and observation freshness checks. */
 export function selectionMarker(node: VomNode): string | undefined {
   const attrs = node.attrs ?? {};
-  const aria = attrs["aria-selected"]?.toLowerCase();
-  if (aria === "true" || aria === "false") return aria === "true" ? "selected" : "unselected";
+  const aria = attrs['aria-selected']?.toLowerCase();
+  if (aria === 'true' || aria === 'false')
+    return aria === 'true' ? 'selected' : 'unselected';
   // Custom styling is only a hint on controls, never semantic proof on wrappers.
-  if (!isSemanticReferenceNode(node) && !hasRecoveryHandler(node)) return undefined;
-  if (attrs["data-selected"] === "true" || attrs["data-state"] === "selected")
-    return "selected:data";
-  if (attrs["data-selected"] === "false" || attrs["data-state"] === "unselected")
-    return "unselected:data";
-  if (attrs.class?.split(/\s+/).some((token) => token === "selected" || token === "is-selected"))
-    return "selected:class";
+  if (!isSemanticReferenceNode(node) && !hasRecoveryHandler(node))
+    return undefined;
+  if (attrs['data-selected'] === 'true' || attrs['data-state'] === 'selected')
+    return 'selected:data';
+  if (
+    attrs['data-selected'] === 'false' ||
+    attrs['data-state'] === 'unselected'
+  )
+    return 'unselected:data';
+  if (
+    attrs.class
+      ?.split(/\s+/)
+      .some(token => token === 'selected' || token === 'is-selected')
+  )
+    return 'selected:class';
   return undefined;
 }
 
 function indexedItemName(node: VomNode): string | undefined {
-  const index = node.attrs?.["data-index"];
-  return hasRecoveryHandler(node) && index !== undefined && /^\d{1,9}$/.test(index)
+  const index = node.attrs?.['data-index'];
+  return hasRecoveryHandler(node) &&
+    index !== undefined &&
+    /^\d{1,9}$/.test(index)
     ? `item ${index}`
     : undefined;
 }
@@ -245,20 +294,24 @@ function shouldRender(node: VomNode): boolean {
 function isSemanticReferenceNode(node: VomNode): boolean {
   return (
     node.referenceable !== false &&
-    (INTERACTIVE_ROLES.has(normalizedRole(node)) || isUrlBearingStructuralAction(node))
+    (INTERACTIVE_ROLES.has(normalizedRole(node)) ||
+      isUrlBearingStructuralAction(node))
   );
 }
 
 export function isVomReferenceNode(node: VomNode): boolean {
   return (
-    isSemanticReferenceNode(node) || (node.referenceable !== false && dragHint(node) !== undefined)
+    isSemanticReferenceNode(node) ||
+    (node.referenceable !== false && dragHint(node) !== undefined)
   );
 }
 
 function hasRecoveryHandler(node: VomNode): boolean {
   if (node.clickable) return true;
   const attrs = node.attrs ?? {};
-  return RECOVERY_HANDLER_ATTRS.some((key) => Object.prototype.hasOwnProperty.call(attrs, key));
+  return RECOVERY_HANDLER_ATTRS.some(key =>
+    Object.prototype.hasOwnProperty.call(attrs, key),
+  );
 }
 
 function isFocusable(node: VomNode): boolean {
@@ -271,34 +324,48 @@ function isFocusable(node: VomNode): boolean {
 function isContentEditable(node: VomNode): boolean {
   const contentEditable = node.attrs?.contenteditable?.toLowerCase();
   return (
-    contentEditable === "" || contentEditable === "true" || contentEditable === "plaintext-only"
+    contentEditable === '' ||
+    contentEditable === 'true' ||
+    contentEditable === 'plaintext-only'
   );
 }
 
-const ICON_REFERENCE_MARKERS = new Set(["glyph", "icon", "icons", "symbol"]);
-const ICON_REFERENCE_DECORATORS = new Set(["fill", "filled", "line", "outline", "outlined"]);
+const ICON_REFERENCE_MARKERS = new Set(['glyph', 'icon', 'icons', 'symbol']);
+const ICON_REFERENCE_DECORATORS = new Set([
+  'fill',
+  'filled',
+  'line',
+  'outline',
+  'outlined',
+]);
 
 function iconReferenceName(value: string | undefined): string | undefined {
   const reference = cleaned(value);
   if (!reference) return undefined;
-  const fragment = reference.includes("#") ? reference.slice(reference.lastIndexOf("#") + 1) : "";
+  const fragment = reference.includes('#')
+    ? reference.slice(reference.lastIndexOf('#') + 1)
+    : '';
   const tokens = (fragment || reference)
     ?.split(/[#/.\s:_-]+/)
     .filter(Boolean)
-    .map((token) => token.toLowerCase());
+    .map(token => token.toLowerCase());
   if (tokens.length === 0) return undefined;
   if (fragment) {
     const semanticTokens = tokens.filter(
-      (token) => !ICON_REFERENCE_MARKERS.has(token) && !ICON_REFERENCE_DECORATORS.has(token),
+      token =>
+        !ICON_REFERENCE_MARKERS.has(token) &&
+        !ICON_REFERENCE_DECORATORS.has(token),
     );
-    return semanticTokens.length > 0 ? semanticTokens.join(" ") : undefined;
+    return semanticTokens.length > 0 ? semanticTokens.join(' ') : undefined;
   }
-  const marker = tokens.findLastIndex((token) => ICON_REFERENCE_MARKERS.has(token));
+  const marker = tokens.findLastIndex(token =>
+    ICON_REFERENCE_MARKERS.has(token),
+  );
   if (marker < 0) return undefined;
   const semanticTokens = tokens
     .slice(marker + 1)
-    .filter((token) => !ICON_REFERENCE_DECORATORS.has(token));
-  return semanticTokens.length > 0 ? semanticTokens.join(" ") : undefined;
+    .filter(token => !ICON_REFERENCE_DECORATORS.has(token));
+  return semanticTokens.length > 0 ? semanticTokens.join(' ') : undefined;
 }
 
 function iconHintFromSubtree(
@@ -310,11 +377,12 @@ function iconHintFromSubtree(
   for (const child of children.get(node.id) ?? []) {
     const attrs = child.attrs ?? {};
     const hint =
-      cleaned(attrs["aria-label"]) ??
+      cleaned(attrs['aria-label']) ??
       cleaned(attrs.title) ??
-      (normalizedRole(child) === "img" ? cleaned(child.name) : undefined) ??
-      (["img", "svg", "use"].includes(normalizedTag(child))
-        ? (iconReferenceName(attrs.href) ?? iconReferenceName(attrs["xlink:href"]))
+      (normalizedRole(child) === 'img' ? cleaned(child.name) : undefined) ??
+      (['img', 'svg', 'use'].includes(normalizedTag(child))
+        ? (iconReferenceName(attrs.href) ??
+          iconReferenceName(attrs['xlink:href']))
         : undefined);
     if (hint) return hint;
     const nested = iconHintFromSubtree(child, children, depth + 1);
@@ -328,7 +396,7 @@ function recoveryCandidateName(
   children?: Map<number | null, VomNode[]>,
 ): string | undefined {
   return (
-    cleaned(node.attrs?.["aria-label"]) ??
+    cleaned(node.attrs?.['aria-label']) ??
     cleaned(node.attrs?.title) ??
     cleaned(node.name) ??
     cleaned(node.text) ??
@@ -343,29 +411,34 @@ function recoveredRole(
   children?: Map<number | null, VomNode[]>,
 ): string | undefined {
   const currentRole = normalizedRole(node);
-  const explicitRole = node.attrs?.role?.toLowerCase() ?? "";
+  const explicitRole = node.attrs?.role?.toLowerCase() ?? '';
   const hasHandler = hasRecoveryHandler(node);
   const focusable = isFocusable(node);
   const hasName = recoveryCandidateName(node, children) !== undefined;
 
-  if (isContentEditable(node)) return "textbox";
-  if (explicitRole === "combobox" && (hasHandler || focusable)) return "combobox";
+  if (isContentEditable(node)) return 'textbox';
+  if (explicitRole === 'combobox' && (hasHandler || focusable))
+    return 'combobox';
   if (
     EXPLICIT_RECOVERY_ROLES.has(explicitRole) &&
     hasName &&
-    (hasHandler || focusable || node.cursor === "pointer")
+    (hasHandler || focusable || node.cursor === 'pointer')
   ) {
-    return explicitRole === "switch" ||
-      explicitRole === "checkbox" ||
-      explicitRole === "radio" ||
-      explicitRole === "tab" ||
-      explicitRole === "menuitem"
+    return explicitRole === 'switch' ||
+      explicitRole === 'checkbox' ||
+      explicitRole === 'radio' ||
+      explicitRole === 'tab' ||
+      explicitRole === 'menuitem'
       ? explicitRole
-      : "button";
+      : 'button';
   }
-  if (hasHandler && hasName) return "button";
-  if ((!currentRole || SKIP_ROLES.has(currentRole)) && node.cursor === "pointer" && hasName) {
-    return "button";
+  if (hasHandler && hasName) return 'button';
+  if (
+    (!currentRole || SKIP_ROLES.has(currentRole)) &&
+    node.cursor === 'pointer' &&
+    hasName
+  ) {
+    return 'button';
   }
   return undefined;
 }
@@ -375,11 +448,14 @@ function rectArea(node: VomNode): number {
   return Math.max(0, node.rect.w) * Math.max(0, node.rect.h);
 }
 
-function passesRecoveryGuards(node: VomNode, children: Map<number | null, VomNode[]>): boolean {
+function passesRecoveryGuards(
+  node: VomNode,
+  children: Map<number | null, VomNode[]>,
+): boolean {
   const area = rectArea(node);
   const tag = normalizedTag(node);
 
-  if (node.pointerEvents === "none") return false;
+  if (node.pointerEvents === 'none') return false;
   if (node.disabled || node.inert || node.insideNative) return false;
   if (node.hasNativeDescendant && !isContentEditable(node)) return false;
 
@@ -387,19 +463,26 @@ function passesRecoveryGuards(node: VomNode, children: Map<number | null, VomNod
     area <= MAX_RECOVERABLE_SINGLE_INTENT_AREA &&
     recoveryCandidateName(node, children) !== undefined &&
     hasRecoveryHandler(node);
-  if (area > MAX_CUSTOM_RECOVERY_AREA && !isContentEditable(node) && !singleIntentLargeCandidate) {
+  if (
+    area > MAX_CUSTOM_RECOVERY_AREA &&
+    !isContentEditable(node) &&
+    !singleIntentLargeCandidate
+  ) {
     return false;
   }
-  if (NATIVE_TAGS.has(tag) || tag === "a") return false;
+  if (NATIVE_TAGS.has(tag) || tag === 'a') return false;
   if (GRAPHIC_ONLY_TAGS.has(tag)) return false;
   return recoveredRole(node, children) !== undefined;
 }
 
 function buildParentMap(nodes: VomNode[]): Map<number, number | null> {
-  const ids = new Set(nodes.map((node) => node.id));
+  const ids = new Set(nodes.map(node => node.id));
   const parentMap = new Map<number, number | null>();
   for (const node of nodes) {
-    parentMap.set(node.id, node.parentId !== null && ids.has(node.parentId) ? node.parentId : null);
+    parentMap.set(
+      node.id,
+      node.parentId !== null && ids.has(node.parentId) ? node.parentId : null,
+    );
   }
   return parentMap;
 }
@@ -422,15 +505,15 @@ function isAncestorOf(
 export function applyVomInteractionRecovery(nodes: VomNode[]): VomNode[] {
   // CSS cursors inherit. Expose the handle once instead of assigning refs to
   // every decorative span inside it; retain explicit nested draggable/drop cues.
-  const byId = new Map(nodes.map((node) => [node.id, node]));
-  nodes = nodes.map((node) => {
+  const byId = new Map(nodes.map(node => [node.id, node]));
+  nodes = nodes.map(node => {
     const parent = node.parentId === null ? undefined : byId.get(node.parentId);
-    return dragHint(node) === "drag-handle" &&
+    return dragHint(node) === 'drag-handle' &&
       parent &&
       dragHint(parent) &&
       parent.cursor === node.cursor &&
       parent.frameId === node.frameId
-      ? { ...node, dragHint: false }
+      ? {...node, dragHint: false}
       : node;
   });
   const parentMap = buildParentMap(nodes);
@@ -461,7 +544,7 @@ export function applyVomInteractionRecovery(nodes: VomNode[]): VomNode[] {
     }
   }
 
-  return nodes.map((node) => {
+  return nodes.map(node => {
     if (!recoveredIds.has(node.id)) return node;
     return {
       ...node,
@@ -473,10 +556,11 @@ export function applyVomInteractionRecovery(nodes: VomNode[]): VomNode[] {
 
 function buildChildren(nodes: VomNode[]): Map<number | null, VomNode[]> {
   const children = new Map<number | null, VomNode[]>();
-  const ids = new Set(nodes.map((node) => node.id));
+  const ids = new Set(nodes.map(node => node.id));
 
   for (const node of nodes) {
-    const parentId = node.parentId !== null && ids.has(node.parentId) ? node.parentId : null;
+    const parentId =
+      node.parentId !== null && ids.has(node.parentId) ? node.parentId : null;
     const siblings = children.get(parentId) ?? [];
     siblings.push(node);
     children.set(parentId, siblings);
@@ -486,13 +570,13 @@ function buildChildren(nodes: VomNode[]): Map<number | null, VomNode[]> {
 }
 
 const CONTEXT_LABEL_ROLES = new Set([
-  "heading",
-  "article",
-  "section",
-  "group",
-  "region",
-  "row",
-  "form",
+  'heading',
+  'article',
+  'section',
+  'group',
+  'region',
+  'row',
+  'form',
 ]);
 
 interface DomContextIndex {
@@ -501,11 +585,18 @@ interface DomContextIndex {
 }
 
 function buildDomContextIndex(nodes: VomNode[]): DomContextIndex {
-  const nonBoundaryByScopeParent = new Map<string | undefined, Map<number, VomNode[]>>();
+  const nonBoundaryByScopeParent = new Map<
+    string | undefined,
+    Map<number, VomNode[]>
+  >();
   const sourceOrderById = new Map<number, number>();
   for (const [sourceOrder, node] of nodes.entries()) {
     sourceOrderById.set(node.id, sourceOrder);
-    if (!CONTEXT_LABEL_ROLES.has(normalizedRole(node)) || isContextBoundary(node)) continue;
+    if (
+      !CONTEXT_LABEL_ROLES.has(normalizedRole(node)) ||
+      isContextBoundary(node)
+    )
+      continue;
     const parentId = node.domParentId;
     if (parentId === undefined || parentId === null) continue;
     let byParent = nonBoundaryByScopeParent.get(node.contextScopeId);
@@ -517,7 +608,7 @@ function buildDomContextIndex(nodes: VomNode[]): DomContextIndex {
     siblings.push(node);
     byParent.set(parentId, siblings);
   }
-  return { nonBoundaryByScopeParent, sourceOrderById };
+  return {nonBoundaryByScopeParent, sourceOrderById};
 }
 
 function duplicateReferenceNames(nodes: VomNode[]): Set<string> {
@@ -529,10 +620,15 @@ function duplicateReferenceNames(nodes: VomNode[]): Set<string> {
     const key = normalizeContextKey(name);
     counts.set(key, (counts.get(key) ?? 0) + 1);
   }
-  return new Set([...counts].filter(([, count]) => count > 1).map(([name]) => name));
+  return new Set(
+    [...counts].filter(([, count]) => count > 1).map(([name]) => name),
+  );
 }
 
-function needsHandleContext(nodeName: string, duplicateRefNames: Set<string>): boolean {
+function needsHandleContext(
+  nodeName: string,
+  duplicateRefNames: Set<string>,
+): boolean {
   const key = normalizeContextKey(nodeName);
   if (!key) return false;
   return duplicateRefNames.has(key);
@@ -546,7 +642,10 @@ function contextLabel(node: VomNode, targetName: string): string | undefined {
   );
 }
 
-function weakLabelContext(node: VomNode, targetName: string): string | undefined {
+function weakLabelContext(
+  node: VomNode,
+  targetName: string,
+): string | undefined {
   if (isVomReferenceNode(node)) return undefined;
   return weakContextText(
     cleaned(node.name) ?? cleaned(node.text) ?? cleaned(node.nearbyText),
@@ -554,7 +653,10 @@ function weakLabelContext(node: VomNode, targetName: string): string | undefined
   );
 }
 
-function weakContextText(label: string | undefined, targetName: string): string | undefined {
+function weakContextText(
+  label: string | undefined,
+  targetName: string,
+): string | undefined {
   const clean = cleanSemanticText(label);
   if (!clean) return undefined;
   const key = normalizeContextKey(clean);
@@ -562,8 +664,8 @@ function weakContextText(label: string | undefined, targetName: string): string 
     !key ||
     isLowValueContext(clean) ||
     key === normalizeContextKey(targetName) ||
-    key.startsWith("ctx_") ||
-    key === "section" ||
+    key.startsWith('ctx_') ||
+    key === 'section' ||
     WEAK_ACTION_LABELS.has(key)
   ) {
     return undefined;
@@ -571,7 +673,7 @@ function weakContextText(label: string | undefined, targetName: string): string 
   return clean;
 }
 
-type ContextSource = "owned" | "same" | "dom";
+type ContextSource = 'owned' | 'same' | 'dom';
 
 interface ContextCandidate {
   text: string;
@@ -580,7 +682,7 @@ interface ContextCandidate {
 }
 
 function contextSourceRank(source: ContextSource): number {
-  return source === "same" ? 0 : source === "owned" ? 1 : 2;
+  return source === 'same' ? 0 : source === 'owned' ? 1 : 2;
 }
 
 function contextCategory(key: string): string {
@@ -588,8 +690,8 @@ function contextCategory(key: string): string {
 }
 
 function contextRank(key: string): number {
-  if (key.startsWith("level ")) return 0;
-  if (key.startsWith("group ")) return 1;
+  if (key.startsWith('level ')) return 0;
+  if (key.startsWith('group ')) return 1;
   return 2;
 }
 
@@ -599,7 +701,8 @@ function dedupeContexts(contexts: ContextCandidate[]): string[] {
   const sorted = [...contexts].sort(
     (a, b) =>
       contextSourceRank(a.source) - contextSourceRank(b.source) ||
-      contextRank(normalizeContextKey(a.text)) - contextRank(normalizeContextKey(b.text)) ||
+      contextRank(normalizeContextKey(a.text)) -
+        contextRank(normalizeContextKey(b.text)) ||
       a.order - b.order,
   );
   const unique: string[] = [];
@@ -618,9 +721,15 @@ function dedupeContexts(contexts: ContextCandidate[]): string[] {
 }
 
 function isContextBoundary(node: VomNode): boolean {
-  return ["region", "form", "section", "article", "row", "listitem", "group"].includes(
-    normalizedRole(node),
-  );
+  return [
+    'region',
+    'form',
+    'section',
+    'article',
+    'row',
+    'listitem',
+    'group',
+  ].includes(normalizedRole(node));
 }
 
 function sharesContextScope(node: VomNode, candidate: VomNode): boolean {
@@ -660,7 +769,8 @@ function collectOwnedContext(
     if (!parent) break;
     if (!sharesContextScope(node, parent)) break;
     const label = contextLabel(parent, nodeName);
-    if (label) contexts.push({ text: label, source: "owned", order: contexts.length });
+    if (label)
+      contexts.push({text: label, source: 'owned', order: contexts.length});
     current = state.parentMap.get(current) ?? null;
     guard += 1;
   }
@@ -689,7 +799,8 @@ function collectSameContainerContext(
     // the original context semantics. DFS visits sibling prefixes in order.
     const key = JSON.stringify([node.contextScopeId, nodeName, labels]);
     let prefix = cache.get(key);
-    if (!prefix || prefix.nextIndex > end) prefix = { nextIndex: 0, labels: [...labels] };
+    if (!prefix || prefix.nextIndex > end)
+      prefix = {nextIndex: 0, labels: [...labels]};
     for (; prefix.nextIndex < end; prefix.nextIndex++) {
       collectWeakLabelsFromSubtree(
         siblings[prefix.nextIndex],
@@ -698,20 +809,27 @@ function collectSameContainerContext(
         state,
         prefix.labels,
       );
-      while (prefix.labels.length > MAX_HANDLE_CONTEXT_ITEMS) prefix.labels.shift();
+      while (prefix.labels.length > MAX_HANDLE_CONTEXT_ITEMS)
+        prefix.labels.shift();
     }
     labels.splice(0, labels.length, ...prefix.labels);
     // Bound retained variants on pages with many distinct action names.
-    if (!cache.has(key) && cache.size >= 64) cache.delete(cache.keys().next().value!);
+    if (!cache.has(key) && cache.size >= 64)
+      cache.delete(cache.keys().next().value!);
     cache.set(key, prefix);
 
     const parent = state.nodesById.get(parentId);
-    if (!parent || !sharesContextScope(node, parent) || isContextBoundary(parent)) break;
+    if (
+      !parent ||
+      !sharesContextScope(node, parent) ||
+      isContextBoundary(parent)
+    )
+      break;
     childId = parentId;
     parentId = state.parentMap.get(parentId) ?? null;
     guard += 1;
   }
-  return labels.map((text, index) => ({ text, source: "same", order: index }));
+  return labels.map((text, index) => ({text, source: 'same', order: index}));
 }
 
 function collectDomContext(
@@ -728,9 +846,8 @@ function collectDomContext(
   }
 
   const candidates = new Map<number, VomNode>();
-  const nonBoundaryByParent = state.domContextIndex.nonBoundaryByScopeParent.get(
-    node.contextScopeId,
-  );
+  const nonBoundaryByParent =
+    state.domContextIndex.nonBoundaryByScopeParent.get(node.contextScopeId);
   for (const ancestorId of ancestorRank.keys()) {
     const boundary = state.nodesById.get(ancestorId);
     const boundaryParentId = boundary?.domParentId;
@@ -751,7 +868,8 @@ function collectDomContext(
 
   const sourceOrderById = state.domContextIndex.sourceOrderById;
   const orderedCandidates = [...candidates.values()].sort(
-    (a, b) => (sourceOrderById.get(a.id) ?? 0) - (sourceOrderById.get(b.id) ?? 0),
+    (a, b) =>
+      (sourceOrderById.get(a.id) ?? 0) - (sourceOrderById.get(b.id) ?? 0),
   );
   for (const candidate of orderedCandidates) {
     if (candidate.id === node.id) continue;
@@ -759,7 +877,11 @@ function collectDomContext(
     if (parentId === undefined || parentId === null) continue;
     const label = contextLabel(candidate, nodeName);
     if (!label) continue;
-    contexts.push({ text: label, source: "dom", order: ancestorRank.get(parentId) ?? 0 });
+    contexts.push({
+      text: label,
+      source: 'dom',
+      order: ancestorRank.get(parentId) ?? 0,
+    });
   }
 
   return contexts;
@@ -783,36 +905,38 @@ function renderNodeLine(
   surface: CondSurface | undefined = undefined,
   redactValues = false,
 ): string {
-  let line = `${"  ".repeat(depth)}${ref ? `@${ref} ` : ""}${node.role ?? "generic"}`;
+  let line = `${'  '.repeat(depth)}${ref ? `@${ref} ` : ''}${node.role ?? 'generic'}`;
 
   const hint = dragHint(node);
   if (hint) line += ` [${hint}]`;
   const name = cleaned(node.name);
   if (name) line += ` ${JSON.stringify(name)}`;
-  if (context.length > 0) line += ` [ctx: ${context.join(" > ")}]`;
+  if (context.length > 0) line += ` [ctx: ${context.join(' > ')}]`;
 
   // For link nodes with an external href, annotate so the agent can
   // distinguish external navigation from same-origin links.
-  if (normalizedRole(node) === "link" && node.href) {
+  if (normalizedRole(node) === 'link' && node.href) {
     line += ` [→ ${node.href}]`;
   }
 
   const rawValue = cleaned(node.value);
   const role = normalizedRole(node);
-  const fillable = ["textbox", "searchbox"].includes(role);
-  if (node.disabled) line += " [disabled]";
+  const fillable = ['textbox', 'searchbox'].includes(role);
+  if (node.disabled) line += ' [disabled]';
   const selection = selectionMarker(node);
   if (selection) line += ` [${selection}]`;
   if (node.checked !== undefined) {
-    line += ` [${node.checked === "mixed" ? "mixed" : node.checked ? "checked" : "unchecked"}]`;
+    line += ` [${node.checked === 'mixed' ? 'mixed' : node.checked ? 'checked' : 'unchecked'}]`;
   }
   if (fillable) {
-    line += ` [${node.inputState ?? (rawValue === undefined ? "empty" : "filled")}]`;
+    line += ` [${node.inputState ?? (rawValue === undefined ? 'empty' : 'filled')}]`;
   }
   const placeholder = cleaned(node.placeholder);
   if (placeholder) line += ` placeholder=${JSON.stringify(placeholder)}`;
   const hasValue =
-    rawValue !== undefined || node.inputState === "filled" || node.inputState === "default";
+    rawValue !== undefined ||
+    node.inputState === 'filled' ||
+    node.inputState === 'default';
   const value =
     node.sensitive || redactValues
       ? hasValue
@@ -822,10 +946,12 @@ function renderNodeLine(
   if (value !== undefined) line += ` =${JSON.stringify(value)}`;
 
   if (surface && surface.subItems.length > 0) {
-    const items = surface.subItems.slice(0, MAX_SURFACE_ITEMS).join(" | ");
-    const suffix = surface.subItems.length > MAX_SURFACE_ITEMS ? " | …" : "";
+    const items = surface.subItems.slice(0, MAX_SURFACE_ITEMS).join(' | ');
+    const suffix = surface.subItems.length > MAX_SURFACE_ITEMS ? ' | …' : '';
     const action =
-      surface.triggerAction === "hover" ? "hover first" : `${surface.triggerAction} first`;
+      surface.triggerAction === 'hover'
+        ? 'hover first'
+        : `${surface.triggerAction} first`;
     line += ` [${action}: ${items}${suffix}]`;
   }
 
@@ -835,18 +961,28 @@ function renderNodeLine(
 function shouldSkipRedundantRefChildren(node: VomNode): boolean {
   const role = normalizedRole(node);
   if (
-    ["textbox", "searchbox"].includes(role) &&
-    ["input", "textarea"].includes((node.tag ?? "").toLowerCase())
+    ['textbox', 'searchbox'].includes(role) &&
+    ['input', 'textarea'].includes((node.tag ?? '').toLowerCase())
   ) {
     return true;
   }
   if (!cleaned(node.name)) return false;
-  return ["button", "link", "menuitem", "tab", "switch", "checkbox", "radio", "combobox"].includes(
-    role,
-  );
+  return [
+    'button',
+    'link',
+    'menuitem',
+    'tab',
+    'switch',
+    'checkbox',
+    'radio',
+    'combobox',
+  ].includes(role);
 }
 
-function descendantTextCoveredByName(node: VomNode, state: RenderState): boolean {
+function descendantTextCoveredByName(
+  node: VomNode,
+  state: RenderState,
+): boolean {
   const name = cleaned(node.name);
   if (!name) return false;
   const stack = [...(state.children.get(node.id) ?? [])];
@@ -854,16 +990,20 @@ function descendantTextCoveredByName(node: VomNode, state: RenderState): boolean
   while (stack.length > 0) {
     const child = stack.pop() as VomNode;
     if (isVomReferenceNode(child)) return false;
-    const text = cleaned(child.name) ?? cleaned(child.text) ?? cleaned(child.value);
+    const text =
+      cleaned(child.name) ?? cleaned(child.text) ?? cleaned(child.value);
     if (text) texts.push(text);
     stack.push(...(state.children.get(child.id) ?? []));
   }
-  return texts.length > 0 && texts.every((text) => name.includes(text));
+  return texts.length > 0 && texts.every(text => name.includes(text));
 }
 
-function shouldSkipRedundantChildren(node: VomNode, state: RenderState): boolean {
+function shouldSkipRedundantChildren(
+  node: VomNode,
+  state: RenderState,
+): boolean {
   const role = normalizedRole(node);
-  if (["cell", "gridcell", "columnheader", "rowheader"].includes(role)) {
+  if (['cell', 'gridcell', 'columnheader', 'rowheader'].includes(role)) {
     return descendantTextCoveredByName(node, state);
   }
   return false;
@@ -881,7 +1021,10 @@ interface RenderState {
   truncated: boolean;
   children: Map<number | null, VomNode[]>;
   siblingIndex: Map<number, number>;
-  siblingContextCache: Map<number, Map<string, { nextIndex: number; labels: string[] }>>;
+  siblingContextCache: Map<
+    number,
+    Map<string, {nextIndex: number; labels: string[]}>
+  >;
   parentMap: Map<number, number | null>;
   nodesById: Map<number, VomNode>;
   domContextIndex: DomContextIndex;
@@ -900,12 +1043,12 @@ export interface RenderRow {
 }
 
 function pushRenderChildren(
-  stack: Array<{ node: VomNode; depth: number }>,
+  stack: Array<{node: VomNode; depth: number}>,
   children: readonly VomNode[],
   depth: number,
 ): void {
   for (let index = children.length - 1; index >= 0; index -= 1) {
-    stack.push({ node: children[index], depth });
+    stack.push({node: children[index], depth});
   }
 }
 
@@ -915,13 +1058,16 @@ function* renderTreeRows(
   observation = false,
   representedSources?: ReadonlySet<number>,
 ): Generator<RenderRow> {
-  const stack: Array<{ node: VomNode; depth: number }> = [];
+  const stack: Array<{node: VomNode; depth: number}> = [];
   pushRenderChildren(stack, children.get(null) ?? [], 1);
 
   while (stack.length > 0) {
-    const { node, depth } = stack.pop() as { node: VomNode; depth: number };
+    const {node, depth} = stack.pop() as {node: VomNode; depth: number};
 
-    if (representedSources?.has(node.id) || (node.visualKey === undefined && !shouldRender(node))) {
+    if (
+      representedSources?.has(node.id) ||
+      (node.visualKey === undefined && !shouldRender(node))
+    ) {
       pushRenderChildren(stack, children.get(node.id) ?? [], depth);
       continue;
     }
@@ -934,38 +1080,42 @@ function* renderTreeRows(
     }
 
     const visual = node.visualKey !== undefined;
-    const ref = visual || isVomReferenceNode(node) ? `e${state.nextRef++}` : undefined;
+    const ref =
+      visual || isVomReferenceNode(node) ? `e${state.nextRef++}` : undefined;
     const context = ref && !visual ? handleContext(node, state) : [];
     const surface = state.surfaceMap.get(node.id);
-    const indent = "  ".repeat(Math.min(depth, state.maxDepth, 32));
-    const minimal = visual ? `${indent}@${ref} canvas [visual:screenshot]` : undefined;
+    const indent = '  '.repeat(Math.min(depth, state.maxDepth, 32));
+    const minimal = visual
+      ? `${indent}@${ref} canvas [visual:screenshot]`
+      : undefined;
     const label = cleaned(node.name);
     const text = visual
       ? label
-        ? `${indent}@${ref} canvas ${JSON.stringify(Array.from(label).slice(0, 160).join(""))} [visual:screenshot]`
+        ? `${indent}@${ref} canvas ${JSON.stringify(Array.from(label).slice(0, 160).join(''))} [visual:screenshot]`
         : minimal!
       : renderNodeLine(node, depth, ref, context, surface, state.redactValues);
-    const parent = node.parentId === null ? undefined : state.nodesById.get(node.parentId);
+    const parent =
+      node.parentId === null ? undefined : state.nodesById.get(node.parentId);
     const parentLabel = parent ? cleaned(parent.name) : undefined;
     yield {
       ...(parent
         ? {
-            context: `@context ${parent.role ?? parent.tag}${parentLabel ? ` ${JSON.stringify(Array.from(parentLabel).slice(0, 80).join(""))}` : ""}`,
+            context: `@context ${parent.role ?? parent.tag}${parentLabel ? ` ${JSON.stringify(Array.from(parentLabel).slice(0, 80).join(''))}` : ''}`,
           }
         : {}),
       frameId: node.frameId,
       text,
-      ...(minimal ? { minimal } : {}),
+      ...(minimal ? {minimal} : {}),
       ...(ref
         ? {
             ref: {
               ref,
               backendNodeId: node.backendNodeId ?? node.id,
-              ...(visual ? { visualKey: node.visualKey } : {}),
-              ...(node.frameId ? { frameId: node.frameId } : {}),
-              ...(node.role ? { role: node.role } : {}),
-              ...(label ? { name: label } : {}),
-              ...(context.length > 0 ? { ctx: context.join(" > ") } : {}),
+              ...(visual ? {visualKey: node.visualKey} : {}),
+              ...(node.frameId ? {frameId: node.frameId} : {}),
+              ...(node.role ? {role: node.role} : {}),
+              ...(label ? {name: label} : {}),
+              ...(context.length > 0 ? {ctx: context.join(' > ')} : {}),
               line: 0,
             },
           }
@@ -973,16 +1123,17 @@ function* renderTreeRows(
     };
     const scope = state.scopeMap.get(node.id);
     if (scope?.lines.length) {
-      yield { text: `${"  ".repeat(depth + 1)}[§ active: ${scope.label}]` };
+      yield {text: `${'  '.repeat(depth + 1)}[§ active: ${scope.label}]`};
       for (const text of scope.lines.slice(0, MAX_SCOPE_LINES)) {
         const clean = cleaned(text);
-        if (clean) yield { text: `${"  ".repeat(depth + 2)}${clean}` };
+        if (clean) yield {text: `${'  '.repeat(depth + 2)}${clean}`};
       }
     }
 
     if (
       (!observation || !state.visualAncestors.has(node.id)) &&
-      ((ref && shouldSkipRedundantRefChildren(node)) || shouldSkipRedundantChildren(node, state))
+      ((ref && shouldSkipRedundantRefChildren(node)) ||
+        shouldSkipRedundantChildren(node, state))
     ) {
       continue;
     }
@@ -1010,18 +1161,18 @@ function createRenderState(
     lines: [...initialLines],
     refs: [],
     nextRef: 1,
-    tokens: estimateTokens(initialLines.join("\n")),
+    tokens: estimateTokens(initialLines.join('\n')),
     maxDepth: options.maxDepth ?? DEFAULT_MAX_DEPTH,
     maxTokens: options.maxTokens ?? DEFAULT_MAX_TOKENS,
     redactValues: options.redactValues ?? false,
     truncated: false,
     children,
     parentMap: buildParentMap(nodes),
-    nodesById: new Map(nodes.map((node) => [node.id, node])),
+    nodesById: new Map(nodes.map(node => [node.id, node])),
     domContextIndex: buildDomContextIndex(nodes),
     duplicateRefNames: duplicateReferenceNames(nodes),
-    surfaceMap: new Map(surfaces.map((surface) => [surface.triggerId, surface])),
-    scopeMap: new Map(activeScopeBlocks.map((scope) => [scope.triggerId, scope])),
+    surfaceMap: new Map(surfaces.map(surface => [surface.triggerId, surface])),
+    scopeMap: new Map(activeScopeBlocks.map(scope => [scope.triggerId, scope])),
   };
 
   for (const node of nodes) {
@@ -1042,7 +1193,13 @@ function renderNodes(
   surfaces: CondSurface[] = [],
   activeScopeBlocks: ActiveScopeBlock[] = [],
 ): RenderState {
-  const state = createRenderState(nodes, options, initialLines, surfaces, activeScopeBlocks);
+  const state = createRenderState(
+    nodes,
+    options,
+    initialLines,
+    surfaces,
+    activeScopeBlocks,
+  );
   const children = state.children;
   for (const row of renderTreeRows(children, state)) {
     const cost = estimateLineTokens(row.text);
@@ -1050,7 +1207,7 @@ function renderNodes(
       state.truncated = true;
       break;
     }
-    if (row.ref) state.refs.push({ ...row.ref, line: state.lines.length });
+    if (row.ref) state.refs.push({...row.ref, line: state.lines.length});
     state.lines.push(row.text);
     state.tokens += cost;
   }
@@ -1064,14 +1221,16 @@ function renderPageOcclusionLine(hiddenNodeCount: number): string {
 
 function isPositionedRegionCandidate(node: VomNode): boolean {
   return (
-    node.pointerEvents !== "none" &&
+    node.pointerEvents !== 'none' &&
     node.rect !== null &&
     ACTIVE_REGION_POSITIONS.has(node.position)
   );
 }
 
 function rectContains(rect: Rect, x: number, y: number): boolean {
-  return x >= rect.x && x <= rect.x + rect.w && y >= rect.y && y <= rect.y + rect.h;
+  return (
+    x >= rect.x && x <= rect.x + rect.w && y >= rect.y && y <= rect.y + rect.h
+  );
 }
 
 function interactionPoints(rect: Rect): Array<[number, number]> {
@@ -1129,13 +1288,23 @@ function comparablePaintNodes(
   parentMap: Map<number, number | null>,
   nodesById: Map<number, VomNode>,
   lineageCache: Map<number, Map<string | undefined, VomNode>>,
-): { target: VomNode; blocker: VomNode } | null {
-  if (target.frameId === blocker.frameId) return { target, blocker };
-  const targetLineage = cachedPaintLineageByFrame(target, parentMap, nodesById, lineageCache);
-  const blockerLineage = cachedPaintLineageByFrame(blocker, parentMap, nodesById, lineageCache);
+): {target: VomNode; blocker: VomNode} | null {
+  if (target.frameId === blocker.frameId) return {target, blocker};
+  const targetLineage = cachedPaintLineageByFrame(
+    target,
+    parentMap,
+    nodesById,
+    lineageCache,
+  );
+  const blockerLineage = cachedPaintLineageByFrame(
+    blocker,
+    parentMap,
+    nodesById,
+    lineageCache,
+  );
   for (const [frameId, blockerInFrame] of blockerLineage) {
     const targetInFrame = targetLineage.get(frameId);
-    if (targetInFrame) return { target: targetInFrame, blocker: blockerInFrame };
+    if (targetInFrame) return {target: targetInFrame, blocker: blockerInFrame};
   }
   return null;
 }
@@ -1152,7 +1321,13 @@ function isBlockedByRegion(
   if (isAncestorOf(parentMap, blocker.id, target.id)) return false;
   if (isAncestorOf(parentMap, target.id, blocker.id)) return false;
   if (!target.rect || !blocker.rect) return false;
-  const paintNodes = comparablePaintNodes(target, blocker, parentMap, nodesById, lineageCache);
+  const paintNodes = comparablePaintNodes(
+    target,
+    blocker,
+    parentMap,
+    nodesById,
+    lineageCache,
+  );
   if (!paintNodes) return false;
 
   const points = interactionPoints(target.rect);
@@ -1165,7 +1340,8 @@ function isBlockedByRegion(
     return false;
   }
 
-  if (paintNodes.blocker.paintOrder < paintNodes.target.paintOrder) return false;
+  if (paintNodes.blocker.paintOrder < paintNodes.target.paintOrder)
+    return false;
   if (
     paintNodes.blocker.paintOrder === paintNodes.target.paintOrder &&
     paintNodes.blocker.id <= paintNodes.target.id
@@ -1203,21 +1379,24 @@ function applyActiveRegionPolicy(
   visualSources?: ReadonlyMap<number, VomNode>,
 ): VomNode[] {
   const parentMap = buildParentMap(nodes);
-  const nodesById = new Map(nodes.map((node) => [node.id, node]));
+  const nodesById = new Map(nodes.map(node => [node.id, node]));
   const lineageCache = new Map<number, Map<string | undefined, VomNode>>();
   const candidates = nodes
     .filter(isPositionedRegionCandidate)
-    .map((node) => ({
+    .map(node => ({
       node,
       viewportCoverage: coverage(node.rect, scene.viewport),
       fullCover: spansViewport(node.rect, scene.viewport),
     }))
-    .filter((candidate) => candidate.viewportCoverage > 0 || candidate.node.modal === true);
+    .filter(
+      candidate =>
+        candidate.viewportCoverage > 0 || candidate.node.modal === true,
+    );
 
   const blockedRoots = new Set<number>();
   for (const target of nodes) {
     if (target.visualKey === undefined && !isVomReferenceNode(target)) continue;
-    const blocked = candidates.some((candidate) =>
+    const blocked = candidates.some(candidate =>
       isBlockedByRegion(
         visualSources?.get(target.id) ?? target,
         candidate.node,
@@ -1232,55 +1411,72 @@ function applyActiveRegionPolicy(
 
   if (blockedRoots.size === 0) return nodes;
   const blocked = collectDescendants(nodes, blockedRoots);
-  return nodes.filter((node) => !blocked.has(node.id));
+  return nodes.filter(node => !blocked.has(node.id));
 }
 
 function countRenderable(nodes: VomNode[]): number {
   return nodes.filter(shouldRender).length;
 }
 
-function renderDoubleLayer(scene: VomScene, layer: BlockingLayer, options: VomOptions): VomResult {
+function renderDoubleLayer(
+  scene: VomScene,
+  layer: BlockingLayer,
+  options: VomOptions,
+): VomResult {
   const included = collectDescendants(scene.nodes, layer.members);
-  const visibleNodes = scene.nodes.filter((node) => included.has(node.id));
-  const hiddenCount = countRenderable(scene.nodes.filter((node) => !included.has(node.id)));
+  const visibleNodes = scene.nodes.filter(node => included.has(node.id));
+  const hiddenCount = countRenderable(
+    scene.nodes.filter(node => !included.has(node.id)),
+  );
   const header = [
-    "@vom 1",
+    '@vom 1',
     `@view ${scene.viewport.width}x${scene.viewport.height}`,
-    "@layers 2 focus=L1",
+    '@layers 2 focus=L1',
     `L1 ${layer.kind} cover=${Math.round(layer.coverage * 100)}%`,
   ];
-  const state = renderNodes(visibleNodes, options, header, scene.surfaces, scene.activeScopeBlocks);
+  const state = renderNodes(
+    visibleNodes,
+    options,
+    header,
+    scene.surfaces,
+    scene.activeScopeBlocks,
+  );
   state.lines.push(renderPageOcclusionLine(hiddenCount));
 
   return {
-    text: state.lines.join("\n"),
+    text: state.lines.join('\n'),
     refs: state.refs,
     truncated: state.truncated,
   };
 }
 
-export function renderVom(scene: VomScene, options: VomOptions = {}): VomResult {
+export function renderVom(
+  scene: VomScene,
+  options: VomOptions = {},
+): VomResult {
   const nodes = applyVomInteractionRecovery(scene.nodes);
-  const renderScene = { ...scene, nodes };
+  const renderScene = {...scene, nodes};
   const layer = detectBlockingLayer(nodes, scene.viewport, scene.rootFrameId);
   if (layer) return renderDoubleLayer(renderScene, layer, options);
-  const visibleNodes = options.activeRegionPolicy ? applyActiveRegionPolicy(nodes, scene) : nodes;
+  const visibleNodes = options.activeRegionPolicy
+    ? applyActiveRegionPolicy(nodes, scene)
+    : nodes;
 
   const state = renderNodes(
     visibleNodes,
     options,
     [
-      "@vom 1",
+      '@vom 1',
       `@view ${scene.viewport.width}x${scene.viewport.height}`,
-      "@layers 1 focus=L1",
-      "L1 page",
+      '@layers 1 focus=L1',
+      'L1 page',
     ],
     scene.surfaces,
     scene.activeScopeBlocks,
   );
 
   return {
-    text: state.lines.join("\n"),
+    text: state.lines.join('\n'),
     refs: state.refs,
     truncated: state.truncated,
   };
@@ -1296,31 +1492,45 @@ export function prepareObservationRender(
   truncated: () => boolean;
 } {
   const recovered = applyVomInteractionRecovery(scene.nodes);
-  const layer = detectBlockingLayer(recovered, scene.viewport, scene.rootFrameId);
-  const recoveredById = new Map(recovered.map((n) => [n.id, n]));
+  const layer = detectBlockingLayer(
+    recovered,
+    scene.viewport,
+    scene.rootFrameId,
+  );
+  const recoveredById = new Map(recovered.map(n => [n.id, n]));
   let nextId = recovered.reduce((max, n) => Math.max(max, n.id), 0) + 1;
   // Scope targets participate in existing filtering, never in blocker detection.
   // Keep the exact source as parent so an excluded source cannot reappear via fallback.
-  const visualTargets: VomNode[] = (scene.visuals ?? []).map((v) => ({
+  const visualTargets: VomNode[] = (scene.visuals ?? []).map(v => ({
     id: nextId++,
     parentId: v.sourceId ?? v.parentId,
     frameId: v.frameId,
     visualKey: v.key,
-    tag: "canvas",
-    rect: v.rect ?? (v.sourceId === undefined ? null : recoveredById.get(v.sourceId)?.rect) ?? null,
+    tag: 'canvas',
+    rect:
+      v.rect ??
+      (v.sourceId === undefined ? null : recoveredById.get(v.sourceId)?.rect) ??
+      null,
     paintOrder:
       v.paintOrder ??
-      (v.sourceId === undefined ? undefined : recoveredById.get(v.sourceId)?.paintOrder) ??
+      (v.sourceId === undefined
+        ? undefined
+        : recoveredById.get(v.sourceId)?.paintOrder) ??
       0,
-    position: "static",
-    pointerEvents: "none",
+    position: 'static',
+    pointerEvents: 'none',
     referenceable: false,
   }));
   const visualSources = new Map<number, VomNode>();
   for (let i = 0; i < visualTargets.length; i++) {
     const sourceId = scene.visuals![i].sourceId;
-    const source = sourceId === undefined ? undefined : recoveredById.get(sourceId);
-    if (source) visualSources.set(visualTargets[i].id, { ...source, rect: visualTargets[i].rect });
+    const source =
+      sourceId === undefined ? undefined : recoveredById.get(sourceId);
+    if (source)
+      visualSources.set(visualTargets[i].id, {
+        ...source,
+        rect: visualTargets[i].rect,
+      });
   }
   const scopeNodes = [...recovered, ...visualTargets];
   const members = layer ? new Set(layer.members) : undefined;
@@ -1338,17 +1548,19 @@ export function prepareObservationRender(
         members.add(target.id);
     }
   }
-  const included = members ? collectDescendants(scopeNodes, members) : undefined;
+  const included = members
+    ? collectDescendants(scopeNodes, members)
+    : undefined;
   const scoped = included
-    ? scopeNodes.filter((n) => included.has(n.id))
+    ? scopeNodes.filter(n => included.has(n.id))
     : options.activeRegionPolicy
       ? applyActiveRegionPolicy(scopeNodes, scene, visualSources)
       : scopeNodes;
   const allowedVisuals = new Set(
-    scoped.filter((n) => n.visualKey !== undefined).map((n) => n.visualKey),
+    scoped.filter(n => n.visualKey !== undefined).map(n => n.visualKey),
   );
-  const visible = scoped.filter((n) => n.visualKey === undefined);
-  const byId = new Map(visible.map((n) => [n.id, n]));
+  const visible = scoped.filter(n => n.visualKey === undefined);
+  const byId = new Map(visible.map(n => [n.id, n]));
   const ids = new Set(byId.keys());
   const before = new Map<number, VomNode[]>();
   const tail: VomNode[] = [];
@@ -1361,8 +1573,8 @@ export function prepareObservationRender(
     // Action refs and distinct semantic content remain separate.
     if (
       source &&
-      normalizedTag(source) === "canvas" &&
-      normalizedRole(source) === "canvas" &&
+      normalizedTag(source) === 'canvas' &&
+      normalizedRole(source) === 'canvas' &&
       !isVomReferenceNode(source) &&
       !source.value &&
       !source.text &&
@@ -1374,19 +1586,19 @@ export function prepareObservationRender(
     const node: VomNode = {
       id: nextId++,
       parentId: v.parentId !== null && ids.has(v.parentId) ? v.parentId : null,
-      tag: "canvas",
-      role: "canvas",
+      tag: 'canvas',
+      role: 'canvas',
       name: v.label,
       frameId: v.frameId,
       visualKey: v.key,
       rect: null,
       paintOrder: 0,
-      position: "static",
-      pointerEvents: "none",
+      position: 'static',
+      pointerEvents: 'none',
       referenceable: false,
     };
     if (node.parentId === null) {
-      const label = v.fallbackContext ?? "Unplaced Canvas regions";
+      const label = v.fallbackContext ?? 'Unplaced Canvas regions';
       let groupId = fallbackGroups.get(label);
       if (groupId === undefined) {
         groupId = nextId++;
@@ -1394,13 +1606,13 @@ export function prepareObservationRender(
         tail.push({
           id: groupId,
           parentId: null,
-          tag: "section",
-          role: "group",
+          tag: 'section',
+          role: 'group',
           name: label,
           rect: null,
           paintOrder: 0,
-          position: "static",
-          pointerEvents: "none",
+          position: 'static',
+          pointerEvents: 'none',
           referenceable: false,
         });
       }
@@ -1416,12 +1628,16 @@ export function prepareObservationRender(
       before.set(v.beforeId, list);
     } else tail.push(node);
   }
-  const nodes = visible.flatMap((n) => [...(before.get(n.id) ?? []), n]).concat(tail);
+  const nodes = visible
+    .flatMap(n => [...(before.get(n.id) ?? []), n])
+    .concat(tail);
   const headers = [
-    "@vom 1",
+    '@vom 1',
     `@view ${scene.viewport.width}x${scene.viewport.height}`,
     `@layers ${layer ? 2 : 1} focus=L1`,
-    layer ? `L1 ${layer.kind} cover=${Math.round(layer.coverage * 100)}%` : "L1 page",
+    layer
+      ? `L1 ${layer.kind} cover=${Math.round(layer.coverage * 100)}%`
+      : 'L1 page',
   ];
   const state = createRenderState(
     nodes,
@@ -1435,9 +1651,9 @@ export function prepareObservationRender(
     if (layer)
       yield {
         text: renderPageOcclusionLine(
-          countRenderable(recovered.filter((n) => !included!.has(n.id))),
+          countRenderable(recovered.filter(n => !included!.has(n.id))),
         ),
       };
   }
-  return { headers, rows: rows(), truncated: () => state.truncated };
+  return {headers, rows: rows(), truncated: () => state.truncated};
 }

@@ -9,13 +9,16 @@
 import type {zod as zodType} from '../third_party/index.js';
 import {zod} from '../third_party/index.js';
 
+import {ENV_FALSE_VALUES, ENV_TRUE_VALUES} from './browserInvariants.js';
+import {CHANNELS} from './constants.js';
+
 const optionalStringSchema = zod.string();
 
 const booleanSchema = zod.preprocess(value => {
   if (typeof value !== 'string') return value;
   const normalized = value.toLowerCase().trim();
-  if (['true', '1', 'yes', 'on'].includes(normalized)) return true;
-  if (['false', '0', 'no', 'off'].includes(normalized)) return false;
+  if (ENV_TRUE_VALUES.includes(normalized)) return true;
+  if (ENV_FALSE_VALUES.includes(normalized)) return false;
   return value;
 }, zod.boolean());
 
@@ -63,27 +66,7 @@ export const BrowserConfigSchema = zod
     isolated: booleanSchema.optional(),
     executablePath: optionalStringSchema.optional(),
     channel: zod
-      .enum([
-        // Chromium (CDP)
-        'stable',
-        'beta',
-        'dev',
-        'canary',
-        'chrome',
-        'chrome-beta',
-        'chrome-dev',
-        'chrome-canary',
-        'chromium',
-        // Chromium (WebDriver BiDi) — patchright routes channel.startsWith('bidi-') to BidiChromium
-        'bidi-chromium',
-        'bidi-chrome',
-        'bidi-chrome-beta',
-        'bidi-chrome-dev',
-        'bidi-chrome-canary',
-        // Firefox — patchright routes channel.startsWith('moz-') to Firefox launcher
-        'firefox',
-        'moz-firefox',
-      ])
+      .enum(CHANNELS)
       .transform(channel => {
         // Only Chrome CDP aliases collapse to short forms; bidi-* and moz-* pass through unchanged
         // because patchright dispatches on their prefixes.

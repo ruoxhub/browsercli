@@ -18,12 +18,10 @@ import {DOMInspector} from './modules/collector/DOMInspector.js';
 import {PageController} from './modules/collector/PageController.js';
 import {HookManager} from './modules/hook/HookManager.js';
 import type {NetworkModule} from './modules/network/index.js';
-import type {SourceMapService} from './modules/sourcemap/SourceMapService.js';
 import type {WasmAnalyzer} from './modules/wasm/WasmAnalyzer.js';
 import type {WasmCollector} from './modules/wasm/WasmCollector.js';
 import type {WasmDecompiler} from './modules/wasm/WasmDecompiler.js';
 import type {WasmRuntimeInspector} from './modules/wasm/WasmRuntimeInspector.js';
-import type {VideoManager} from './modules/video/index.js';
 import {RuntimeServices} from './runtime/RuntimeServices.js';
 import type {Page} from './third_party/index.js';
 import {createAppEventBusOptions, type AppEventMap} from './types/events.js';
@@ -52,8 +50,6 @@ export interface Runtime {
   wasmRuntimeInspector: WasmRuntimeInspector;
   eventBus: EventBus<AppEventMap>;
   contextProvider?: ToolContextProvider;
-  sourceMapService?: SourceMapService;
-  videoManager?: VideoManager;
   bindPageContext: (resolver: () => Page) => void;
   syncPageContext: (page: Page) => void;
   clearPageContext: () => void;
@@ -110,12 +106,6 @@ export function getRuntime(): Runtime {
     },
     get wasmRuntimeInspector() {
       return services.getWasmRuntimeInspector();
-    },
-    get sourceMapService() {
-      return services.getSourceMapService();
-    },
-    get videoManager() {
-      return services.getVideoManager(browserManager);
     },
     eventBus,
     bindPageContext: resolver => {

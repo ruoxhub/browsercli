@@ -261,6 +261,10 @@ function createFetchPlugin(): HookTypePlugin {
       }
 
       lines.push(`  };`);
+      lines.push(`  window.__mcp_hooks__ = window.__mcp_hooks__ || {};`);
+      lines.push(
+        `  window.__mcp_hooks__[${JSON.stringify(hookId)}] = { target: 'window.fetch', restore: function() { window.fetch = __originalFetch; } };`,
+      );
       lines.push(`  console.log('[${hookId}] ✅ Hooked: fetch');`);
       lines.push(`})();`);
 
@@ -378,6 +382,10 @@ function createXHRPlugin(): HookTypePlugin {
       }
 
       lines.push(`  };`);
+      lines.push(`  window.__mcp_hooks__ = window.__mcp_hooks__ || {};`);
+      lines.push(
+        `  window.__mcp_hooks__[${JSON.stringify(hookId)}] = { target: 'XMLHttpRequest', restore: function() { XMLHttpRequest.prototype.open = __origOpen; XMLHttpRequest.prototype.send = __origSend; } };`,
+      );
       lines.push(`  console.log('[${hookId}] ✅ Hooked: XMLHttpRequest');`);
       lines.push(`})();`);
 
@@ -1080,6 +1088,10 @@ function createEvalPlugin(): HookTypePlugin {
       lines.push(`    return new __origFunction(...funcArgs);`);
       lines.push(`  };`);
       lines.push(`  window.Function.prototype = __origFunction.prototype;`);
+      lines.push(`  window.__mcp_hooks__ = window.__mcp_hooks__ || {};`);
+      lines.push(
+        `  window.__mcp_hooks__[${JSON.stringify(hookId)}] = { target: 'eval & Function', restore: function() { window.eval = __origEval; window.Function = __origFunction; } };`,
+      );
 
       lines.push(`  console.log('[${hookId}] ✅ Hooked: eval & Function');`);
       lines.push(`})();`);

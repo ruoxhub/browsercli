@@ -5,65 +5,45 @@
  */
 
 import assert from 'node:assert/strict';
-import {readdir, readFile} from 'node:fs/promises';
+import {readFile} from 'node:fs/promises';
 import path from 'node:path';
 import {describe, it} from 'node:test';
 
 import {GENERATED_TOOL_REGISTRY} from '../../../src/tools/generated-tools-index.js';
 
 const repoRoot = process.cwd();
+const skillPath = path.join(repoRoot, 'skills/browsercli/SKILL.md');
 
 describe('browsercli skill contract', () => {
-  it('documents recovery and runtime tools with supported parameters across skill docs', async () => {
-    const skillDir = path.join(repoRoot, 'skills/browsercli');
-    const refDir = path.join(skillDir, 'references');
-    const refFiles = await readdir(refDir);
-    const allDocPaths = [
-      path.join(skillDir, 'SKILL.md'),
-      ...refFiles.map(f => path.join(refDir, f)),
-    ];
-    const docs = await Promise.all(allDocPaths.map(p => readFile(p, 'utf8')));
-    const allContent = docs.join('\n');
+  it('documents recovery and runtime tools with supported parameters', async () => {
+    const skillContent = await readFile(skillPath, 'utf8');
 
-    assert.match(allContent, /get_script_source[\s\S]*?--filePath/);
-    assert.match(allContent, /get_script_source[\s\S]*?--startLine/);
-    assert.match(allContent, /get_script_source[\s\S]*?--endLine/);
+    assert.match(skillContent, /get_script_source[\s\S]*?--filePath/);
+    assert.match(skillContent, /get_script_source[\s\S]*?--startLine/);
+    assert.match(skillContent, /get_script_source[\s\S]*?--endLine/);
     assert.doesNotMatch(
-      allContent,
+      skillContent,
       /get_script_source[^\n]*(--prettyPrint|--offset)/,
     );
 
     for (const command of [
-      'browsercli jobs list',
-      'browsercli jobs cancel',
-      'browsercli video start',
-      'browsercli call evaluate_script',
-      'browsercli call get_storage',
-      'browsercli call collect_wasm',
-      '--captureBase64 <bool>',
-      'browsercli call record_start',
-      'browsercli call record_stop',
-      'browsercli call video',
+      'browsercli screencast_start',
+      'browsercli screencast_stop',
+      'browsercli evaluate_script',
+      'browsercli get_storage',
+      'browsercli collect_wasm',
+      'browsercli record_start',
+      'browsercli record_stop',
     ]) {
       assert.ok(
-        allContent.includes(command),
+        skillContent.includes(command),
         `missing browsercli docs: ${command}`,
       );
     }
   });
 
-  it('indexes all registered tools in model.md', async () => {
-    const modelContent = await readFile(
-      path.join(repoRoot, 'skills/browsercli/references/model.md'),
-      'utf8',
-    );
-    const modelTools = new Set<string>();
-    for (const line of modelContent.split('\n')) {
-      const match = line.match(/^\|\s*`([a-zA-Z0-9_]+)`\s*\|/);
-      if (match) {
-        modelTools.add(match[1]);
-      }
-    }
+  it('indexes all registered tools in SKILL.md', async () => {
+    const skillContent = await readFile(skillPath, 'utf8');
 
     const base = new URL('../../../../build/src/tools/', import.meta.url);
     const registered = new Set<string>();
@@ -76,16 +56,12 @@ describe('browsercli skill contract', () => {
       registered.add(tool.name);
     }
 
-    assert.equal(
-      modelTools.size,
-      registered.size,
-      `Tool count mismatch: model.md has ${modelTools.size}, registered has ${registered.size}`,
-    );
+    assert.ok(registered.size > 0, 'tool registry is empty');
 
     for (const tool of registered) {
       assert.ok(
-        modelTools.has(tool),
-        `model.md missing registered tool: ${tool}`,
+        skillContent.includes(tool),
+        `SKILL.md missing registered tool: ${tool}`,
       );
     }
   });

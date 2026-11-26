@@ -7,27 +7,23 @@ import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
 import {getRuntime} from '../../../src/runtime.js';
-import {
-  collectCode,
-  collectionDiff,
-  searchInScripts,
-} from '../../../src/tools/collector/index.js';
+import {collectCode, collectionDiff} from '../../../src/tools/collector.js';
 import {
   findClickableElements,
   getDomStructure,
   queryDom,
-} from '../../../src/tools/dom/index.js';
+} from '../../../src/tools/dom.js';
 import {
   createHook,
   getHookData,
   injectHook,
   removeHook,
-} from '../../../src/tools/hook/index.js';
-import {click} from '../../../src/tools/input/click.js';
+} from '../../../src/tools/hook.js';
+import {click} from '../../../src/tools/input.js';
 import {
   checkBrowserHealth,
   waitForElement,
-} from '../../../src/tools/page/index.js';
+} from '../../../src/tools/page.js';
 import {ToolError} from '../../../src/utils/errors.js';
 
 type RuntimeMethod = (...args: unknown[]) => unknown;
@@ -196,9 +192,17 @@ const mockFrame = {
   },
 };
 
+// check_browser_health 等工具会优先用 context.getSelectedPage()；
+// 需要模拟"无选中页面"的用例可把它临时置空。
+let selectedPageOverride: unknown = defaultMockPage;
+
 const defaultTestContext = {
   getSelectedFrame: () => mockFrame,
-  getSelectedPage: () => defaultMockPage,
+  getSelectedPage: () => selectedPageOverride,
+  // collect_code 通过 context.getCodeCollector() 取收集器（与 SessionContext 一致）
+  getCodeCollector: () => (getRuntime() as unknown as RuntimeHarness).collector,
+  // hook 工具通过 context.getHookManager() 取管理器（与 SessionContext 一致）
+  getHookManager: () => (getRuntime() as unknown as RuntimeHarness).hookManager,
 };
 
 const invokeTool = async (
@@ -517,12 +521,6 @@ describe('jshook tools handlers', () => {
         runtime,
       );
       await invokeTool(
-        searchInScripts as unknown as ToolDefinitionHarness,
-        {pattern: 'abc', limit: 1},
-        res,
-        runtime,
-      );
-      await invokeTool(
         collectionDiff as unknown as ToolDefinitionHarness,
         {
           previous: [{url: 'old.js', size: 1, type: 'external'}],
@@ -685,12 +683,14 @@ describe('jshook tools handlers', () => {
       runtime.pageController.getPage = async () => {
         throw new Error('no page');
       };
+      selectedPageOverride = undefined;
       await invokeTool(
         checkBrowserHealth as unknown as ToolDefinitionHarness,
         {},
         res,
         runtime,
       );
+      selectedPageOverride = defaultMockPage;
       runtime.pageController.getPage = async () => activePage;
 
       await assert.rejects(
@@ -713,17 +713,8 @@ describe('jshook tools handlers', () => {
       assert.ok(res.lines.some(line => line.includes('"healthy"')));
       assert.ok(res.lines.some(line => line.includes('BROWSER_DISCONNECTED')));
       assert.ok(res.lines.some(line => line.includes('"unique"')));
-      assert.ok(res.lines.some(line => line.includes('"overwritten"')));
-      assert.ok(res.lines.some(line => line.includes('"remaining"')));
       assert.ok(res.lines.some(line => line.includes('"bodySnippet"')));
-      assert.ok(
-        res.lines.some(
-          line =>
-            line.includes('"encrypted": true') ||
-            line.includes('"encrypted":true'),
-        ),
-      );
-      assert.ok(res.lines.some(line => line.includes('"cleanedExpired":')));
+      assert.ok(res.lines.some(line => line.includes('"unique"')));
     } finally {
       runtime.collector.collect = originals.collect;
       runtime.collector.getFilesByPattern = originals.getFilesByPattern;

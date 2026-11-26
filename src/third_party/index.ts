@@ -25,6 +25,8 @@ export type * from './puppeteer-compat.js';
 export type * from './cdp.js';
 // Stub implementations (Common, Marked, MarkdownIssueDescription, I18n)
 export * from './stubs.js';
+// TOON compact encoder (lazy loader aligned with chrome-devtools-mcp)
+export {getToonEncode, type ToonEncode} from './toon.js';
 
 // ─── AggregatedIssue (used by multiple modules) ───
 export interface AggregatedIssue {

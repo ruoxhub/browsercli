@@ -29,6 +29,7 @@ export interface CollectWasmOptions {
   includeRuntimeEvents?: boolean;
   maxModules?: number;
   captureBase64?: boolean;
+  clearPrevious?: boolean;
 }
 
 interface NetworkCaptureEntry {
@@ -99,6 +100,8 @@ export class WasmCollector {
   private readonly binaryRegistry: WasmBinaryRegistry;
   private readonly artifactStore: WasmArtifactStore;
   private readonly runtimeEvents: WasmRuntimeEvent[] = [];
+  private readonly seenRuntimeEventIds = new Set<string>();
+  private readonly runtimeModuleIdMap = new Map<string, string>();
 
   constructor(
     private readonly pageController: PageController,
@@ -109,11 +112,21 @@ export class WasmCollector {
     this.artifactStore = new WasmArtifactStore(analyzer, runtimeInspector);
   }
 
+  clear(): void {
+    this.binaryRegistry.clear();
+    this.runtimeEvents.length = 0;
+    this.seenRuntimeEventIds.clear();
+    this.runtimeModuleIdMap.clear();
+  }
+
   async collect(
     options: CollectWasmOptions,
     task?: ReverseTaskHandle,
     pageOverride?: Page,
   ): Promise<WasmDetectionResult> {
+    if (options.clearPrevious) {
+      this.clear();
+    }
     const page = pageOverride ?? (await this.pageController.getPage());
     const captureBase64 = options.captureBase64 ?? false;
     const runtimeEnabled = options.includeRuntimeEvents !== false;
@@ -162,8 +175,6 @@ export class WasmCollector {
         ? await this.readRuntimeCaptureState(page, timeout)
         : {modules: [], events: []};
 
-      const runtimeModuleIds = new Map<string, string>();
-
       for (const entry of networkEntries) {
         this.binaryRegistry.registerBinary(entry.bytes, {
           sourceUrl: entry.url,
@@ -175,40 +186,7 @@ export class WasmCollector {
         });
       }
 
-      for (const moduleCapture of runtimeState.modules ?? []) {
-        if (!moduleCapture.base64) {
-          continue;
-        }
-        const bytes = Uint8Array.from(
-          Buffer.from(moduleCapture.base64, 'base64'),
-        );
-        if (!isWasmBinary(bytes)) {
-          continue;
-        }
-        const record = this.binaryRegistry.registerBinary(bytes, {
-          sourceUrl: moduleCapture.sourceUrl,
-          loadMethod: moduleCapture.loadMethod,
-          timestamp: moduleCapture.timestamp,
-          runtimeModuleId: moduleCapture.runtimeModuleId,
-          source: 'runtime',
-          captureBase64,
-        });
-        runtimeModuleIds.set(moduleCapture.runtimeModuleId, record.id);
-      }
-
-      for (const event of runtimeState.events ?? []) {
-        const normalized = cloneRuntimeEvent({
-          ...event,
-          moduleId:
-            event.moduleId ??
-            (event.runtimeModuleId
-              ? runtimeModuleIds.get(event.runtimeModuleId)
-              : undefined),
-        });
-        this.runtimeEvents.push(normalized);
-      }
-
-      this.binaryRegistry.applyExportCallCounts(this.runtimeEvents);
+      this.ingestRuntimeState(runtimeState, captureBase64);
 
       const modules = this.binaryRegistry.getModules();
       const selectedModules = modules.slice(0, maxModules);
@@ -275,6 +253,68 @@ export class WasmCollector {
     return this.runtimeEvents
       .filter(event => !moduleId || event.moduleId === moduleId)
       .map(event => cloneRuntimeEvent(event));
+  }
+
+  /**
+   * 从当前活体页面增量拉取预注入脚本后续捕获的模块与运行时事件（按 event.id 去重）。
+   */
+  async refreshFromPage(
+    pageOverride?: Page,
+    timeoutMs = DEFAULT_TIMEOUT_MS,
+  ): Promise<{addedEvents: number}> {
+    const page = pageOverride ?? (await this.pageController.getPage());
+    const runtimeState = await this.readRuntimeCaptureState(page, timeoutMs);
+    const addedEvents = this.ingestRuntimeState(runtimeState, false);
+    return {addedEvents};
+  }
+
+  private ingestRuntimeState(
+    runtimeState: PageRuntimeCaptureState,
+    captureBase64: boolean,
+  ): number {
+    for (const moduleCapture of runtimeState.modules ?? []) {
+      if (!moduleCapture.base64) {
+        continue;
+      }
+      const bytes = Uint8Array.from(
+        Buffer.from(moduleCapture.base64, 'base64'),
+      );
+      if (!isWasmBinary(bytes)) {
+        continue;
+      }
+      const record = this.binaryRegistry.registerBinary(bytes, {
+        sourceUrl: moduleCapture.sourceUrl,
+        loadMethod: moduleCapture.loadMethod,
+        timestamp: moduleCapture.timestamp,
+        runtimeModuleId: moduleCapture.runtimeModuleId,
+        source: 'runtime',
+        captureBase64,
+      });
+      this.runtimeModuleIdMap.set(moduleCapture.runtimeModuleId, record.id);
+    }
+
+    let addedEvents = 0;
+    for (const event of runtimeState.events ?? []) {
+      if (event.id && this.seenRuntimeEventIds.has(event.id)) {
+        continue;
+      }
+      if (event.id) {
+        this.seenRuntimeEventIds.add(event.id);
+      }
+      const normalized = cloneRuntimeEvent({
+        ...event,
+        moduleId:
+          event.moduleId ??
+          (event.runtimeModuleId
+            ? this.runtimeModuleIdMap.get(event.runtimeModuleId)
+            : undefined),
+      });
+      this.runtimeEvents.push(normalized);
+      addedEvents += 1;
+    }
+
+    this.binaryRegistry.applyExportCallCounts(this.runtimeEvents);
+    return addedEvents;
   }
 
   private async captureNetworkResponse(

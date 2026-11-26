@@ -251,12 +251,14 @@ export class Logger {
   }
 
   close(): Promise<void> {
-    const stream = this.fileStream;
+    const state = getConsoleState();
+    // console 桥接创建的默认流不挂在 logger 实例上，也要一并关闭，
+    // 否则 state.fileStream 会指向已被销毁的目录，后续写入全部丢失。
+    const stream = this.fileStream ?? state.fileStream;
     if (!stream) {
       return Promise.resolve();
     }
     this.fileStream = null;
-    const state = getConsoleState();
     if (state.fileStream === stream) {
       state.fileStream = null;
     }
@@ -266,11 +268,12 @@ export class Logger {
   }
 
   flush(): Promise<void> {
-    if (!this.fileStream) {
+    const stream = this.fileStream ?? getConsoleState().fileStream;
+    if (!stream) {
       return Promise.resolve();
     }
     return new Promise((resolve, reject) => {
-      this.fileStream?.write('', error => {
+      stream.write('', error => {
         if (error) {
           reject(error);
           return;

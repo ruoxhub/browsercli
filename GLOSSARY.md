@@ -1,65 +1,41 @@
-# Browser-CLI Core Domain
+# BrowserCLI Context
 
-Browser-CLI provides browser automation, dynamic reverse engineering, network inspection, and debugging capabilities over the Chrome DevTools Protocol and Patchright.
+面向浏览器逆向工程与自动化的守护进程和 CLI 工具链，基于 Patchright 提供持久化浏览器会话、页面级调试/Hook/抓包能力与结构化工具执行。
 
 ## Language
 
-**Navigation Bucket**:
-A discrete, chronological container of network requests and traffic events recorded during a single page navigation lifecycle.
-_Avoid_: Request group, page history segment, navigation log, request pool
+### Runtime Ownership
 
-**Request Initiator**:
-The origin declaration and immediate call stack describing why and where the browser dispatched a network request or opened a connection.
-_Avoid_: Caller stack, request origin, trigger source, stack trace parent
+**DaemonSession**:
+由工作区路径与会话名唯一标识的本地守护进程实例，通过命名管道或 Unix Socket 接收 CLI 的工具调用请求。
+_Avoid_: Session, WorkerSession, MCP Server
 
-**Operation Evidence**:
-The aggregated causal record linking a specific user or agent input action (such as click, press, or submit) with network requests, console messages, and local DOM state mutations triggered within its immediate observation window.
-_Avoid_: Action trace, click-request mapping, interaction log, event linkage
+**SessionContext**:
+单次守护进程生命周期内的浏览器级聚合根，持有浏览器连接、隔离上下文、页表、并发调度与跨页复用资产。
+_Avoid_: Runtime, ToolContextProvider, ServiceLocator, GlobalContext
 
-**Structured Extraction**:
-The passive extraction capability that traverses Document Object Model or ARIA grid hierarchies, normalizes two-dimensional cell spans (rowspan/colspan) and nested header paths into canonical rows and columns, and optionally serializes them directly to CSV or JSON.
-_Avoid_: Table scraper, DOM table dumper, grid parser
+**BrowserPage**:
+单个浏览器标签页的领域聚合根，收敛该页专属的调试、监听、快照、网络拦截、单页捕获缓冲与健康状态，并随页面关闭统一释放。
+_Avoid_: PageContext, ActivePage, SelectedPage
 
-**Browser Connection Target**:
-The resolved remote endpoint (`browserUrl` or `wsEndpoint`) or local binary selection (`channel` or `executablePath`) directing how Browser-CLI attaches to or launches a browser instance.
-_Avoid_: Browser endpoint, connection URI, attach target, launch mode target
+**PageHook**:
+绑定于单个 `BrowserPage` 运行时的动态钩子，支持显式卸载以还原原函数，并随所属标签页关闭自动释放。
+_Avoid_: FunctionHook, McpHook, RuntimeHook
 
-**Connection Fallback**:
-The resolution cascade that sources browser connection options across CLI flags, environment variables, user configuration (`~/.browsercli/config.json`), and system defaults in strict precedence order.
-_Avoid_: Config cascade, default connection lookup, fallback resolver
+**PersistentHook**:
+绑定于浏览器上下文而非单个标签页的初始化注入钩子，在既有页面及后续新开弹窗或导航页面中持续生效，不因父页面关闭而销毁。
+_Avoid_: GlobalHook, ContextHook
 
-**Active Port Record**:
-A validated, TCP-reachable browser debugging descriptor parsed directly from a user data directory's `DevToolsActivePort` file, specifying the active listening port and DevTools WebSocket path.
-_Avoid_: Debug port file entry, port record, DevTools port snapshot, active port entry
+### Tool Model
 
-**Auto-Connect Probe**:
-The automatic discovery mechanism that locates and attaches to an active, running Chromium instance via its `Active Port Record` (specifically for `chrome://inspect/#remote-debugging` mode where HTTP discovery endpoints return 404), bypassing explicit host and port specification.
-_Avoid_: Automatic debugger scan, background browser hook, port sniffer, auto-attacher
+**ToolScope**:
+工具在类型层声明的运行边界，分为页级（绑定目标 `BrowserPage`）、浏览器级（操作跨页或连接状态）与无状态级（离线计算，不依赖浏览器连接）。
+_Avoid_: CallMode, ToolType, ExecutionMode
 
-**Tool**:
-A single capability exposed to callers through the daemon's `tool.invoke` IPC request, defined via `defineTool()` with a name, description, Zod schema, category annotation, and handler. Tools are invoked as `browsercli call <tool_name>`; they are not CLI subcommands and carry no shell-level flag surface of their own.
-_Avoid_: Command, CLI command, endpoint, API route
+**ToolManifest**:
+在构建期从工具定义静态提取的纯数据清单，供 CLI 在不加载浏览器与逆向运行时依赖的前提下完成命令发现与参数解析。
+_Avoid_: ToolsMeta, GeneratedIndex
 
-**Daemon Session**:
-A detached worker process bound to one workspace directory and identified by a workspace hash in the session registry. A session owns exactly one IPC socket, may host zero or more browser connections, and is discovered, spawned, and managed on demand by the `browsercli` client through the standard lifecycle commands (`start`, `stop`, `status`).
-_Avoid_: Workspace, server instance, background job, worker thread
-
-**Lifecycle Commands**:
-The triad of CLI commands (`start`, `stop`, `status`) modeled after `chrome-devtools` for managing daemon sessions and inspecting browser connections.
-_Avoid_: Session commands, daemon controls, process managers
-
-**Runtime Configuration**:
-The in-memory dynamic configuration maintained by `RuntimeConfigStore` and optionally cached to `~/.browsercli/runtime-config.json` across worker restarts, adhering to strict precedence: explicit CLI flags > environment variables > cached runtime config > user configuration (`~/.browsercli/config.json`) > system defaults.
-_Avoid_: Static config, global options, session flags
-
-**Job Store**:
-The daemon-side memory store for async and long-running execution tasks, supporting query and result retrieval across client calls.
-_Avoid_: Task queue, background worker table
-
-**Worker Activity Coordination**:
-The synchronization mechanism (`WorkerActivityCoordinator`) that arbitrates concurrent tool invocations, active network/CDP subscriptions, and idle state detection to ensure orderly worker shutdown.
-_Avoid_: Activity monitor, idle watcher
-
-**Browser Page Snapshot**:
-A plain object `{ browser, page, url }` capturing the active browser instance, current page, and location at an inspection boundary, distinct from the driver's native `BrowserContext`.
-_Avoid_: BrowserContext (internal alias), page handle
+**DeclarativeResponse**:
+工具执行时只记录输出意图（如附加快照、网络明细、控制台摘要或结构化负载），由统一物化阶段集中查询、格式化并裁剪的响应契约。
+_Avoid_: Accumulator, RawResult

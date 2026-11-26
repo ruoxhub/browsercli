@@ -7,8 +7,8 @@
 import assert from 'node:assert/strict';
 import {describe, it} from 'node:test';
 
-import {selectExecutionContext} from '../../../../src/tools/debugger/contextSelector.js';
-import type {ExecutionContextInfo} from '../../../../src/tools/debugger/executionContexts.js';
+import {selectExecutionContext} from '../../../../src/tools/debugger.js';
+import type {ExecutionContextInfo} from '../../../../src/tools/debugger.js';
 
 function ctx(
   id: number,

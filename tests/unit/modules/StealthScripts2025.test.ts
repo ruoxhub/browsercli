@@ -9,11 +9,16 @@ import {afterEach, beforeEach, describe, it} from 'node:test';
 import {StealthScripts2025} from '../../../src/modules/stealth/StealthScripts2025.js';
 
 interface StealthPageHarness {
-  setUserAgent(userAgent: string): Promise<void>;
-  evaluateOnNewDocument<T extends unknown[]>(
+  addInitScript<T extends unknown[]>(
     fn: (...args: T) => unknown,
     ...args: T
   ): Promise<void>;
+  context(): {
+    newCDPSession(page: unknown): Promise<{
+      send(method: string, params?: unknown): Promise<unknown>;
+      detach(): Promise<void>;
+    }>;
+  };
 }
 
 interface StealthStaticHarness {
@@ -163,14 +168,19 @@ interface StealthAudioBufferHarness {
 
 const globals = globalThis as StealthGlobalHarness;
 
-const createStealthPage = (): StealthPageHarness => ({
-  setUserAgent: async () => undefined,
-  evaluateOnNewDocument: async <T extends unknown[]>(
+const createStealthPage = (execute = true): StealthPageHarness => ({
+  addInitScript: async <T extends unknown[]>(
     fn: (...args: T) => unknown,
     ...args: T
   ) => {
-    fn(...args);
+    if (execute) fn(...args);
   },
+  context: () => ({
+    newCDPSession: async () => ({
+      send: async () => undefined,
+      detach: async () => undefined,
+    }),
+  }),
 });
 
 describe('StealthScripts2025', () => {
@@ -214,10 +224,7 @@ describe('StealthScripts2025', () => {
     assert.strictEqual(resolved.navigatorPlatform, 'Linux x86_64');
     assert.deepStrictEqual(resolved.languages, ['en-US']);
 
-    const page: StealthPageHarness = {
-      setUserAgent: async () => undefined,
-      evaluateOnNewDocument: async () => undefined,
-    };
+    const page = createStealthPage();
     await StealthScripts2025.injectAll(
       page as unknown as Parameters<typeof StealthScripts2025.injectAll>[0],
       {
@@ -282,10 +289,7 @@ describe('StealthScripts2025', () => {
       called.push('overrideScreen');
     };
 
-    const page: StealthPageHarness = {
-      setUserAgent: async () => undefined,
-      evaluateOnNewDocument: async () => undefined,
-    };
+    const page = createStealthPage();
 
     const report = await StealthScripts2025.injectAll(
       page as unknown as Parameters<typeof StealthScripts2025.injectAll>[0],
@@ -306,10 +310,8 @@ describe('StealthScripts2025', () => {
   });
 
   it('covers direct helper invocations and compatibility helper', async () => {
-    const page: StealthPageHarness = {
-      setUserAgent: async () => undefined,
-      evaluateOnNewDocument: async () => undefined,
-    };
+    // 该用例只验证各 helper 可被调用，不准备浏览器全局对象，故不执行注入回调
+    const page = createStealthPage(false);
 
     await StealthScripts2025.hideWebDriver(
       page as unknown as Parameters<typeof StealthScripts2025.hideWebDriver>[0],

@@ -15,15 +15,6 @@
 export {NetworkModule} from './NetworkModule.js';
 
 // 纯领域逻辑
-export {
-  STRIPPED_HEADERS,
-  stripManagedHeaders,
-  buildReplayRequest,
-  emptyReplayResponse,
-  executeReplay,
-  formatCurl,
-} from './replayEngine.js';
-
 export {buildEvidenceCorrelations} from './signatureDetector.js';
 export {SIGNATURE_HEADER_PATTERN} from './constants.js';
 
@@ -55,18 +46,6 @@ export type {
   ListWebSocketConnectionsData,
   GetWebSocketMessageData,
   GetWebSocketMessagesData,
-  // Replay
-  ReplayOverride,
-  BuiltReplayRequest,
-  ReplayResponse,
-  BatchVariantResult,
-  BatchReplayResult,
-  ReplayNetworkRequestParams,
-  ReplayNetworkRequestData,
-  ExportRequestAsCurlParams,
-  ExportRequestAsCurlData,
-  ReplayNetworkRequestBatchParams,
-  ReplayNetworkRequestBatchData,
   TrafficSummary,
   AnalyzeWebSocketMessagesData,
 } from './NetworkTypes.js';

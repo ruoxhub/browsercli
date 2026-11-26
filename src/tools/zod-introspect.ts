@@ -93,7 +93,13 @@ function resolveSimpleType(
   if (inner instanceof zod.ZodEnum || inner instanceof zod.ZodNativeEnum)
     return 'string';
   if (inner instanceof zod.ZodArray) {
-    if (inner.element instanceof zod.ZodString) return 'string[]';
+    if (
+      inner.element instanceof zod.ZodString ||
+      inner.element instanceof zod.ZodEnum ||
+      inner.element instanceof zod.ZodNativeEnum
+    ) {
+      return 'string[]';
+    }
     // 数组元素为对象/记录（如 array<object> 的 variants 参数）→
     // 归为 'json'，交由校验层接受 JSON 数组或对象。
     if (

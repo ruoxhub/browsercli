@@ -9,8 +9,8 @@ import {describe, it} from 'node:test';
 
 import {GENERATED_DOMAIN_MANIFESTS} from '../../../../src/tools/generated-tools-index.js';
 import {ToolRegistry} from '../../../../src/tools/registry/ToolRegistry.js';
-import {manifest as screenshotManifest} from '../../../../src/tools/screenshot/manifest.js';
-import {takeScreenshot} from '../../../../src/tools/screenshot/takeScreenshot.js';
+import {manifest as screenshotManifest} from '../../../../src/tools/screenshot.js';
+import {takeScreenshot} from '../../../../src/tools/screenshot.js';
 import {loadToolMeta} from '../../../../src/tools/tools-meta.js';
 import {ToolError} from '../../../../src/utils/errors.js';
 
@@ -108,10 +108,7 @@ describe('screenshot domain', () => {
   it('manifest contains exactly one tool: take_screenshot', () => {
     assert.equal(screenshotManifest.tools.length, 1);
     assert.equal(screenshotManifest.tools[0].handlerName, 'takeScreenshot');
-    assert.equal(
-      screenshotManifest.tools[0].modulePath,
-      './screenshot/takeScreenshot.js',
-    );
+    assert.equal(screenshotManifest.tools[0].modulePath, './screenshot.js');
   });
 
   it('registry exposes only take_screenshot for the screenshot domain', async () => {

@@ -410,38 +410,17 @@ describe('ToolAdapter', () => {
 
     assert.deepStrictEqual(listResult.structuredContent, {
       success: true,
-      message: '共 1 个 Hook',
+      message: '同步完成，1 个 Hook，共 1 条记录',
       tooltype: 'list_created_hooks',
       syncedHookIds: ['hook_from_params'],
       totalRecords: 1,
       hooks: [
         {
           hookId: 'hook_from_params',
-          source: 'manager',
-          type: 'unknown',
-          description: '',
-          enabled: true,
-          callCount: 1,
-          recordCount: 1,
+          total: 1,
+          type: 'fetch',
         },
       ],
-      data: {
-        totalHooks: 1,
-        totalEnabled: 1,
-        totalDisabled: 0,
-        totalRecords: 1,
-        hooks: [
-          {
-            hookId: 'hook_from_params',
-            source: 'manager',
-            type: 'unknown',
-            description: '',
-            enabled: true,
-            callCount: 1,
-            recordCount: 1,
-          },
-        ],
-      },
     });
 
     assert.deepStrictEqual(removeResult.structuredContent, {
@@ -454,11 +433,24 @@ describe('ToolAdapter', () => {
     const readerHookIds = evaluateCalls
       .filter(call => call.kind === 'reader')
       .map(call => call.hookId);
-    assert.deepStrictEqual(readerHookIds, ['hook_from_params']);
+    // get_hook_data 与 list_created_hooks 各自会读一次浏览器 Hook 数据
+    assert.ok(readerHookIds.length >= 1);
+    assert.ok(
+      readerHookIds.every(id => id === 'hook_from_params'),
+      `reader 应以 params 的 hookId 过滤，实际: ${readerHookIds.join(',')}`,
+    );
 
-    const cleanupCall = evaluateCalls.find(call => call.kind === 'cleanup');
-    assert.ok(cleanupCall?.script?.includes('window.__hookStore'));
-    assert.ok(cleanupCall?.script?.includes('"hook_from_params"'));
+    const cleanupScripts = evaluateCalls
+      .filter(call => call.kind === 'cleanup')
+      .map(call => call.script ?? '');
+    const removeCleanupScript = cleanupScripts.find(script =>
+      script.includes('window.__hookStore'),
+    );
+    assert.ok(
+      removeCleanupScript,
+      `remove_hook 应执行清理 __hookStore 的脚本，实际: ${JSON.stringify(cleanupScripts)}`,
+    );
+    assert.ok(removeCleanupScript.includes('"hook_from_params"'));
   });
 
   it('onInvoke bridges tool:called and tool:error into ToolInvokeEvent', async () => {

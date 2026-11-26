@@ -1,23 +1,37 @@
+/**
+ * @license
+ * Copyright 2026 Browser-CLI
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
-import {listPages} from '../../../../src/tools/navigation/listPages.js';
-import {selectPage} from '../../../../src/tools/navigation/selectPage.js';
+import {listPages} from '../../../../src/tools/navigation.js';
+import {selectPage} from '../../../../src/tools/navigation.js';
 import {ToolResponseAccumulator} from '../../../../src/worker/ToolResponse.js';
 
 describe('page identity navigation tools', () => {
-  it('lists stable IDs alongside indexes', async () => {
+  it('lists stable pageId without redundant index', async () => {
     const page = {url: () => 'https://example.test', title: async () => 'test'};
     const response = new ToolResponseAccumulator();
     await listPages.handler({params: {}}, response, {
       getPages: () => [page],
       getSelectedPage: () => page,
-      getPageId: () => 'page-7',
+      getPageId: () => '7',
     } as never);
-    const data = (response.toJSON().structuredContent as any).data;
-    assert.equal(data.pageInfos[0].index, 0);
-    assert.equal(data.pageInfos[0].pageId, 'page-7');
-    assert.equal(data.selectedPageId, 'page-7');
+    const data = (
+      response.toJSON().structuredContent as {
+        data: {
+          pageInfos: Array<Record<string, unknown>>;
+          selectedPageId: string | null;
+        };
+      }
+    ).data;
+    assert.equal(data.pageInfos[0].pageId, '7');
+    assert.equal('index' in data.pageInfos[0], false);
+    assert.equal(data.selectedPageId, '7');
+    assert.equal('selectedIndex' in data, false);
   });
 
   it('rejects conflicting selectors before page side effects', async () => {

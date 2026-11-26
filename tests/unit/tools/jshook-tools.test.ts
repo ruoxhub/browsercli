@@ -10,15 +10,15 @@ import {zod} from '../../../src/third_party/index.js';
 import {
   collectCode,
   collectionDiff,
-} from '../../../src/tools/collector/index.js';
-import {queryDom} from '../../../src/tools/dom/index.js';
+} from '../../../src/tools/collector.js';
+import {queryDom} from '../../../src/tools/dom.js';
 import {
   createHook,
   getHookData,
   listCreatedHooks,
   removeHook,
-} from '../../../src/tools/hook/index.js';
-import {checkBrowserHealth} from '../../../src/tools/page/index.js';
+} from '../../../src/tools/hook.js';
+import {checkBrowserHealth} from '../../../src/tools/page.js';
 
 describe('jshook tools schema', () => {
   it('validates collect_code schema', () => {

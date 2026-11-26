@@ -248,6 +248,39 @@ function main() {
     }
   }
 
+  // 1b. Check Rule D2 (ADR-0008): src/tools/ and daemon entry must NOT bypass SessionContext via src/runtime.ts
+  const runtimeBypassViolations: ImportEdge[] = [];
+  for (const edge of allEdges) {
+    const fromNorm = edge.from.replace(/\\/g, '/');
+    const toNorm = edge.to.replace(/\\/g, '/');
+    if (
+      (fromNorm.startsWith('src/tools/') ||
+        fromNorm === 'src/worker/daemonMain.ts') &&
+      toNorm === 'src/runtime.ts'
+    ) {
+      runtimeBypassViolations.push(edge);
+    }
+  }
+
+  console.log(
+    '\n[Rule D2: No getRuntime() Bypass in src/tools/ & daemonMain (ADR-0008)]',
+  );
+  if (runtimeBypassViolations.length === 0) {
+    console.log(
+      '  PASS: 0 violations (tools and daemon entry use SessionContext exclusively)',
+    );
+  } else {
+    hasError = true;
+    console.error(
+      `  FAIL: ${runtimeBypassViolations.length} violations found:`,
+    );
+    for (const v of runtimeBypassViolations) {
+      console.error(
+        `    ${v.from}:${v.line} -> ${v.to} [${v.isTypeOnly ? 'type' : 'VALUE'}]`,
+      );
+    }
+  }
+
   // 2. Check Value-only SCCs (Runtime cycles)
   console.log('\n[Rule no-circular: Runtime Value-only Cycles]');
   const sccs = findSCCs(allEdges);

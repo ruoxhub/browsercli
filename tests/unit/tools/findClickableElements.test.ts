@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
 
-import {findClickableElements} from '../../../src/tools/dom/findClickableElements.js';
+import {findClickableElements} from '../../../src/tools/dom.js';
 
 /** 合成快照：一个 id 按钮 + 一个 class 链接 + 一个普通 div。 */
 function makeSnapshot() {

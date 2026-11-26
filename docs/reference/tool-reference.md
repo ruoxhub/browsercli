@@ -1,44 +1,35 @@
 <!-- AUTO GENERATED DO NOT EDIT - run 'npm run docs' to update-->
 
-# Chrome DevTools MCP Tool Reference
+# Browser-CLI Tool Reference
 
 > 快速按逆向目标查工具，请先看：[`reverse-task-index.md`](./reverse-task-index.md)
 
-- **[Navigation automation](#navigation-automation)** (16 tools)
-  - [`click`](#click)
-  - [`click_at`](#click_at)
-  - [`drag`](#drag)
-  - [`fill`](#fill)
-  - [`fill_form`](#fill_form)
-  - [`find_clickable_elements`](#find_clickable_elements)
-  - [`get_dom_structure`](#get_dom_structure)
-  - [`hover`](#hover)
+- **[Navigation automation](#navigation-automation)** (6 tools)
+  - [`close_page`](#close_page)
   - [`list_pages`](#list_pages)
   - [`navigate_page`](#navigate_page)
   - [`new_page`](#new_page)
-  - [`press_key`](#press_key)
-  - [`query_dom`](#query_dom)
   - [`select_page`](#select_page)
-  - [`take_snapshot`](#take_snapshot)
-  - [`upload_file`](#upload_file)
-- **[Network](#network)** (10 tools)
+  - [`wait_for`](#wait_for)
+- **[Network](#network)** (9 tools)
   - [`analyze_websocket_messages`](#analyze_websocket_messages)
   - [`clear_network_requests`](#clear_network_requests)
-  - [`export_request_as_curl`](#export_request_as_curl)
   - [`get_network_request`](#get_network_request)
   - [`get_websocket_message`](#get_websocket_message)
   - [`get_websocket_messages`](#get_websocket_messages)
   - [`list_network_requests`](#list_network_requests)
   - [`list_websocket_connections`](#list_websocket_connections)
-  - [`replay_network_request`](#replay_network_request)
-  - [`replay_network_request_batch`](#replay_network_request_batch)
-- **[Debugging](#debugging)** (21 tools)
+  - [`mock_network`](#mock_network)
+  - [`remove_network_mock`](#remove_network_mock)
+- **[Debugging](#debugging)** (23 tools)
+  - [`debugger_disable`](#debugger_disable)
+  - [`debugger_step`](#debugger_step)
+  - [`debugger_wait_for_paused`](#debugger_wait_for_paused)
   - [`evaluate_on_callframe`](#evaluate_on_callframe)
   - [`evaluate_script`](#evaluate_script)
   - [`get_console_message`](#get_console_message)
   - [`get_css_styles`](#get_css_styles)
   - [`get_paused_info`](#get_paused_info)
-  - [`inspect_locals`](#inspect_locals)
   - [`list_breakpoints`](#list_breakpoints)
   - [`list_console_messages`](#list_console_messages)
   - [`list_frames`](#list_frames)
@@ -48,13 +39,13 @@
   - [`remove_breakpoint`](#remove_breakpoint)
   - [`resume`](#resume)
   - [`reveal_in_devtools`](#reveal_in_devtools)
+  - [`screencast_start`](#screencast_start)
+  - [`screencast_stop`](#screencast_stop)
   - [`select_frame`](#select_frame)
   - [`set_breakpoint`](#set_breakpoint)
-  - [`step_into`](#step_into)
-  - [`step_out`](#step_out)
-  - [`step_over`](#step_over)
+  - [`set_logpoints`](#set_logpoints)
   - [`take_screenshot`](#take_screenshot)
-- **[JS Reverse Engineering](#js-reverse-engineering)** (33 tools)
+- **[JS Reverse Engineering](#js-reverse-engineering)** (27 tools)
   - [`anti_anti_debug`](#anti_anti_debug)
   - [`break_on_xhr`](#break_on_xhr)
   - [`bypass_debugger`](#bypass_debugger)
@@ -63,44 +54,48 @@
   - [`collection_diff`](#collection_diff)
   - [`create_hook`](#create_hook)
   - [`dump_target_scripts`](#dump_target_scripts)
-  - [`find_in_script`](#find_in_script)
   - [`get_hook_data`](#get_hook_data)
   - [`get_request_initiator`](#get_request_initiator)
   - [`get_script_source`](#get_script_source)
   - [`get_storage`](#get_storage)
-  - [`hook_function`](#hook_function)
   - [`inject_hook`](#inject_hook)
   - [`inspect_object`](#inspect_object)
   - [`list_created_hooks`](#list_created_hooks)
-  - [`list_hooks`](#list_hooks)
   - [`list_persistent_hooks`](#list_persistent_hooks)
   - [`list_scripts`](#list_scripts)
   - [`list_targets`](#list_targets)
   - [`monitor_events`](#monitor_events)
   - [`remove_hook`](#remove_hook)
   - [`remove_xhr_breakpoint`](#remove_xhr_breakpoint)
-  - [`search_in_scripts`](#search_in_scripts)
   - [`search_in_sources`](#search_in_sources)
   - [`set_breakpoint_on_text`](#set_breakpoint_on_text)
   - [`stop_monitor`](#stop_monitor)
   - [`trace_function`](#trace_function)
-  - [`unhook_function`](#unhook_function)
   - [`wasm_dump`](#wasm_dump)
-  - [`wasm_memory_inspect`](#wasm_memory_inspect)
   - [`wasm_vmp_trace`](#wasm_vmp_trace)
-- **[Input automation](#input-automation)** (2 tools)
+- **[Input automation](#input-automation)** (11 tools)
+  - [`click`](#click)
+  - [`click_at`](#click_at)
+  - [`drag`](#drag)
+  - [`fill`](#fill)
+  - [`fill_form`](#fill_form)
+  - [`handle_dialog`](#handle_dialog)
+  - [`hover`](#hover)
+  - [`press_key`](#press_key)
   - [`scroll_by`](#scroll_by)
+  - [`upload_file`](#upload_file)
   - [`wait_for_element`](#wait_for_element)
-- **[Emulation](#emulation)** (3 tools)
-  - [`emulate_mobile`](#emulate_mobile)
-  - [`emulate_network`](#emulate_network)
+- **[Emulation](#emulation)** (2 tools)
+  - [`emulate`](#emulate)
   - [`resize_page`](#resize_page)
-- **[Screenshot](#screenshot)** (1 tools)
-  - [`video`](#video)
-- **[Pages](#pages)** (3 tools)
+- **[DOM manipulation](#dom-manipulation)** (4 tools)
+  - [`find_clickable_elements`](#find_clickable_elements)
+  - [`get_dom_structure`](#get_dom_structure)
+  - [`query_dom`](#query_dom)
+  - [`take_snapshot`](#take_snapshot)
+- **[Pages](#pages)** (2 tools)
   - [`check_browser_health`](#check_browser_health)
   - [`detect_captcha`](#detect_captcha)
-  - [`handle_dialog`](#handle_dialog)
 - **[Diagnostics](#diagnostics)** (1 tools)
   - [`diagnose_environment`](#diagnose_environment)
 - **[Extensions](#extensions)** (5 tools)
@@ -112,151 +107,67 @@
 
 ## Navigation automation
 
-### `click` — 点击元素
+### `close_page` — 关闭页面
 
-**Description:** 点击页面元素，支持单击与双击。支持由 take_snapshot 产生的 uid（推荐）或传统定位器（CSS、role=、text=、xpath=）。
-
-**Parameters:**
-
-- `uid`
-- `selector`
-- `dblClick`
-- `timeoutMs`
-
-### `click_at` — 坐标点击
-
-**Description:** 使用 CDP Input.dispatchMouseEvent 在元素中心坐标处派发真实鼠标点击事件，适用于 Playwright 点击被拦截的场景。会选取元素在视口内的最大可见区域中心。
-
-**Parameters:**
-
-- `selector`
-
-### `drag` — 拖拽元素
-
-**Description:** 通过鼠标事件将元素从源定位器拖拽到目标定位器。定位器支持 CSS、role=、text=、xpath=。多匹配时用 >> nth=N 消歧。
-
-**Parameters:**
-
-- `fromSelector`
-- `toSelector`
-
-### `fill` — 填充输入
-
-**Description:** 向输入元素填入值，<select> 会通过 selectOption 自动处理。支持由 take_snapshot 产生的 uid（推荐）或传统定位器（CSS、role=、text=、xpath=）。
-
-**Parameters:**
-
-- `uid`
-- `selector`
-- `value`
-- `timeoutMs`
-
-### `fill_form` — 批量填充表单
-
-**Description:** 在一次调用中批量填充多个表单元素，每个条目指定定位器与值，<select> 通过 selectOption 自动处理。定位器支持 CSS、role=、text=、xpath=。多匹配时用 >> nth=N 消歧。
-
-**Parameters:**
-
-- `elements`
-- `timeoutMs`
-
-### `find_clickable_elements` — 查找可点击元素
-
-**Description:** 查找当前页面中可点击的按钮与链接，可按文本内容过滤，返回选择器、文本、类型、可见性与包围盒。
-
-**Parameters:**
-
-- `filterText`
-
-### `get_dom_structure` — 获取DOM结构
-
-**Description:** 获取当前页面的 DOM 树结构，返回包含标签名、ID、类名及可选文本内容的层级树。
-
-**Parameters:**
-
-- `maxDepth`
-- `includeText`
-
-### `hover` — 悬停元素
-
-**Description:** 将鼠标悬停在指定元素上。支持由 take_snapshot 产生的 uid（推荐）或传统定位器（CSS、role=、text=、xpath=）。
-
-**Parameters:**
-
-- `uid`
-- `selector`
-
-### `list_pages` — 列出页面
-
-**Description:** 列出浏览器中所有已打开的页面及其索引、URL 与标题。在调用 select_page 前可先使用本工具查找页面索引。
-
-### `navigate_page` — 导航页面
-
-**Description:** 导航当前页面，支持 URL 导航、后退、前进与刷新，等待 DOMContentLoaded 事件。
-
-**Parameters:**
-
-- `type`
-- `url`
-- `ignoreCache`
-- `timeout`
-
-### `new_page` — 新建页面
-
-**Description:** 创建新的浏览器页面并导航到指定 URL，新页面会自动被选中。
-
-**Parameters:**
-
-- `url`
-- `timeout`
-- `preloadHook`
-- `preloadPreset`
-
-### `press_key` — 按键
-
-**Description:** 按下键盘按键或组合键（如 "Enter"、"Control+A"、"Alt+Shift+F"），支持修饰键。
-
-**Parameters:**
-
-- `key`
-
-### `query_dom` — 查询DOM元素
-
-**Description:** 通过定位器查询一个或多个 DOM 元素，返回包含标签、属性、包围盒与可见性的结构化信息。定位器支持 CSS、role=、text=、xpath=。多匹配时用 >> nth=N 消歧。
-
-**Parameters:**
-
-- `selector`
-- `all`
-- `limit`
-
-### `select_page` — 选择页面
-
-**Description:** 按索引选择页面并将其带到前台、切换上下文。请先使用 list_pages 获取页面索引。
+**Description:** 关闭指定页面（支持 pageId 或 pageIdx）。浏览器中的最后一个打开页面无法关闭。
 
 **Parameters:**
 
 - `pageId`
 - `pageIdx`
 
-### `take_snapshot` — 获取页面语义快照
+### `list_pages` — 列出页面
 
-**Description:** 获取当前页面的紧凑无障碍语义快照（TextSnapshot）。为每个交互控件分配数字 UID（如 1_4），可直接用于 click、fill、hover 等操作，Token 开销极低且免疫动态 Class 混淆。
+**Description:** 列出浏览器中所有已打开的页面及其稳定 pageId、URL 与标题。调用页级工具时可通过 --pageId 指定标签页，或用 select_page 切换默认页面。
 
-**Parameters:**
+### `navigate_page` — 导航页面
 
-- `mode`
-- `verbose`
-- `interestingOnly`
-
-### `upload_file` — 上传文件
-
-**Description:** 向 file input 元素上传文件，依次尝试 Playwright 原生 setInputFiles、filechooser 事件模式及 CDP DOM.setFileInputFiles 三级降级。
+**Description:** 导航当前页面，支持 URL 导航、后退、前进与刷新，支持注入 initScript 与自动处理 beforeunload 弹窗。
 
 **Parameters:**
 
-- `selector`
-- `filePath`
+- `type`
+- `url`
+- `ignoreCache`
+- `handleBeforeUnload`
+- `initScript`
+- `timeout`
+- `pageId`
+
+### `new_page` — 新建页面
+
+**Description:** 创建新的浏览器页面并导航到指定 URL；默认自动选中新页面，也可在后台或独立上下文中打开。
+
+**Parameters:**
+
+- `url`
+- `timeout`
+- `background`
+- `isolatedContext`
+- `preloadHook`
+- `preloadPreset`
+
+### `select_page` — 选择页面
+
+**Description:** 按 pageId 选择页面并将其设为当前上下文，可选是否把窗口带到前台（默认不切换前台标签）。请先使用 list_pages 获取 pageId。
+
+**Parameters:**
+
+- `pageId`
+- `pageIdx`
+- `bringToFront`
+
+### `wait_for` — 等待文本出现
+
+**Description:** 等待指定文本出现在当前页面中（支持多个候选文本，命中任一即返回）。默认同时匹配隐藏文本；设置 visible=true 仅匹配可见文本。
+
+**Parameters:**
+
+- `text`
+- `timeout`
+- `visible`
+- `includeSnapshot`
+- `pageId`
 
 ## Network
 
@@ -268,6 +179,7 @@
 
 - `wsid`
 - `direction`
+- `pageId`
 
 ### `clear_network_requests` — clear_network_requests
 
@@ -277,20 +189,7 @@
 
 - `targetPageIdx`
 - `targetPageId`
-
-### `export_request_as_curl` — export_request_as_curl
-
-**Description:** 将捕获的网络请求（按 reqid）导出为 curl 命令。支持与 replay_network_request 相同的覆盖项。适用于在浏览器外复现请求，或验证导出的命令能否复现捕获的响应。
-
-**Parameters:**
-
-- `reqid`
-- `method`
-- `url`
-- `headers`
-- `body`
-- `replaceHeaders`
-- `includeCookies`
+- `pageId`
 
 ### `get_network_request` — get_network_request
 
@@ -302,6 +201,9 @@
 - `maxBodyLength`
 - `fullBody`
 - `saveTo`
+- `requestFilePath`
+- `responseFilePath`
+- `pageId`
 
 ### `get_websocket_message` — get_websocket_message
 
@@ -312,6 +214,7 @@
 - `wsid`
 - `frameIndex`
 - `decode`
+- `pageId`
 
 ### `get_websocket_messages` — get_websocket_messages
 
@@ -325,6 +228,7 @@
 - `pageSize`
 - `pageIdx`
 - `show_content`
+- `pageId`
 
 ### `list_network_requests` — list_network_requests
 
@@ -344,6 +248,7 @@
 - `headerFilter`
 - `urlFilter`
 - `includeSignatureEvidence`
+- `pageId`
 
 ### `list_websocket_connections` — list_websocket_connections
 
@@ -355,33 +260,63 @@
 - `pageIdx`
 - `urlFilter`
 - `includePreservedConnections`
+- `pageId`
 
-### `replay_network_request` — replay_network_request
+### `mock_network` — 网络Mock拦截
 
-**Description:** 重放一个捕获的网络请求（按 reqid），使用浏览器上下文的 Cookie 和存储。支持覆盖 method、url、headers 和 body。适用于验证签名字段效果与参数有效性。
+**Description:** Inspect or update network mocks for the selected page. With no action params, lists existing mocks. Providing abort, allowOrigin, body (local file), or upstream (replacement URL) creates/updates a mock rule.
 
 **Parameters:**
 
-- `reqid`
-- `method`
-- `url`
-- `headers`
+- `route`
+- `resourceType`
+- `abort`
+- `allowOrigin`
 - `body`
-- `replaceHeaders`
-- `maxBodyLength`
+- `upstream`
+- `pageId`
 
-### `replay_network_request_batch` — replay_network_request_batch
+### `remove_network_mock` — 移除网络Mock
 
-**Description:** 以不同覆盖项（变体）多次重放一个捕获的网络请求。适用于模糊测试签名字段、测试参数边界、观察响应分布。默认串行执行，也支持有界并发。
+**Description:** Remove network mocks matching the supplied stored route and/or resourceType. Omit both filters to remove all mocks for the page.
 
 **Parameters:**
 
-- `reqid`
-- `variants`
-- `concurrency`
-- `maxBodyLength`
+- `route`
+- `resourceType`
+- `pageId`
 
 ## Debugging
+
+### `debugger_disable` — 关闭调试器
+
+**Description:** 关闭当前调试会话，自动恢复暂停中的页面并移除断点、清理调试监听器。
+
+**Parameters:**
+
+- `pageId`
+
+### `debugger_step` — 单步调试
+
+**Description:** 在当前暂停的调用帧上执行单步调试（into / over / out），并返回更新后的暂停状态与调用栈。
+
+**Parameters:**
+
+- `direction`
+- `includePausedInfo`
+- `includeScopes`
+- `timeout`
+- `pageId`
+
+### `debugger_wait_for_paused` — 等待断点暂停
+
+**Description:** 不占用页面执行队列地等待下一次 JavaScript 暂停事件（如断点触发或待决 pause），返回暂停原因、命中断点与调用栈。
+
+**Parameters:**
+
+- `timeout`
+- `includeScopes`
+- `pageId`
 
 ### `evaluate_on_callframe` — 在调用帧上执行
 
@@ -391,20 +326,27 @@
 
 - `expression`
 - `frameIndex`
+- `pageId`
 
 ### `evaluate_script` — evaluate_script
 
-**Description:** 在页面上执行 JavaScript；支持 page / content-script 上下文。可选的，对于较大的结果可将输出保存到文件。
+**Description:** 在页面上执行 JavaScript（支持 inline function 或本地 sourcePath 文件，支持按 function / script 模式解释、传入元素 uid args、处理执行期间弹窗及保存到文件）。
 
 **Parameters:**
 
 - `function`
+- `sourcePath`
+- `format`
+- `args`
 - `context`
 - `frameId`
 - `allowAnyFrame`
 - `verbose`
 - `filePath`
+- `dialogAction`
+- `waitForStableDom`
 - `timeoutMs`
+- `pageId`
 
 ### `get_console_message` — get_console_message
 
@@ -413,32 +355,37 @@
 **Parameters:**
 
 - `msgid`
+- `pageId`
 
 ### `get_css_styles` — 获取CSS层叠样式
 
-**Description:** 获取指定元素匹配的 CSS 规则、内联样式、伪元素与继承样式及层叠（cascade）信息，标注每个声明是生效（active）还是被覆盖（overloaded）。常用于排查元素隐藏/反爬样式与样式覆盖冲突。支持分页。
+**Description:** 获取指定元素匹配的 CSS 规则、内联样式、伪元素与继承样式及层叠（cascade）信息，支持通过 take_snapshot uid 或定位器指定元素。
 
 **Parameters:**
 
+- `uid`
 - `selector`
 - `pageSize`
 - `pageIdx`
+- `pageId`
 
 ### `get_paused_info` — 获取暂停信息
 
-**Description:** 获取当前暂停状态信息，包括调用栈、当前位置和作用域变量。在断点命中后使用此工具了解执行上下文。
+**Description:** 获取当前暂停状态信息，包括调用栈、当前位置和作用域变量。在断点命中后使用此工具了解执行上下文；设置 scopeFrames="all" 可额外展开全部调用帧的 local 局部变量摘要。
 
 **Parameters:**
 
 - `includeScopes`
-
-### `inspect_locals` — 检查局部变量
-
-**Description:** 检查当前暂停栈所有帧的局部变量摘要。
+- `scopeFrames`
+- `pageId`
 
 ### `list_breakpoints` — 列出断点
 
 **Description:** 列出当前调试会话中的所有活跃断点。
+
+**Parameters:**
+
+- `pageId`
 
 ### `list_console_messages` — list_console_messages
 
@@ -450,22 +397,40 @@
 - `pageIdx`
 - `types`
 - `includePreservedMessages`
+- `includeStackTraces`
+- `pageId`
 
 ### `list_frames` — 列出 Frame
 
 **Description:** 以树形结构列出当前页面中的所有 Frame（含 iframe），显示索引、名称与 URL。使用 select_frame 可将执行上下文切换到指定 Frame。
 
+**Parameters:**
+
+- `pageId`
+
 ### `pause` — 暂停执行
 
 **Description:** 暂停 JavaScript 执行。用于中断运行中的代码。
+
+**Parameters:**
+
+- `pageId`
 
 ### `record_start` — 开始轨迹录制
 
 **Description:** 启动用户交互轨迹录制器。在当前活动页面注入监听，实时捕获点击、输入、改动等行为，准备与网络请求关联沉淀 Operation Evidence。
 
+**Parameters:**
+
+- `pageId`
+
 ### `record_stop` — 停止轨迹录制
 
 **Description:** 停止用户交互轨迹录制器，提取记录的所有用户点击/输入步骤，并与捕获的网络因果请求关联输出 Operation Evidence。
+
+**Parameters:**
+
+- `pageId`
 
 ### `remove_breakpoint` — 移除断点
 
@@ -474,10 +439,15 @@
 **Parameters:**
 
 - `breakpointId`
+- `pageId`
 
 ### `resume` — 恢复执行
 
 **Description:** 从暂停状态恢复执行，直到下一个断点或执行结束。
+
+**Parameters:**
+
+- `pageId`
 
 ### `reveal_in_devtools` — 高亮元素
 
@@ -487,18 +457,39 @@
 
 - `selector`
 - `durationMs`
+- `pageId`
+
+### `screencast_start` — 开始录屏
+
+**Description:** Starts recording a screencast (video) of the target page. The recording stops automatically after maxDurationMs and is written to the file only when it stops, so call screencast_stop to finish it.
+
+**Parameters:**
+
+- `filePath`
+- `maxDurationMs`
+- `fps`
+- `pageId`
+
+### `screencast_stop` — 停止录屏
+
+**Description:** Stops the active screencast recording on the target page.
+
+**Parameters:**
+
+- `pageId`
 
 ### `select_frame` — 选择 Frame
 
-**Description:** 选择一个 Frame（索引来自 list_frames）作为 evaluate_script、hook_function、inspect_object 等页面内 JavaScript 执行工具的运行上下文。
+**Description:** 选择一个 Frame（索引来自 list_frames）作为 evaluate_script、create_hook、inspect_object 等页面内 JavaScript 执行工具的运行上下文。
 
 **Parameters:**
 
 - `frameIdx`
+- `pageId`
 
 ### `set_breakpoint` — 设置断点
 
-**Description:** 设置 JavaScript 断点。支持按脚本 URL 或 scriptId（来自 list_scripts / search_in_sources）加行号设置，可选条件表达式。注意：优先使用 hook_function 或 trace_function 进行监控，断点需要暂停/恢复协调，在自动化流程中容易出错。
+**Description:** 设置 JavaScript 断点。支持按脚本 URL 或 scriptId（来自 list_scripts / search_in_sources）加行号设置，可选条件表达式。注意：优先使用 create_hook(type="function", inject=true) 或 trace_function 进行监控，断点需要暂停/恢复协调，在自动化流程中容易出错。
 
 **Parameters:**
 
@@ -508,45 +499,31 @@
 - `columnNumber`
 - `condition`
 - `isRegex`
+- `pageId`
 
-### `step_into` — 单步进入
+### `set_logpoints` — 设置日志点
 
-**Description:** 单步进入函数调用。用于进入函数体内部进行调试。需要先在断点暂停。返回结果默认包含暂停后的调用栈/作用域，省去再次调用 get_paused_info。
-
-**Parameters:**
-
-- `includePausedInfo`
-- `includeScopes`
-
-### `step_out` — 单步跳出
-
-**Description:** 单步跳出当前函数，继续执行直到函数返回。用于快速退出函数。需要先在断点暂停。返回结果默认包含暂停后的调用栈/作用域，省去再次调用 get_paused_info。
+**Description:** Set the complete set of logpoints on the selected page: logpoints not in the list are removed, new ones are added, and an empty list removes all. Format: <url>:<lineNumber>[:<columnNumber>] <expression>. Output appears in list_console_messages.
 
 **Parameters:**
 
-- `includePausedInfo`
-- `includeScopes`
-
-### `step_over` — 单步跳过
-
-**Description:** 单步跳过函数调用，将函数调用视为一个步骤。用于跳过函数体。需要先在断点暂停。返回结果默认包含暂停后的调用栈/作用域，省去再次调用 get_paused_info。
-
-**Parameters:**
-
-- `includePausedInfo`
-- `includeScopes`
+- `logpoints`
+- `pageId`
 
 ### `take_screenshot` — 截图
 
-**Description:** 对页面或元素进行截图。
+**Description:** 对页面或指定元素（uid / selector）进行截图，支持全页与导出文件。
 
 **Parameters:**
 
 - `format`
 - `quality`
+- `uid`
+- `selector`
 - `fullPage`
 - `filePath`
 - `timeoutMs`
+- `pageId`
 
 ## JS Reverse Engineering
 
@@ -557,6 +534,7 @@
 **Parameters:**
 
 - `features`
+- `pageId`
 
 ### `break_on_xhr` — 设置 XHR 断点
 
@@ -565,6 +543,7 @@
 **Parameters:**
 
 - `url`
+- `pageId`
 
 ### `bypass_debugger` — Bypass Debugger
 
@@ -573,6 +552,7 @@
 **Parameters:**
 
 - `targets`
+- `pageId`
 
 ### `collect_code` — collect_code
 
@@ -591,6 +571,7 @@
 - `pattern`
 - `limit`
 - `topN`
+- `pageId`
 
 ### `collect_wasm` — collect_wasm
 
@@ -604,6 +585,8 @@
 - `includeRuntimeEvents`
 - `maxModules`
 - `captureBase64`
+- `clearPrevious`
+- `pageId`
 
 ### `collection_diff` — collection_diff
 
@@ -617,7 +600,7 @@
 
 ### `create_hook` — create_hook
 
-**Description:** 推荐：为 function/fetch/xhr/property/cookie/websocket/eval/timer 创建 hook 脚本。Hook 运行时不会暂停页面执行，相比断点是更优的监控与拦截手段。返回 hookId 与 script，供 inject_hook 使用。
+**Description:** 推荐：为 function/fetch/xhr/websocket/property/event/timer/localstorage/cookie/eval/object-method/custom 创建 hook 脚本。Hook 运行时不会暂停页面执行，相比断点是更优的监控与拦截手段。默认仅生成并返回 hookId 与 script 供 inject_hook 使用；设置 inject=true 时可一步注入当前 BrowserPage（可搭配 persistent=true 注册为 PersistentHook）。
 
 **Parameters:**
 
@@ -629,6 +612,9 @@
 - `capture`
 - `condition`
 - `protocolFallback`
+- `inject`
+- `persistent`
+- `pageId`
 
 ### `dump_target_scripts` — dump_target_scripts
 
@@ -637,18 +623,6 @@
 **Parameters:**
 
 - `targetId`
-
-### `find_in_script` — 在脚本中查找
-
-**Description:** 在指定脚本中查找字符串，返回精确的行号/列号及周围上下文。适用于在压缩文件中设置断点。
-
-**Parameters:**
-
-- `scriptId`
-- `query`
-- `contextChars`
-- `occurrence`
-- `caseSensitive`
 
 ### `get_hook_data` — Get Hook Data
 
@@ -662,6 +636,7 @@
 - `type`
 - `event`
 - `phase`
+- `pageId`
 
 ### `get_request_initiator` — 获取请求发起者
 
@@ -670,6 +645,7 @@
 **Parameters:**
 
 - `requestId`
+- `pageId`
 
 ### `get_script_source` — 获取脚本源码
 
@@ -682,6 +658,7 @@
 - `filePath`
 - `startLine`
 - `endLine`
+- `pageId`
 
 ### `get_storage` — 获取存储
 
@@ -691,18 +668,7 @@
 
 - `type`
 - `filter`
-
-### `hook_function` — Hook Function
-
-**Description:** 逆向工程推荐工具：Hook 一个 JavaScript 函数，记录其调用、参数与返回值，且不暂停执行。相比断点更适用于自动化工作流，建议作为监控函数的默认手段。
-
-**Parameters:**
-
-- `target`
-- `logArgs`
-- `logResult`
-- `logStack`
-- `hookId`
+- `pageId`
 
 ### `inject_hook` — Inject Hook
 
@@ -714,6 +680,7 @@
 - `script`
 - `persistent`
 - `world`
+- `pageId`
 
 ### `inspect_object` — 检查对象
 
@@ -725,6 +692,7 @@
 - `depth`
 - `showMethods`
 - `showPrototype`
+- `pageId`
 
 ### `list_created_hooks` — List Created Hooks
 
@@ -738,10 +706,7 @@
 - `type`
 - `event`
 - `phase`
-
-### `list_hooks` — 列出 Hook
-
-**Description:** 列出当前所有已安装的函数 Hook。
+- `pageId`
 
 ### `list_persistent_hooks` — List Persistent Hooks
 
@@ -754,6 +719,7 @@
 **Parameters:**
 
 - `filter`
+- `pageId`
 
 ### `list_targets` — list_targets
 
@@ -768,15 +734,17 @@
 - `selector`
 - `events`
 - `monitorId`
+- `pageId`
 
 ### `remove_hook` — remove_hook
 
-**Description:** 按 ID 移除 hook。会从进程内 HookManager 删除，并可选地清理浏览器端数据。
+**Description:** 按 ID 移除 hook：从进程内 HookManager 与 PageHookStore 删除，并在浏览器侧还原已包裹的 PageHook 原函数引用、清理 __hookStore 数据。
 
 **Parameters:**
 
 - `hookId`
 - `cleanBrowser`
+- `pageId`
 
 ### `remove_xhr_breakpoint` — 移除 XHR 断点
 
@@ -785,24 +753,18 @@
 **Parameters:**
 
 - `url`
-
-### `search_in_scripts` — search_in_scripts
-
-**Description:** 使用正则表达式在已收集的脚本缓存中搜索。
-
-**Parameters:**
-
-- `pattern`
-- `limit`
-- `maxTotalSize`
+- `pageId`
 
 ### `search_in_sources` — 在源码中搜索
 
-**Description:** 在所有已加载的 JavaScript 源码中搜索字符串或正则表达式。每条匹配仅返回脚本 ID、行号与源码缓存路径（sourcePath），避免上下文臃肿；需要查看代码内容时直接读取 sourcePath 或调用 get_script_source(scriptId, startLine, endLine)。可选 filePath 参数（目录）可将每个匹配脚本的源码写入该目录（<filePath>/<scriptId>.js）并返回绝对路径。
+**Description:** 在已加载的 JavaScript 源码中搜索字符串或正则表达式。全局搜索每条匹配返回脚本 ID、行号与源码缓存路径（sourcePath）；传入 scriptId 时进入单脚本精确定位模式，返回精确列号（columnNumber）、字符偏移与上下文片段（适用于压缩单行文件设断点）。可选 filePath 参数（目录）可将每个匹配脚本的源码写入该目录（<filePath>/<scriptId>.js）并返回绝对路径。
 
 **Parameters:**
 
 - `query`
+- `scriptId`
+- `occurrence`
+- `contextChars`
 - `caseSensitive`
 - `isRegex`
 - `maxResults`
@@ -810,10 +772,11 @@
 - `urlFilter`
 - `source`
 - `filePath`
+- `pageId`
 
 ### `set_breakpoint_on_text` — 在文本上设置断点
 
-**Description:** 在指定代码文本（函数名、语句等）上设置断点，通过搜索自动确定精确位置。适用于正常和压缩文件。注意：优先使用 hook_function 监控函数调用 — 它无需暂停执行即可捕获参数/返回值。仅在需要检查特定代码位置的局部变量时使用此工具。
+**Description:** 在指定代码文本（函数名、语句等）上设置断点，通过搜索自动确定精确位置。适用于正常和压缩文件。注意：优先使用 create_hook(type="function", inject=true) 监控函数调用 — 它无需暂停执行即可捕获参数/返回值。仅在需要检查特定代码位置的局部变量时使用此工具。
 
 **Parameters:**
 
@@ -821,6 +784,7 @@
 - `urlFilter`
 - `occurrence`
 - `condition`
+- `pageId`
 
 ### `stop_monitor` — 停止监控
 
@@ -829,6 +793,7 @@
 **Parameters:**
 
 - `monitorId`
+- `pageId`
 
 ### `trace_function` — 追踪函数
 
@@ -842,14 +807,7 @@
 - `logResult`
 - `logStack`
 - `hookId`
-
-### `unhook_function` — Unhook Function
-
-**Description:** 移除已安装的函数 Hook。
-
-**Parameters:**
-
-- `hookId`
+- `pageId`
 
 ### `wasm_dump` — wasm_dump
 
@@ -860,28 +818,113 @@
 - `moduleIndex`
 - `outputPath`
 
-### `wasm_memory_inspect` — wasm_memory_inspect
-
-**Description:** 检查当前页面中导出的 WebAssembly.Memory —— 提供 hex/ascii 转储与模式搜索。
-
-**Parameters:**
-
-- `offset`
-- `length`
-- `format`
-- `searchPattern`
-- `timeoutMs`
-
 ### `wasm_vmp_trace` — wasm_vmp_trace
 
-**Description:** 追踪由 JS-Wasm 边界 hook 捕获的 Wasm 运行时事件，可选按模块过滤。
+**Description:** 追踪由 JS-Wasm 边界 hook 捕获的 Wasm 运行时事件，默认从当前页面增量拉取最新事件，可选按模块过滤。
 
 **Parameters:**
 
 - `maxEvents`
 - `filterModule`
+- `refresh`
+- `pageId`
 
 ## Input automation
+
+### `click` — 点击元素
+
+**Description:** 点击页面元素，支持单击与双击。支持由 take_snapshot 产生的 uid（推荐）或传统定位器（CSS、role=、text=、xpath=）。
+
+**Parameters:**
+
+- `uid`
+- `selector`
+- `dblClick`
+- `includeSnapshot`
+- `timeoutMs`
+- `pageId`
+
+### `click_at` — 坐标点击
+
+**Description:** 使用 CDP Input.dispatchMouseEvent 在指定视口坐标 (x, y) 或元素 (uid/selector) 中心处派发真实鼠标点击事件，适用于 Canvas 或普通点击被拦截的场景。
+
+**Parameters:**
+
+- `x`
+- `y`
+- `uid`
+- `selector`
+- `dblClick`
+- `includeSnapshot`
+- `pageId`
+
+### `drag` — 拖拽元素
+
+**Description:** 通过鼠标事件将元素从源位置（fromUid/fromSelector）拖拽到目标位置（toUid/toSelector）。
+
+**Parameters:**
+
+- `fromUid`
+- `toUid`
+- `fromSelector`
+- `toSelector`
+- `includeSnapshot`
+- `pageId`
+
+### `fill` — 填充输入
+
+**Description:** 向输入或选择控件填入值，<select> 自动调用 selectOption，复选框/开关/单选支持布尔值切换。支持由 take_snapshot 产生的 uid（推荐）或传统定位器。
+
+**Parameters:**
+
+- `uid`
+- `selector`
+- `value`
+- `includeSnapshot`
+- `timeoutMs`
+- `pageId`
+
+### `fill_form` — 批量填充表单
+
+**Description:** 在一次调用中批量填充多个表单元素，每个条目支持通过 uid（推荐）或 selector 定位，自动处理 <select> 与复选框。
+
+**Parameters:**
+
+- `elements`
+- `includeSnapshot`
+- `timeoutMs`
+- `pageId`
+
+### `handle_dialog` — handle_dialog
+
+**Description:** 处理浏览器弹窗（alert/confirm/prompt），可接收或取消。
+
+**Parameters:**
+
+- `action`
+- `promptText`
+- `pageId`
+
+### `hover` — 悬停元素
+
+**Description:** 将鼠标悬停在指定元素上。支持由 take_snapshot 产生的 uid（推荐）或传统定位器（CSS、role=、text=、xpath=）。
+
+**Parameters:**
+
+- `uid`
+- `selector`
+- `includeSnapshot`
+- `pageId`
+
+### `press_key` — 按键
+
+**Description:** 按下键盘按键或组合键（如 "Enter"、"Control+A"、"Alt+Shift+F"），支持修饰键。
+
+**Parameters:**
+
+- `key`
+- `includeSnapshot`
+- `pageId`
 
 ### `scroll_by` — scroll_by
 
@@ -891,6 +934,20 @@
 
 - `direction`
 - `pixels`
+- `pageId`
+
+### `upload_file` — 上传文件
+
+**Description:** 向 file input 元素上传单个或多个文件，支持 uid（推荐）与 selector 双模定位；依次尝试 Playwright 原生 setInputFiles、filechooser 事件模式及 CDP DOM.setFileInputFiles 三级降级。
+
+**Parameters:**
+
+- `uid`
+- `selector`
+- `filePath`
+- `filePaths`
+- `includeSnapshot`
+- `pageId`
 
 ### `wait_for_element` — wait_for_element
 
@@ -900,25 +957,27 @@
 
 - `selector`
 - `timeout`
+- `pageId`
 
 ## Emulation
 
-### `emulate_mobile` — emulate_mobile
+### `emulate` — 环境仿真
 
-**Description:** 模拟移动设备视口、User-Agent 与触摸事件，或恢复桌面模式。
-
-**Parameters:**
-
-- `enable`
-- `device`
-
-### `emulate_network` — emulate_network
-
-**Description:** 通过 CDP Network.emulateNetworkConditions 模拟网络条件（节流/离线）。
+**Description:** Emulates various features on the target page (network, CPU throttling, geolocation, userAgent, media features, viewport, extraHttpHeaders). Each call replaces all emulation settings (except extraHttpHeaders), so pass all desired settings in a single call.
 
 **Parameters:**
 
-- `throttlingOption`
+- `networkConditions`
+- `cpuThrottlingRate`
+- `geolocation`
+- `userAgent`
+- `colorScheme`
+- `forcedColors`
+- `prefersContrast`
+- `prefersReducedMotion`
+- `viewport`
+- `extraHttpHeaders`
+- `pageId`
 
 ### `resize_page` — resize_page
 
@@ -928,25 +987,51 @@
 
 - `width`
 - `height`
+- `pageId`
 
-## Screenshot
+## DOM manipulation
 
-### `video` — 视频录制
+### `find_clickable_elements` — 查找可点击元素
 
-**Description:** Record and manage browser session video via CDP screencast. Supports start, stop, status, save, read, list, discard, and capabilities.
+**Description:** 查找当前页面中可点击的按钮与链接，可按文本内容过滤，返回选择器、文本、类型、可见性与包围盒。
 
 **Parameters:**
 
-- `action`
-- `recording_id`
-- `tab_id`
-- `session_id`
-- `quality`
-- `max_duration_ms`
-- `request_id`
-- `output`
-- `overwrite`
-- `offset`
+- `filterText`
+- `pageId`
+
+### `get_dom_structure` — 获取DOM结构
+
+**Description:** 获取当前页面的 DOM 树结构，返回包含标签名、ID、类名及可选文本内容的层级树。
+
+**Parameters:**
+
+- `maxDepth`
+- `includeText`
+- `pageId`
+
+### `query_dom` — 查询DOM元素
+
+**Description:** 通过定位器查询一个或多个 DOM 元素，返回包含标签、属性、包围盒与可见性的结构化信息。定位器支持 CSS、role=、text=、xpath=。多匹配时用 >> nth=N 消歧。
+
+**Parameters:**
+
+- `selector`
+- `all`
+- `limit`
+- `pageId`
+
+### `take_snapshot` — 获取页面语义快照
+
+**Description:** 获取当前页面的紧凑无障碍语义快照（TextSnapshot）。为每个交互控件分配数字 UID（如 1_4），可直接用于 click、fill、hover 等操作，支持保存到文件以节省上下文。
+
+**Parameters:**
+
+- `mode`
+- `verbose`
+- `interestingOnly`
+- `filePath`
+- `pageId`
 
 ## Pages
 
@@ -962,15 +1047,7 @@
 
 - `action`
 - `timeout`
-
-### `handle_dialog` — handle_dialog
-
-**Description:** 处理浏览器弹窗（alert/confirm/prompt），可接收或取消。
-
-**Parameters:**
-
-- `action`
-- `promptText`
+- `pageId`
 
 ## Diagnostics
 

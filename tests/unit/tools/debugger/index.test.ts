@@ -7,12 +7,12 @@
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
-import {selectExecutionContext} from '../../../../src/tools/debugger/contextSelector.js';
-import {createExecutionContextInfo} from '../../../../src/tools/debugger/executionContexts.js';
+import {selectExecutionContext} from '../../../../src/tools/debugger.js';
+import {createExecutionContextInfo} from '../../../../src/tools/debugger.js';
 import {
   breakOnXhr,
+  debuggerStep,
   evaluateOnCallframe,
-  findInScript,
   getPausedInfo,
   getRequestInitiator,
   getScriptSource,
@@ -24,11 +24,8 @@ import {
   resume,
   searchInSources,
   setBreakpoint,
-  stepInto,
-  stepOut,
-  stepOver,
   traceFunction,
-} from '../../../../src/tools/debugger/index.js';
+} from '../../../../src/tools/debugger.js';
 import type {ToolDefinition} from '../../../../src/tools/ToolDefinition.js';
 import {ToolError} from '../../../../src/utils/errors.js';
 
@@ -400,7 +397,7 @@ describe('src/tools/debugger/index.ts', () => {
       context,
     );
     const findLines = await callTool(
-      findInScript,
+      searchInSources,
       {
         scriptId: '1',
         query: 'token',
@@ -509,9 +506,21 @@ describe('src/tools/debugger/index.ts', () => {
     );
     const pauseLines = await callTool(pause, {}, context);
     const resumeLines = await callTool(resume, {}, context);
-    const stepIntoLines = await callTool(stepInto, {}, context);
-    const stepOverLines = await callTool(stepOver, {}, context);
-    const stepOutLines = await callTool(stepOut, {}, context);
+    const stepIntoLines = await callTool(
+      debuggerStep,
+      {direction: 'into'},
+      context,
+    );
+    const stepOverLines = await callTool(
+      debuggerStep,
+      {direction: 'over'},
+      context,
+    );
+    const stepOutLines = await callTool(
+      debuggerStep,
+      {direction: 'out'},
+      context,
+    );
     const xhrLines = await callTool(breakOnXhr, {url: '/api'}, context);
     const xhrRemoveLines = await callTool(
       removeXhrBreakpoint,
@@ -539,9 +548,9 @@ describe('src/tools/debugger/index.ts', () => {
     assert.match(evalText, /cf-1:token/);
     assert.match(pauseText, /暂停/);
     assert.match(resumeText, /恢复/);
-    assert.match(stepIntoText, /单步进入/);
-    assert.match(stepOverText, /单步跳过/);
-    assert.match(stepOutText, /单步跳出/);
+    assert.match(stepIntoText, /into/);
+    assert.match(stepOverText, /over/);
+    assert.match(stepOutText, /out/);
     assert.match(xhrText, /XHR/);
     assert.match(xhrRemoveText, /XHR/);
     assert.match(initiatorText, /script/);
@@ -746,7 +755,7 @@ describe('src/tools/debugger/index.ts', () => {
     // Regression: these stub tools were never implemented and must not
     // appear as exports or in the generated tool registry.
     const debuggerModule =
-      await import('../../../../src/tools/debugger/index.js');
+      await import('../../../../src/tools/debugger.js');
     assert.equal(
       'startContinuousDebugging' in debuggerModule,
       false,

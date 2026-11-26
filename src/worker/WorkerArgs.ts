@@ -4,147 +4,56 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {
+  CONFIG_OPTIONS,
+  toKebabCase,
+  type ConfigOptionMeta,
+} from '../config/options.js';
 import type {GlobalConfig} from '../config.js';
 import type {WorkerStartOptions} from '../types/platform.js';
 
 type ResolvedWorkerConfig = Required<Pick<WorkerStartOptions, 'headless'>> &
   Pick<WorkerStartOptions, 'browserUrl' | 'wsEndpoint' | 'executablePath'>;
 
-const BOOLEAN_FLAG_MAP: Record<string, keyof GlobalConfig> = {
-  // 核心隐身与模式
-  '--headless': 'headless',
-  '--cloak': 'cloak',
-  '--js-stealth': 'jsStealth',
-  '--jsstealth': 'jsStealth',
-  '--full-stealth-args': 'fullStealthArgs',
-  '--fullstealthargs': 'fullStealthArgs',
-  '--minimal-stealth': 'minimalStealth',
-  '--minimalstealth': 'minimalStealth',
-  '--auto-connect': 'autoConnect',
-  '--autoconnect': 'autoConnect',
-  '--isolated': 'isolated',
-  '--accept-insecure-certs': 'acceptInsecureCerts',
-  '--acceptinsecurecerts': 'acceptInsecureCerts',
+const BOOLEAN_FLAG_MAP: Record<string, keyof GlobalConfig> = {};
+const VALUE_FLAG_MAP: Record<string, keyof GlobalConfig> = {};
+const ARRAY_FLAG_MAP: Record<string, keyof GlobalConfig> = {};
 
-  // 工具分类开关 (Category flags)
-  '--category-input': 'categoryInput',
-  '--categoryinput': 'categoryInput',
-  '--category-navigation': 'categoryNavigation',
-  '--categorynavigation': 'categoryNavigation',
-  '--category-emulation': 'categoryEmulation',
-  '--categoryemulation': 'categoryEmulation',
-  '--category-performance': 'categoryPerformance',
-  '--categoryperformance': 'categoryPerformance',
-  '--category-network': 'categoryNetwork',
-  '--categorynetwork': 'categoryNetwork',
-  '--category-debugging': 'categoryDebugging',
-  '--categorydebugging': 'categoryDebugging',
-  '--category-extensions': 'categoryExtensions',
-  '--categoryextensions': 'categoryExtensions',
-  '--category-experimental-third-party': 'categoryExperimentalThirdParty',
-  '--categoryexperimentalthirdparty': 'categoryExperimentalThirdParty',
-  '--category-memory': 'categoryMemory',
-  '--categorymemory': 'categoryMemory',
-  '--category-experimental-webmcp': 'categoryExperimentalWebmcp',
-  '--categoryexperimentalwebmcp': 'categoryExperimentalWebmcp',
-  '--category-pwa': 'categoryPwa',
-  '--categorypwa': 'categoryPwa',
+/** 仅由 config.json / 内部承载、不作为 CLI flag 解析的复合字段 */
+const NON_CLI_CONFIG_KEYS = new Set<keyof GlobalConfig>([
+  'browser',
+  'toolResultRecording',
+  'runtimeDirName',
+  'debug',
+  'logLevel',
+  'outputDir',
+]);
 
-  // 截图与视觉
-  '--experimental-vision': 'experimentalVision',
-  '--experimentalvision': 'experimentalVision',
+for (const [key, meta] of Object.entries(CONFIG_OPTIONS) as Array<
+  [keyof GlobalConfig, ConfigOptionMeta]
+>) {
+  if (NON_CLI_CONFIG_KEYS.has(key)) continue;
 
-  // 调试与实验特性
-  '--experimental-devtools': 'experimentalDevtools',
-  '--experimentaldevtools': 'experimentalDevtools',
-  '--memory-debugging': 'memoryDebugging',
-  '--memorydebugging': 'memoryDebugging',
-  '--experimental-memory': 'experimentalMemory',
-  '--experimentalmemory': 'experimentalMemory',
-  '--experimental-include-all-pages': 'experimentalIncludeAllPages',
-  '--experimentalincludeallpages': 'experimentalIncludeAllPages',
-  '--experimental-screencast': 'experimentalScreencast',
-  '--experimentalscreencast': 'experimentalScreencast',
-  '--performance-crux': 'performanceCrux',
-  '--performancecrux': 'performanceCrux',
-  '--usage-statistics': 'usageStatistics',
-  '--usagestatistics': 'usageStatistics',
-  '--javascript-evaluation': 'javascriptEvaluation',
-  '--javascriptevaluation': 'javascriptEvaluation',
-  '--file-navigations': 'fileNavigations',
-  '--filenavigations': 'fileNavigations',
-  '--source-maps': 'sourceMaps',
-  '--sourcemaps': 'sourceMaps',
-  '--redact-network-headers': 'redactNetworkHeaders',
-  '--redactnetworkheaders': 'redactNetworkHeaders',
+  const targetMap =
+    meta.type === 'boolean'
+      ? BOOLEAN_FLAG_MAP
+      : meta.type === 'array'
+        ? ARRAY_FLAG_MAP
+        : VALUE_FLAG_MAP;
 
-  // 工作区与配置监听
-  '--allow-unrestricted-paths': 'allowUnrestrictedPaths',
-  '--allowunrestrictedpaths': 'allowUnrestrictedPaths',
-  '--watch-config': 'watchConfig',
-  '--watchconfig': 'watchConfig',
-};
+  const camelFlag = `--${String(key).toLowerCase()}`;
+  const kebabFlag = `--${toKebabCase(String(key)).toLowerCase()}`;
+  targetMap[camelFlag] = key;
+  targetMap[kebabFlag] = key;
 
-const VALUE_FLAG_MAP: Record<string, keyof GlobalConfig> = {
-  // 短别名
-  '-u': 'browserUrl',
-  '-w': 'wsEndpoint',
-  '-e': 'executablePath',
-
-  // 浏览器连接
-  '--browserurl': 'browserUrl',
-  '--browser-url': 'browserUrl',
-  '--executablepath': 'executablePath',
-  '--executable-path': 'executablePath',
-  '--wsendpoint': 'wsEndpoint',
-  '--ws-endpoint': 'wsEndpoint',
-  '--wsheaders': 'wsHeaders',
-  '--ws-headers': 'wsHeaders',
-  '--userdatadir': 'userDataDir',
-  '--user-data-dir': 'userDataDir',
-  '--channel': 'channel',
-  '--proxyserver': 'proxyServer',
-  '--proxy-server': 'proxyServer',
-
-  // 截图与性能
-  '--screenshotformat': 'screenshotFormat',
-  '--screenshot-format': 'screenshotFormat',
-  '--screenshotquality': 'screenshotQuality',
-  '--screenshot-quality': 'screenshotQuality',
-  '--screenshotmaxwidth': 'screenshotMaxWidth',
-  '--screenshot-max-width': 'screenshotMaxWidth',
-  '--screenshotmaxheight': 'screenshotMaxHeight',
-  '--screenshot-max-height': 'screenshotMaxHeight',
-  '--maxnavigationsaved': 'maxNavigationSaved',
-  '--max-navigation-saved': 'maxNavigationSaved',
-
-  // 调试与录屏
-  '--logfile': 'logFile',
-  '--log-file': 'logFile',
-  '--experimentalffmpegpath': 'experimentalFfmpegPath',
-  '--experimental-ffmpeg-path': 'experimentalFfmpegPath',
-  '--screencastfps': 'screencastFps',
-  '--screencast-fps': 'screencastFps',
-  '--experimentalscreencastfps': 'experimentalScreencastFps',
-  '--experimental-screencast-fps': 'experimentalScreencastFps',
-
-  // 配置
-  '--config': 'config',
-};
-
-const ARRAY_FLAG_MAP: Record<string, keyof GlobalConfig> = {
-  '--chromearg': 'chromeArg',
-  '--chrome-arg': 'chromeArg',
-  '--ignoredefaultchromearg': 'ignoreDefaultChromeArg',
-  '--ignore-default-chrome-arg': 'ignoreDefaultChromeArg',
-  '--blockedurlpattern': 'blockedUrlPattern',
-  '--blocked-url-pattern': 'blockedUrlPattern',
-  '--allowedurlpattern': 'allowedUrlPattern',
-  '--allowed-url-pattern': 'allowedUrlPattern',
-  '--workspace': 'workspace',
-  '--filesystemroot': 'filesystemRoot',
-  '--filesystem-root': 'filesystemRoot',
-};
+  if (meta.alias) {
+    const aliases = Array.isArray(meta.alias) ? meta.alias : [meta.alias];
+    for (const alias of aliases) {
+      const flag = alias.length === 1 ? `-${alias}` : `--${alias.toLowerCase()}`;
+      targetMap[flag] = key;
+    }
+  }
+}
 
 function normalizeKey(flag: string): string {
   return flag.toLowerCase();

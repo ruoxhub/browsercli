@@ -1,3 +1,8 @@
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
 // Token estimate for observation budgets (`--max-tokens`).
 //
 // Real tokenizers (o200k, cl100k) first split text into pieces with a regex
@@ -27,7 +32,7 @@
 // more for CJK text, and newer Claude tokenizers are reported to need more
 // tokens than o200k for the same text.
 
-export const TOKEN_ESTIMATOR = "vom-pretok-v2";
+export const TOKEN_ESTIMATOR = 'vom-pretok-v2';
 
 /** Multiplier on the central estimate so a budget errs high, not low. */
 const SAFETY_FACTOR = 1.05;
@@ -41,15 +46,15 @@ const MARK = /\p{M}/u;
 
 /** English function words: their share tells English text from other Latin-script languages. */
 const ENGLISH_FUNCTION_WORDS = new Set(
-  "a about after all also an and are as at be been before but by can do does for from had has have if in into is it its more no not of on or than that the their these they this those to was we were what when which will with you your".split(
-    " ",
+  'a about after all also an and are as at be been before but by can do does for from had has have if in into is it its more no not of on or than that the their these they this those to was we were what when which will with you your'.split(
+    ' ',
   ),
 );
 const ENGLISH_MIN_SHARE = 0.1;
 
 /** Common characters that exist only in Traditional Chinese; their presence marks costlier Han text. */
 const TRADITIONAL_ONLY = new Set(
-  "這個們為會說時開關選擇設資訊頁點錄載動號碼應該與對見後從際實現發經過還進給覺長間問題無來東車書電話網線讀寫請認識處檔畫視窗區單擊顯啟儲體驗證權據傳輸複製連結帳戶務歷種類標籤屬隱藏圖裝備註冊維護輕鬆試產專業學習師議並節員總統勢況環遠運氣燈萬億態濟術輯稱擁樣變價買賣廣層頭慣歡邊",
+  '這個們為會說時開關選擇設資訊頁點錄載動號碼應該與對見後從際實現發經過還進給覺長間問題無來東車書電話網線讀寫請認識處檔畫視窗區單擊顯啟儲體驗證權據傳輸複製連結帳戶務歷種類標籤屬隱藏圖裝備註冊維護輕鬆試產專業學習師議並節員總統勢況環遠運氣燈萬億態濟術輯稱擁樣變價買賣廣層頭慣歡邊',
 );
 
 /**
@@ -58,15 +63,16 @@ const TRADITIONAL_ONLY = new Set(
  * curves (which would treat `navigation` on a non-English page as foreign).
  */
 const VOM_WORDS = new Map<string, number>();
-for (const word of "alert article banner button canvas cell checkbox checked complementary ctx definition dialog directory disabled document empty feed figure filled first focus form generic grid group heading hover iframe img layers link list main menu mixed more navigation nodes none option page paragraph placeholder presentation radio region row scrollbar search section separator slider status switch tab table term textarea textbox toolbar tooltip tree unchecked view vom".split(
-  " ",
+for (const word of 'alert article banner button canvas cell checkbox checked complementary ctx definition dialog directory disabled document empty feed figure filled first focus form generic grid group heading hover iframe img layers link list main menu mixed more navigation nodes none option page paragraph placeholder presentation radio region row scrollbar search section separator slider status switch tab table term textarea textbox toolbar tooltip tree unchecked view vom'.split(
+  ' ',
 ))
   VOM_WORDS.set(word, 1);
-for (const word of "alertdialog columnheader combobox contentinfo gridcell listbox listitem menubar menuitem occluded progressbar rowgroup rowheader searchbox spinbutton tablist tabpanel treeitem".split(
-  " ",
+for (const word of 'alertdialog columnheader combobox contentinfo gridcell listbox listitem menubar menuitem occluded progressbar rowgroup rowheader searchbox spinbutton tablist tabpanel treeitem'.split(
+  ' ',
 ))
   VOM_WORDS.set(word, 2);
-for (const word of ["menuitemcheckbox", "menuitemradio", "radiogroup"]) VOM_WORDS.set(word, 3);
+for (const word of ['menuitemcheckbox', 'menuitemradio', 'radiogroup'])
+  VOM_WORDS.set(word, 3);
 
 /**
  * The 150 most common letter pairs in English and other Latin-script UI text
@@ -74,8 +80,8 @@ for (const word of ["menuitemcheckbox", "menuitemradio", "radiogroup"]) VOM_WORD
  * ids (`qwertyuiopasdf`, `hhcmgoofomhg…`) are not, and cost ~1.9 letters per token.
  */
 const COMMON_BIGRAMS = new Set(
-  "ab ac ad ag ai al am an ap ar as at au av be bl bo br bs bu ca ce ch ci ck cl co cr ct da de di do ea ec ed ee ei el em en ep er es et ex fi fo ge gi ha he hi ho ia ic id ie ig il im in io ir is it ke la ld le li ll lo lu ma me mi mo mp na nc nd ne ng ni nn no ns nt nu oc ol om on op or os ot ou ov ow ox pa pe pl po pr pt qu ra rd re ri ro rs rt ru sa sc se sh si sk so ss st su ta te th ti to tr ts tt tu ue ui ul un up ur us ut va ve vi wi ws xt".split(
-    " ",
+  'ab ac ad ag ai al am an ap ar as at au av be bl bo br bs bu ca ce ch ci ck cl co cr ct da de di do ea ec ed ee ei el em en ep er es et ex fi fo ge gi ha he hi ho ia ic id ie ig il im in io ir is it ke la ld le li ll lo lu ma me mi mo mp na nc nd ne ng ni nn no ns nt nu oc ol om on op or os ot ou ov ow ox pa pe pl po pr pt qu ra rd re ri ro rs rt ru sa sc se sh si sk so ss st su ta te th ti to tr ts tt tu ue ui ul un up ur us ut va ve vi wi ws xt'.split(
+    ' ',
   ),
 );
 const OPAQUE_MIN_LETTERS = 8;
@@ -142,7 +148,7 @@ function isHangul(cp: number): boolean {
 }
 
 /** One pass over the pieces: is this English text, and does it contain Traditional-only Han? */
-function scanText(pieces: string[]): { english: boolean; traditional: boolean } {
+function scanText(pieces: string[]): {english: boolean; traditional: boolean} {
   let words = 0;
   let functionWords = 0;
   let traditional = false;
@@ -151,7 +157,10 @@ function scanText(pieces: string[]): { english: boolean; traditional: boolean } 
     const c = piece.charCodeAt(start) | 0x20;
     if (c >= 0x61 && c <= 0x7a) {
       words++;
-      if (piece.length - start <= 6 && ENGLISH_FUNCTION_WORDS.has(piece.slice(start).toLowerCase()))
+      if (
+        piece.length - start <= 6 &&
+        ENGLISH_FUNCTION_WORDS.has(piece.slice(start).toLowerCase())
+      )
         functionWords++;
     } else if (!traditional && piece.charCodeAt(start) >= 0x3400) {
       for (const ch of piece) {
@@ -162,12 +171,16 @@ function scanText(pieces: string[]): { english: boolean; traditional: boolean } 
       }
     }
   }
-  return { english: words > 0 && functionWords / words >= ENGLISH_MIN_SHARE, traditional };
+  return {
+    english: words > 0 && functionWords / words >= ENGLISH_MIN_SHARE,
+    traditional,
+  };
 }
 
 /** Weight of a non-ASCII code point that is not a letter or a CJK character. */
 function symbolWeight(cp: number): number {
-  if ((cp >= 0xfe00 && cp <= 0xfe0f) || (cp >= 0xe0100 && cp <= 0xe01ef)) return W.modifier;
+  if ((cp >= 0xfe00 && cp <= 0xfe0f) || (cp >= 0xe0100 && cp <= 0xe01ef))
+    return W.modifier;
   if (
     (cp >= 0x2000 && cp <= 0x206f) ||
     (cp >= 0x3000 && cp <= 0x303f) ||
@@ -204,7 +217,8 @@ function wordCost(
   english: boolean,
   opaque: boolean,
 ): number {
-  if (letters >= W.identifierLength || opaque) return letters / W.identifierCharsPerToken;
+  if (letters >= W.identifierLength || opaque)
+    return letters / W.identifierCharsPerToken;
   let cost: number;
   if (upper > 1 && upper === letters) {
     cost = 1 + (letters - 2) * W.allCapsPerChar;
@@ -226,10 +240,14 @@ function wordCost(
   return cost + nonAscii * W.nonAsciiLetter;
 }
 
-function pieceCost(piece: string, english: boolean, traditional: boolean): number {
+function pieceCost(
+  piece: string,
+  english: boolean,
+  traditional: boolean,
+): number {
   const first = piece.charCodeAt(0);
   if (first >= 0x30 && first <= 0x39) return 1; // digit group (at most three)
-  if (piece.trim() === "") return 1; // whitespace or newline run
+  if (piece.trim() === '') return 1; // whitespace or newline run
 
   let han = 0;
   let kana = 0;
@@ -265,12 +283,17 @@ function pieceCost(piece: string, english: boolean, traditional: boolean): numbe
       const ch = String.fromCodePoint(cp);
       // A combining mark belongs to the letter before it (decomposed accents);
       // anywhere else (an emoji's U+FE0F) it is a modifier, not a letter.
-      if (LETTER.test(ch) || (letters > 0 && MARK.test(ch) && symbolWeight(cp) !== W.modifier)) {
+      if (
+        LETTER.test(ch) ||
+        (letters > 0 && MARK.test(ch) && symbolWeight(cp) !== W.modifier)
+      ) {
         letters++;
         nonAscii++;
       } else {
         const weight =
-          MARK.test(ch) && symbolWeight(cp) !== W.modifier ? W.modifier : symbolWeight(cp);
+          MARK.test(ch) && symbolWeight(cp) !== W.modifier
+            ? W.modifier
+            : symbolWeight(cp);
         wide += weight;
         if (start === 0) {
           glued = true;
@@ -285,7 +308,8 @@ function pieceCost(piece: string, english: boolean, traditional: boolean): numbe
   if (han + kana + hangul > 0) {
     let cost = (glued ? W.gluedPrefix : 0) + extraWide;
     if (kana > 0) cost += W.kanaBase + (kana + han) * W.kana;
-    else if (han > 0) cost += W.hanBase + han * (traditional ? W.hanTraditional : W.han);
+    else if (han > 0)
+      cost += W.hanBase + han * (traditional ? W.hanTraditional : W.han);
     if (hangul > 0) cost += W.hangulBase + hangul * W.hangul;
     return cost + letters / 4;
   }
@@ -293,12 +317,15 @@ function pieceCost(piece: string, english: boolean, traditional: boolean): numbe
     const ascii = symbols > 0 ? 1 + Math.max(0, symbols - 2) * W.punctExtra : 0;
     return Math.max(1, ascii + wide);
   }
-  if (piece === "@e") return 2; // VOM ref marker at the start of a line: `@` and `e`
-  const opaque = letters >= OPAQUE_MIN_LETTERS && nonAscii === 0 && isOpaque(piece);
+  if (piece === '@e') return 2; // VOM ref marker at the start of a line: `@` and `e`
+  const opaque =
+    letters >= OPAQUE_MIN_LETTERS && nonAscii === 0 && isOpaque(piece);
   const word = wordCost(letters, upper, nonAscii, english, opaque);
   if (glued || wide > 0) return W.gluedPrefix + extraWide + word;
   if (upper === 0 && nonAscii === 0) {
-    const known = VOM_WORDS.get(piece.charCodeAt(0) === 0x20 ? piece.slice(1) : piece);
+    const known = VOM_WORDS.get(
+      piece.charCodeAt(0) === 0x20 ? piece.slice(1) : piece,
+    );
     if (known !== undefined) return known;
   }
   return word;
@@ -308,7 +335,7 @@ function pieceCost(piece: string, english: boolean, traditional: boolean): numbe
 function rawEstimate(text: string): number {
   const pieces = text.match(PIECE);
   if (!pieces) return 0;
-  const { english, traditional } = scanText(pieces);
+  const {english, traditional} = scanText(pieces);
   let total = 0;
   for (const piece of pieces) total += pieceCost(piece, english, traditional);
   return total * SAFETY_FACTOR;

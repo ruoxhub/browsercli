@@ -14,22 +14,34 @@
  * 时做浅合并，避免面板只改一个字段却清空其余字段。
  */
 
-/* eslint-disable import/no-cycle -- 已知例外：loadUserConfig() 播种 store 与 getRuntimeConfigStore() 读回 store 的初始化时序契约。见 spec §2.1 目标 2 与 §5.1 环 1 决议 A，Phase 4 复核。 */
-import {loadUserConfig} from './resolver.js';
+import {loadUserConfigFile} from './ConfigParser.js';
 import {type GlobalConfig, validateGlobalConfig} from './schema.js';
+import type {ServerConfig} from './ServerConfig.js';
 
 /** 需要浅合并的深层对象字段 */
 const DEEP_MERGE_KEYS = new Set(['browser', 'toolResultRecording']);
 
 export class RuntimeConfigStore {
   private config: GlobalConfig;
+  private serverConfig?: ServerConfig;
 
-  constructor(seed: GlobalConfig = loadUserConfig()) {
+  constructor(seed: GlobalConfig = loadUserConfigFile()) {
     this.config = validateGlobalConfig(seed);
   }
 
   get(): Readonly<GlobalConfig> {
     return this.config;
+  }
+
+  /** 获取当前绑定的分层 ServerConfig（若由 daemon 分层播种初始化）。 */
+  getServerConfig(): ServerConfig | undefined {
+    return this.serverConfig;
+  }
+
+  /** 绑定分层 ServerConfig 并同步其解析快照到当前运行态。 */
+  setServerConfig(serverConfig: ServerConfig): void {
+    this.serverConfig = serverConfig;
+    this.config = validateGlobalConfig(serverConfig.resolved);
   }
 
   /**
@@ -79,7 +91,8 @@ export class RuntimeConfigStore {
   }
 
   reset(seed?: GlobalConfig): void {
-    this.config = validateGlobalConfig(seed ?? loadUserConfig());
+    this.serverConfig = undefined;
+    this.config = validateGlobalConfig(seed ?? loadUserConfigFile());
   }
 }
 

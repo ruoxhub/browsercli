@@ -6,47 +6,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-/**
- * browsercli CLI 入口 — 基于 axi-sdk-js runAxiCli 框架（daemon socket 客户端）
- *
- * 用法: browsercli [-s=<session>] <command> [options]
- *
- * Commands:
- *   start         启动或重启 daemon 会话 (对齐 chrome-devtools start)
- *   stop          停止 daemon 会话，支持 --all (对齐 chrome-devtools stop)
- *   status        查看 daemon 会话与浏览器状态 (对齐 chrome-devtools status)
- *   call          调用 MCP 工具或兼容技能
- *   list-tools    列出所有可用的 MCP 工具
- *   jobs          列出/取消工具任务
- *   config        查看/设置/初始化全局配置
- *   scaffold      创建新的逆向任务脚手架
- */
+import process from 'node:process';
 
-import {runAxiCli} from 'axi-sdk-js';
+import {runCli} from '../cli.js';
 
-import {
-  cliCommands,
-  cliDescription,
-  cliVersion,
-  createWorkerContext,
-  homeCommand,
-} from '../app.js';
-import {generateCommandHelp, generateTopLevelHelp} from '../help.js';
-import {extractLeadingSession} from '../sessionArgs.js';
-import type {WorkerContext} from '../types.js';
+process.title = 'browsercli';
 
-// runAxiCli 要求 flag 位于命令之后；`browsercli -s=x start` 式前置会话 flag
-// 先摘出来（仍保留在完整 argv 中供 createWorkerContext 解析），rest 交给 SDK。
-const rawArgv = process.argv.slice(2);
-const {rest} = extractLeadingSession(rawArgv);
-
-void runAxiCli<WorkerContext>({
-  description: cliDescription,
-  version: cliVersion,
-  topLevelHelp: generateTopLevelHelp(),
-  commands: cliCommands,
-  home: homeCommand,
-  getCommandHelp: command => generateCommandHelp(command, rest.slice(1)),
-  argv: rest,
-  resolveContext: () => createWorkerContext(rawArgv),
-});
+const code = await runCli();
+if (code !== 0) {
+  process.exit(code);
+}

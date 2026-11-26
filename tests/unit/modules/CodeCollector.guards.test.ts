@@ -71,7 +71,7 @@ describe('CodeCollector defensive guards', () => {
   it('getFilesByPattern() returns INVALID_PATTERN for bad regex', () => {
     const collector = buildStubCollector();
     // Pre-populate cache so we pass the empty-cache guard
-    (collector as any).collectedFilesCache.set('test', {
+    (collector as any).fileRegistry.collectedFilesCache.set('test', {
       url: 'test.js',
       content: 'x',
       size: 1,

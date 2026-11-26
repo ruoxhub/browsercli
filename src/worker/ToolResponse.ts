@@ -5,37 +5,98 @@
  */
 
 import {appendFileSync, mkdirSync} from 'node:fs';
+import {mkdir, writeFile} from 'node:fs/promises';
 import path from 'node:path';
 
 import {
   getToolResultRecordingConfig,
   type ResolvedToolResultRecordingConfig,
 } from '../config.js';
-import type {ImageContentData, Response} from '../tools/ToolDefinition.js';
+import {
+  formatConsoleMessageDetail,
+  formatConsoleMessages,
+} from '../formatters/consoleFormatter.js';
+import {
+  formatNetworkRequestDetail,
+  formatNetworkRequests,
+} from '../formatters/networkFormatter.js';
+import {
+  formatSnapshotInline,
+  formatSnapshotSavedFile,
+} from '../formatters/snapshotFormatter.js';
+import type {WaitForEventsResult} from '../modules/browser/WaitForHelper.js';
+import type {ConsoleMessage, Page} from '../third_party/index.js';
+import type {
+  ImageContentData,
+  Response,
+  SnapshotParams,
+} from '../tools/ToolDefinition.js';
 import {
   ArtifactStorage,
   type ArtifactStorageConfig,
 } from '../utils/ArtifactStorage.js';
 import type {ToolError} from '../utils/errors.js';
+import {validateOutputPath} from '../utils/fsSafe.js';
 import {logger} from '../utils/logger.js';
 import {safeStringify} from '../utils/safeJson.js';
 import {TokenBudgetManager} from '../utils/TokenBudgetManager.js';
 import type {PaginationOptions} from '../utils/types.js';
 
-import type {ToolContextProvider} from './ToolContext.js';
+import type {BrowserPage} from './BrowserPage.js';
+import type {SessionContext} from './SessionContext.js';
+
+type NetworkListOptions = PaginationOptions & {
+  resourceTypes?: string[];
+  includePreservedRequests?: boolean;
+  networkRequestIdInDevToolsUI?: number;
+};
+
+type ConsoleListOptions = PaginationOptions & {
+  types?: string[];
+  includePreservedMessages?: boolean;
+};
+
+type WebSocketListOptions = PaginationOptions & {
+  urlFilter?: string;
+  includePreservedConnections?: boolean;
+};
 
 /**
- * ToolResponseAccumulator — 复刻 Daemon 中 response 对象的 accumulator 模式
+ * ToolResponseAccumulator — DeclarativeResponse 统一物化器（ADR-0010）
  *
- * Tool handler 通过 appendResponseLine / setStructuredContent 等方法累积结果，
- * 最终通过 toJSON() 输出统一格式。
- * 实现 defineTool 所需 the Response 接口。
+ * Tool handler 只声明输出意图（appendResponseLine / setStructuredContent /
+ * includeSnapshot / setIncludePages / setIncludeNetworkRequests /
+ * attachNetworkRequest / setIncludeConsoleData / attachConsoleMessage /
+ * setIncludeWebSocketConnections / attachWebSocket / setListExtensions /
+ * attachImage），在 materialize(session, targetPage) 阶段统一查数据并经
+ * src/formatters/* 物化，同时产出 structuredContent 与可读文本摘要。
  */
 export class ToolResponseAccumulator implements Response {
   private lines: string[] = [];
   private structuredContent: unknown = null;
   private includePages = false;
+  private includeExtensions = false;
   private includeNetwork = false;
+  private networkOptions?: NetworkListOptions;
+  private includeConsole = false;
+  private consoleOptions?: ConsoleListOptions;
+  private includeWebSockets = false;
+  private webSocketOptions?: WebSocketListOptions;
+  private attachedNetworkRequestId?: number;
+  private attachedConsoleMessageId?: number;
+  private attachedWebSocketId?: number;
+  private readonly images: ImageContentData[] = [];
+  private snapshotParams?: SnapshotParams;
+  private waitForResult?: WaitForEventsResult;
+  private readonly capturedConsoleErrors: string[] = [];
+  private readonly cleanupCallbacks: Array<() => void> = [];
+
+  private materializedPages?: Array<{
+    pageId: string;
+    url: string;
+    selected: boolean;
+  }>;
+  private materializedNetwork?: unknown;
 
   appendResponseLine(line: string): void {
     this.lines.push(line);
@@ -45,59 +106,301 @@ export class ToolResponseAccumulator implements Response {
     this.structuredContent = content;
   }
 
+  getStructuredContent(): unknown {
+    return this.structuredContent;
+  }
+
+  getResponseLines(): readonly string[] {
+    return this.lines;
+  }
+
+  getAttachedImages(): readonly ImageContentData[] {
+    return this.images;
+  }
+
   setIncludePages(value: boolean): void {
     this.includePages = value;
   }
 
   setListExtensions(): void {
-    // no-op for worker mode
+    this.includeExtensions = true;
+  }
+
+  includeSnapshot(params?: SnapshotParams): void {
+    this.snapshotParams = params ?? {};
+  }
+
+  getSnapshotRequest(): SnapshotParams | undefined {
+    return this.snapshotParams;
+  }
+
+  attachWaitForResult(result: WaitForEventsResult): void {
+    this.waitForResult = result;
+  }
+
+  getWaitForResult(): WaitForEventsResult | undefined {
+    return this.waitForResult;
+  }
+
+  includeConsoleErrorsFrom(page: Page): void {
+    if (!page || typeof page.on !== 'function') {
+      return;
+    }
+    const onConsole = (msg: ConsoleMessage): void => {
+      try {
+        if (msg.type() === 'error') {
+          this.capturedConsoleErrors.push(msg.text());
+        }
+      } catch {
+        // 忽略已销毁消息读取异常
+      }
+    };
+    const onPageError = (err: Error): void => {
+      this.capturedConsoleErrors.push(err.message || String(err));
+    };
+    page.on('console', onConsole);
+    page.on('pageerror', onPageError);
+    this.cleanupCallbacks.push(() => {
+      page.off('console', onConsole);
+      page.off('pageerror', onPageError);
+    });
+  }
+
+  getCapturedConsoleErrors(): readonly string[] {
+    return this.capturedConsoleErrors;
+  }
+
+  cleanupListeners(): void {
+    for (const cb of this.cleanupCallbacks.splice(0)) {
+      try {
+        cb();
+      } catch {
+        // 忽略监听清理异常
+      }
+    }
   }
 
   setIncludeNetworkRequests(
-    _value: boolean,
-    _options?: PaginationOptions & {
-      resourceTypes?: string[];
-      includePreservedRequests?: boolean;
-      networkRequestIdInDevToolsUI?: number;
-    },
+    value: boolean,
+    options?: NetworkListOptions,
   ): void {
-    this.includeNetwork = _value;
+    this.includeNetwork = value;
+    this.networkOptions = options;
   }
 
-  setIncludeConsoleData(
-    _value: boolean,
-    _options?: PaginationOptions & {
-      types?: string[];
-      includePreservedMessages?: boolean;
-    },
-  ): void {
-    // no-op for worker mode
+  setIncludeConsoleData(value: boolean, options?: ConsoleListOptions): void {
+    this.includeConsole = value;
+    this.consoleOptions = options;
   }
 
-  attachImage(_value: ImageContentData): void {
-    // no-op for worker mode
+  attachImage(value: ImageContentData): void {
+    this.images.push(value);
   }
 
-  attachNetworkRequest(_reqid: number): void {
-    // no-op for worker mode
+  attachNetworkRequest(reqid: number): void {
+    this.attachedNetworkRequestId = reqid;
   }
 
-  attachConsoleMessage(_msgid: number): void {
-    // no-op for worker mode
+  attachConsoleMessage(msgid: number): void {
+    this.attachedConsoleMessageId = msgid;
   }
 
   setIncludeWebSocketConnections(
-    _value: boolean,
-    _options?: PaginationOptions & {
-      urlFilter?: string;
-      includePreservedConnections?: boolean;
-    },
+    value: boolean,
+    options?: WebSocketListOptions,
   ): void {
-    // no-op for worker mode
+    this.includeWebSockets = value;
+    this.webSocketOptions = options;
   }
 
-  attachWebSocket(_wsid: number): void {
-    // no-op for worker mode
+  attachWebSocket(wsid: number): void {
+    this.attachedWebSocketId = wsid;
+  }
+
+  /**
+   * 统一物化全部声明式响应指令（ADR-0010）：
+   * 集中读取目标页与会话数据、走 src/formatters/* 格式化并合并入 structuredContent。
+   */
+  async materialize(
+    session: SessionContext,
+    targetPage?: BrowserPage,
+  ): Promise<void> {
+    const bp = targetPage ?? session.getSelectedBrowserPage() ?? undefined;
+
+    const hasEnrichment =
+      Boolean(this.snapshotParams) ||
+      Boolean(
+        this.waitForResult && Object.keys(this.waitForResult).length > 0,
+      ) ||
+      this.capturedConsoleErrors.length > 0 ||
+      this.includePages ||
+      this.includeExtensions ||
+      this.includeNetwork ||
+      this.includeConsole ||
+      this.includeWebSockets ||
+      this.attachedNetworkRequestId !== undefined ||
+      this.attachedConsoleMessageId !== undefined ||
+      this.attachedWebSocketId !== undefined;
+
+    if (!hasEnrichment) {
+      return;
+    }
+
+    const base: Record<string, unknown> =
+      this.structuredContent &&
+      typeof this.structuredContent === 'object' &&
+      !Array.isArray(this.structuredContent)
+        ? {...(this.structuredContent as Record<string, unknown>)}
+        : this.structuredContent !== null
+          ? {value: this.structuredContent}
+          : {success: true};
+
+    if (this.waitForResult && Object.keys(this.waitForResult).length > 0) {
+      base.events = this.waitForResult;
+    }
+
+    if (this.capturedConsoleErrors.length > 0) {
+      base.consoleErrors = [...this.capturedConsoleErrors];
+    }
+
+    if (this.snapshotParams && bp) {
+      const snapshot = await bp.captureSnapshot({
+        mode: this.snapshotParams.mode ?? 'ax',
+        verbose: this.snapshotParams.verbose ?? false,
+      });
+      if (this.snapshotParams.filePath) {
+        const resolved = validateOutputPath(this.snapshotParams.filePath);
+        await mkdir(path.dirname(resolved), {recursive: true});
+        await writeFile(resolved, snapshot.formattedText, 'utf-8');
+        const formatted = formatSnapshotSavedFile(snapshot, resolved);
+        base.snapshot = formatted.payload;
+        this.lines.push(formatted.line);
+      } else {
+        const formatted = formatSnapshotInline(snapshot);
+        base.snapshot = formatted.payload;
+        this.lines.push(formatted.line);
+      }
+    }
+
+    if (this.includePages) {
+      const pages = session.getPages();
+      const selected = session.getSelectedPage();
+      this.materializedPages = pages.map(page => ({
+        pageId: session.getPageId(page),
+        url: typeof page.url === 'function' ? page.url() : '',
+        selected: page === selected,
+      }));
+      base.pages = this.materializedPages;
+    }
+
+    if (this.includeExtensions) {
+      const extMap = await session.listExtensions();
+      base.extensions = Array.from(extMap.values());
+    }
+
+    if (this.includeNetwork) {
+      const requests = bp
+        ? bp.getNetworkRequests(this.networkOptions?.includePreservedRequests)
+        : session.getNetworkRequests(
+            this.networkOptions?.includePreservedRequests,
+          );
+      const formatted = formatNetworkRequests(
+        requests,
+        req => session.getNetworkRequestStableId(req, bp?.rawPage),
+        this.networkOptions,
+      );
+      this.materializedNetwork = formatted.items;
+      base.network = {
+        total: formatted.total,
+        pageIdx: formatted.pageIdx,
+        pageSize: formatted.pageSize,
+        requests: formatted.items,
+      };
+      this.lines.push(...formatted.lines);
+    }
+
+    if (this.attachedNetworkRequestId !== undefined) {
+      const req = session.getNetworkRequestById(
+        this.attachedNetworkRequestId,
+        bp?.rawPage,
+      );
+      const formatted = formatNetworkRequestDetail(
+        this.attachedNetworkRequestId,
+        req,
+      );
+      base.networkRequest = formatted.detail;
+      this.lines.push(formatted.line);
+    }
+
+    if (this.includeConsole) {
+      if (bp) {
+        await bp.ensureConsoleEnabled();
+      } else {
+        await session.ensureConsoleEnabled();
+      }
+      const messages = bp
+        ? bp.getConsoleData(this.consoleOptions?.includePreservedMessages)
+        : session.getConsoleData(this.consoleOptions?.includePreservedMessages);
+      const formatted = formatConsoleMessages(
+        messages,
+        msg => session.getConsoleMessageStableId(msg, bp?.rawPage),
+        this.consoleOptions,
+      );
+      base.console = {
+        total: formatted.total,
+        pageIdx: formatted.pageIdx,
+        pageSize: formatted.pageSize,
+        messages: formatted.items,
+      };
+      this.lines.push(...formatted.lines);
+    }
+
+    if (this.attachedConsoleMessageId !== undefined) {
+      const msg = session.getConsoleMessageById(
+        this.attachedConsoleMessageId,
+        bp?.rawPage,
+      );
+      const formatted = formatConsoleMessageDetail(
+        this.attachedConsoleMessageId,
+        msg,
+      );
+      base.consoleMessage = formatted.detail;
+      this.lines.push(formatted.line);
+    }
+
+    if (this.includeWebSockets) {
+      const connections = bp
+        ? bp.getWebSocketConnections(
+            this.webSocketOptions?.includePreservedConnections,
+          )
+        : session.getWebSocketConnections(
+            this.webSocketOptions?.includePreservedConnections,
+          );
+      const filtered = this.webSocketOptions?.urlFilter
+        ? connections.filter(c =>
+            c.connection.url.includes(this.webSocketOptions!.urlFilter!),
+          )
+        : connections;
+      base.websockets = filtered.map(c => ({
+        wsid: session.getWebSocketStableId(c, bp?.rawPage),
+        url: c.connection.url,
+        framesCount: c.frames?.length ?? 0,
+      }));
+    }
+
+    if (this.attachedWebSocketId !== undefined) {
+      const ws = session.getWebSocketConnectionById(
+        this.attachedWebSocketId,
+        bp?.rawPage,
+      );
+      base.websocket = {
+        wsid: this.attachedWebSocketId,
+        url: ws.connection.url,
+        framesCount: ws.frames?.length ?? 0,
+      };
+    }
+
+    this.structuredContent = base;
   }
 
   toJSON(): Record<string, unknown> {
@@ -107,8 +410,16 @@ export class ToolResponseAccumulator implements Response {
       result.structuredContent = this.structuredContent;
     }
 
-    if (this.includePages) result.pages = [];
-    if (this.includeNetwork) result.network = [];
+    if (this.images.length > 0) {
+      result.images = [...this.images];
+    }
+
+    if (this.includePages) {
+      result.pages = this.materializedPages ?? [];
+    }
+    if (this.includeNetwork) {
+      result.network = this.materializedNetwork ?? [];
+    }
 
     return result;
   }
@@ -149,7 +460,7 @@ export class ToolResponseProcessor {
   }
 
   /**
-   * 将 handler 原始返回值规范化为标准 MCP Tool 响应结构
+   * 将 handler 原始返回值规范化为标准 Tool 响应结构
    */
   normalize(result: unknown): unknown {
     if (this.isToolDefinitionResponse(result)) {
@@ -258,7 +569,7 @@ export class ToolResultRecorder {
 }
 
 export class ToolTelemetry {
-  constructor(private readonly contextProvider: ToolContextProvider) {}
+  constructor(private readonly contextProvider: SessionContext) {}
 
   success(
     toolName: string,

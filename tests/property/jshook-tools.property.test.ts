@@ -9,10 +9,10 @@ import {describe, it} from 'node:test';
 import fc from 'fast-check';
 
 import {zod} from '../../src/third_party/index.js';
-import {collectCode} from '../../src/tools/collector/collectCode.js';
-import {queryDom} from '../../src/tools/dom/queryDom.js';
-import {createHook} from '../../src/tools/hook/CreateHook.js';
-import {click} from '../../src/tools/input/click.js';
+import {collectCode} from '../../src/tools/collector.js';
+import {queryDom} from '../../src/tools/dom.js';
+import {createHook} from '../../src/tools/hook.js';
+import {click} from '../../src/tools/input.js';
 
 const collectSchema = zod.object(collectCode.schema);
 const hookSchema = zod.object(createHook.schema);

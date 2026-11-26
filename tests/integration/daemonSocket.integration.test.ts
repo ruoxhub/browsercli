@@ -8,7 +8,7 @@
  * 端到端集成测试：真实 detached daemon（build/src/index.js --daemon）
  * + 真实 browsercli CLI（browsercli/build/bin/browsercli.js），
  * 走本地命名管道 / unix socket 的完整生命周期：
- * open → list-tools → call(未知工具) → close。
+ * start → 工具调用（未知工具 / list_pages） → stop。
  */
 
 import assert from 'node:assert/strict';
@@ -176,8 +176,8 @@ describe('daemon socket end-to-end', () => {
     fs.rmSync(tmpRoot, {recursive: true, force: true, maxRetries: 5});
   });
 
-  it('open spawns a detached daemon and writes its session file', async () => {
-    runCli([`-s=${SESSION_NAME}`, 'open']);
+  it('start spawns a detached daemon and writes its session file', async () => {
+    runCli([`-s=${SESSION_NAME}`, 'start']);
     const cfg = await waitFor(() => findSession(daemonDir), 15_000);
     daemonPid = cfg.pid;
     assert.equal(cfg.name, SESSION_NAME);
@@ -185,46 +185,30 @@ describe('daemon socket end-to-end', () => {
     assert.ok(cfg.socketPath.length > 0);
   });
 
-  it('list-tools returns a non-empty tool list over the socket', () => {
-    const {stdout} = runCli([`-s=${SESSION_NAME}`, 'list-tools']);
-    // axi-sdk-js 以 TOON 编码渲染（renderOutput 无条件 encode），--json 只
-    // 控制字段形状而非 JSON 编码；默认列表走 tableOutput → `headers[3]` +
-    // `rows[<n>]`，断言行数与已知工具名。
-    const match = stdout.match(/^rows\[(\d+)\]/m);
-    assert.ok(
-      match,
-      `expected TOON rows table in stdout, got:\n${stdout.slice(0, 200)}`,
-    );
-    assert.ok(Number(match[1]) > 0, 'expected non-empty tools list');
-    assert.match(stdout, /list_pages/);
-  });
-
-  it('call on an unknown tool exits 1 with UNKNOWN_TOOL in output', () => {
+  it('invoking an unknown tool exits 1 with UNKNOWN_TOOL in output', () => {
     const {status, output} = runCliFailure([
       `-s=${SESSION_NAME}`,
-      'call',
       'no_such_tool_for_e2e',
     ]);
     assert.equal(status, 1);
     assert.match(output, /UNKNOWN_TOOL/);
   });
 
-  it('call list_pages over socket returns valid structured data', () => {
-    const {stdout} = runCli([`-s=${SESSION_NAME}`, 'call', 'list_pages']);
+  it('list_pages over socket returns valid structured data', () => {
+    const {stdout} = runCli([`-s=${SESSION_NAME}`, 'list_pages']);
     assert.match(stdout, /list_pages/);
-    assert.match(stdout, /status:\s*success/);
   });
 
-  it('close removes the session file and stops the daemon process', async () => {
-    assert.ok(daemonPid, 'daemon pid recorded by the open test');
-    runCli([`-s=${SESSION_NAME}`, 'close']);
+  it('stop removes the session file and stops the daemon process', async () => {
+    assert.ok(daemonPid, 'daemon pid recorded by the start test');
+    runCli([`-s=${SESSION_NAME}`, 'stop']);
     const start = Date.now();
     for (;;) {
       const still = findSession(daemonDir);
       if (!still && !isProcessAlive(daemonPid as number)) break;
       if (Date.now() - start > 5_000) {
         throw new Error(
-          `daemon (pid=${daemonPid}) still alive or session file lingering after close`,
+          `daemon (pid=${daemonPid}) still alive or session file lingering after stop`,
         );
       }
       await new Promise(resolve => setTimeout(resolve, 100));

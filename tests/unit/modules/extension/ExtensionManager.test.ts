@@ -198,6 +198,135 @@ describe('ExtensionManager', () => {
     });
   });
 
+  it('requests tab targets explicitly via TargetFilter and prefers tab targetId', async () => {
+    const browserCdpCalls: Array<{method: string; params?: unknown}> = [];
+    const mockBrowserSession = {
+      send: async (method: string, params?: unknown) => {
+        browserCdpCalls.push({method, params});
+        if (method === 'Extensions.loadUnpacked') {
+          return {id: 'mv3-ext-id'};
+        }
+        if (method === 'Target.getTargets') {
+          return {
+            targetInfos: [
+              {
+                targetId: 'page-id-1',
+                type: 'page',
+                url: 'https://example.com/',
+              },
+              {
+                targetId: 'tab-id-1',
+                type: 'tab',
+                url: 'https://example.com/',
+              },
+            ],
+          };
+        }
+        return {};
+      },
+      detach: async () => undefined,
+    };
+
+    const mockPage = {
+      url: () => 'https://example.com/',
+      context: () => ({
+        newCDPSession: async () => ({
+          send: async () => ({targetInfo: {targetId: 'page-id-1'}}),
+          detach: async () => undefined,
+        }),
+      }),
+    } as unknown as Page;
+
+    const manager = new ExtensionManager({
+      getBrowser: () =>
+        ({
+          newBrowserCDPSession: async () => mockBrowserSession,
+        }) as unknown as Browser,
+      getSelectedPage: () => mockPage,
+    });
+
+    const id = await manager.installExtension(tempDir);
+    await manager.triggerExtensionAction(id);
+
+    const getTargetsCall = browserCdpCalls.find(
+      c => c.method === 'Target.getTargets',
+    );
+    assert.deepEqual(getTargetsCall?.params, {
+      filter: [{type: 'tab', exclude: false}, {}],
+    });
+    const triggerCall = browserCdpCalls.find(
+      c => c.method === 'Extensions.triggerAction',
+    );
+    assert.deepEqual(triggerCall?.params, {
+      id: 'mv3-ext-id',
+      targetId: 'tab-id-1',
+    });
+  });
+
+  it('falls back to opening MV3 action.default_popup when Extensions.triggerAction is unavailable', async () => {
+    await writeFile(
+      path.join(tempDir, 'manifest.json'),
+      JSON.stringify({
+        manifest_version: 3,
+        name: 'MV3 Popup Ext',
+        version: '1.0.0',
+        action: {default_popup: 'popup.html'},
+      }),
+      'utf8',
+    );
+
+    const openedUrls: string[] = [];
+    const mockBrowserSession = {
+      send: async (method: string) => {
+        if (method === 'Extensions.loadUnpacked') {
+          return {id: 'mv3-popup-id'};
+        }
+        if (method === 'Target.getTargets') {
+          return {
+            targetInfos: [{targetId: 'tab-1', type: 'tab', url: 'about:blank'}],
+          };
+        }
+        if (method === 'Extensions.triggerAction') {
+          throw new Error(
+            "Protocol error (Extensions.triggerAction): 'Extensions.triggerAction' wasn't found",
+          );
+        }
+        return {};
+      },
+      detach: async () => undefined,
+    };
+
+    const mockPage = {
+      url: () => 'about:blank',
+      context: () => ({
+        newCDPSession: async () => ({
+          send: async () => ({targetInfo: {targetId: 'page-1'}}),
+          detach: async () => undefined,
+        }),
+        newPage: async () => ({
+          goto: async (url: string) => {
+            openedUrls.push(url);
+          },
+        }),
+      }),
+    } as unknown as Page;
+
+    const manager = new ExtensionManager({
+      getBrowser: () =>
+        ({
+          newBrowserCDPSession: async () => mockBrowserSession,
+        }) as unknown as Browser,
+      getSelectedPage: () => mockPage,
+    });
+
+    const id = await manager.installExtension(tempDir);
+    await manager.triggerExtensionAction(id);
+
+    assert.deepEqual(openedUrls, [
+      'chrome-extension://mv3-popup-id/popup.html',
+    ]);
+  });
+
   it('triggerExtensionAction throws when extension is not found', async () => {
     const manager = new ExtensionManager({
       getBrowser: () => null,

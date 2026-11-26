@@ -30,34 +30,12 @@ describe('CLI Integration', () => {
     }
   });
 
-  it('should expose legacy skills via list-tools (daemon must be running)', async () => {
-    try {
-      const {stdout} = await execAsync(
-        'node',
-        ['build/src/bin/js-reverse.js', 'list-tools'],
-        {
-          timeout: 10000,
-        },
-      );
-      assert.ok(stdout.includes('observe-flow'), 'Should include observe-flow');
-      assert.ok(stdout.includes('auto-hook'), 'Should include auto-hook');
-      assert.ok(
-        stdout.includes('rebuild-bundle'),
-        'Should include rebuild-bundle',
-      );
-    } catch {
-      // Skip if daemon not running
-      console.log('SKIP: Daemon not running for list-tools test');
-    }
-  });
-
-  it('should execute rebuild-bundle via call (daemon must be running)', async () => {
+  it('should execute rebuild-bundle as a top-level command (daemon must be running)', async () => {
     try {
       const {stdout} = await execAsync(
         'node',
         [
           'build/src/bin/js-reverse.js',
-          'call',
           'rebuild-bundle',
           '--url',
           'https://example.com/test.js',

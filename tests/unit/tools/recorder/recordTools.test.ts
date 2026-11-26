@@ -11,7 +11,7 @@ import {globalInteractionRecorder} from '../../../../src/modules/recorder/Intera
 import {
   recordStart,
   recordStop,
-} from '../../../../src/tools/recorder/recordTools.js';
+} from '../../../../src/tools/recorder.js';
 
 function createMockContext(mockPage: unknown) {
   return {

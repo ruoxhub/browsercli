@@ -4,19 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {getSourceMapConfig} from '../config/servicesConfig.js';
 import type {PageController} from '../modules/collector/PageController.js';
 import {NetworkModule} from '../modules/network/index.js';
-import {SourceMapService} from '../modules/sourcemap/SourceMapService.js';
-import {VideoManager} from '../modules/video/index.js';
-import type {BrowserManager} from '../modules/browser/index.js';
 import {WasmAnalyzer} from '../modules/wasm/WasmAnalyzer.js';
 import {WasmCollector} from '../modules/wasm/WasmCollector.js';
 import {WasmDecompiler} from '../modules/wasm/WasmDecompiler.js';
 import {WasmRuntimeInspector} from '../modules/wasm/WasmRuntimeInspector.js';
 
 /**
- * 延迟初始化的运行时服务集合。通过 getter 属性按需创建抓包、Wasm、SourceMap 等重服务。
+ * 延迟初始化的运行时服务集合。通过 getter 属性按需创建抓包、Wasm 等重服务。
  *
  * @see {@link src/runtime.ts} — getRuntime() 创建 RuntimeServices 并暴露 lazy getter
  */
@@ -26,8 +22,6 @@ export class RuntimeServices {
   private wasmDecompiler?: WasmDecompiler;
   private wasmRuntimeInspector?: WasmRuntimeInspector;
   private wasmCollector?: WasmCollector;
-  private sourceMapService: SourceMapService | null = null;
-  private videoManager?: VideoManager;
 
   constructor(private readonly pageController: PageController) {}
 
@@ -53,23 +47,5 @@ export class RuntimeServices {
       this.getWasmAnalyzer(),
       this.getWasmRuntimeInspector(),
     ));
-  }
-
-  getSourceMapService(): SourceMapService {
-    return (this.sourceMapService ??= new SourceMapService(
-      getSourceMapConfig(),
-    ));
-  }
-
-  getVideoManager(browserManager?: BrowserManager): VideoManager {
-    return (this.videoManager ??= new VideoManager({
-      getPage: async (tabId?: number) => {
-        if (tabId !== undefined) {
-          const pages = browserManager?.getContext()?.pages() ?? [];
-          return pages[tabId] ?? null;
-        }
-        return this.pageController.getPage();
-      },
-    }));
   }
 }

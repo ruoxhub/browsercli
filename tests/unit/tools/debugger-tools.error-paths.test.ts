@@ -9,15 +9,13 @@ import {describe, it} from 'node:test';
 
 import {
   breakOnXhr,
+  debuggerStep,
   evaluateOnCallframe,
-  findInScript,
   getPausedInfo,
   getRequestInitiator,
   getScriptSource,
-  hookFunction,
   inspectObject,
   listBreakpoints,
-  listHooks,
   listScripts,
   monitorEvents,
   pause,
@@ -27,14 +25,10 @@ import {
   searchInSources,
   setBreakpoint,
   setBreakpointOnText,
-  stepInto,
-  stepOut,
-  stepOver,
   stopMonitor,
   traceFunction,
-  unhookFunction,
   getStorage,
-} from '../../../src/tools/debugger/index.js';
+} from '../../../src/tools/debugger.js';
 
 interface DebuggerResponseHarness {
   lines: string[];
@@ -127,46 +121,6 @@ function makeDisabledContext(): ToolContextHarness {
 }
 
 describe('debugger tools error paths', () => {
-  it('hook_function should write records into single __hookStore', async () => {
-    const response = makeResponse();
-    let capturedScript = '';
-    const context: ToolContextHarness = {
-      debuggerContext: {
-        isEnabled: () => true,
-      },
-      getSelectedPage: () => ({evaluate: async () => ({})}),
-      getSelectedFrame: () => ({
-        evaluate: async (script: unknown) => {
-          capturedScript =
-            typeof script === 'function' ? script.toString() : String(script);
-          return {success: true, hookId: 'h_store'};
-        },
-      }),
-      getNetworkRequestById: () => ({url: () => 'https://example.com'}),
-      getRequestInitiator: () => undefined,
-    };
-
-    await hookFunction.handler(
-      {
-        params: {
-          target: 'window.fetch',
-          hookId: 'h_store',
-          logArgs: true,
-          logResult: true,
-          logStack: false,
-        },
-      },
-      response as unknown as Parameters<typeof hookFunction.handler>[1],
-      context as unknown as Parameters<typeof hookFunction.handler>[2],
-    );
-
-    assert.ok(
-      capturedScript.includes('window.__hookStore = window.__hookStore || {}'),
-    );
-    assert.ok(capturedScript.includes('window.__hookStore[hookId]'));
-    assert.ok(!capturedScript.includes('__mcp_hook_data__'));
-  });
-
   it('covers debugger-disabled early-return branches', async () => {
     const response = makeResponse();
     const context = makeDisabledContext();
@@ -186,7 +140,7 @@ describe('debugger tools error paths', () => {
       );
     });
     await assert.rejects(async () => {
-      await findInScript.handler(
+      await searchInSources.handler(
         {
           params: {
             scriptId: '1',
@@ -196,11 +150,13 @@ describe('debugger tools error paths', () => {
             caseSensitive: true,
           },
         },
-        response as unknown as Parameters<typeof findInScript.handler>[1],
-        context as unknown as Parameters<typeof findInScript.handler>[2],
+        response as unknown as Parameters<typeof searchInSources.handler>[1],
+        context as unknown as Parameters<typeof searchInSources.handler>[2],
       );
     });
-    await assert.rejects(async () => {
+    // 全局搜索（不带 scriptId）在 debugger 不可用时按 source='auto' 回退到本地缓存，
+    // 属于优雅降级：不抛错，返回匹配列表（可能为空）。
+    await assert.doesNotReject(async () => {
       await searchInSources.handler(
         {
           params: {
@@ -259,24 +215,24 @@ describe('debugger tools error paths', () => {
       );
     });
     await assert.rejects(async () => {
-      await stepOver.handler(
-        {params: {}} as EmptyRequestHarness,
-        response as unknown as Parameters<typeof stepOver.handler>[1],
-        context as unknown as Parameters<typeof stepOver.handler>[2],
+      await debuggerStep.handler(
+        {params: {direction: 'over'}},
+        response as unknown as Parameters<typeof debuggerStep.handler>[1],
+        context as unknown as Parameters<typeof debuggerStep.handler>[2],
       );
     });
     await assert.rejects(async () => {
-      await stepInto.handler(
-        {params: {}} as EmptyRequestHarness,
-        response as unknown as Parameters<typeof stepInto.handler>[1],
-        context as unknown as Parameters<typeof stepInto.handler>[2],
+      await debuggerStep.handler(
+        {params: {direction: 'into'}},
+        response as unknown as Parameters<typeof debuggerStep.handler>[1],
+        context as unknown as Parameters<typeof debuggerStep.handler>[2],
       );
     });
     await assert.rejects(async () => {
-      await stepOut.handler(
-        {params: {}} as EmptyRequestHarness,
-        response as unknown as Parameters<typeof stepOut.handler>[1],
-        context as unknown as Parameters<typeof stepOut.handler>[2],
+      await debuggerStep.handler(
+        {params: {direction: 'out'}},
+        response as unknown as Parameters<typeof debuggerStep.handler>[1],
+        context as unknown as Parameters<typeof debuggerStep.handler>[2],
       );
     });
     await assert.rejects(async () => {
@@ -386,35 +342,6 @@ describe('debugger tools error paths', () => {
         {params: {requestId: 1}},
         response as unknown as Parameters<typeof getRequestInitiator.handler>[1],
         context as unknown as Parameters<typeof getRequestInitiator.handler>[2],
-      );
-    });
-    await assert.rejects(async () => {
-      await hookFunction.handler(
-        {
-          params: {
-            target: 'window.fetch',
-            hookId: 'h1',
-            logArgs: true,
-            logResult: true,
-            logStack: false,
-          },
-        },
-        response as unknown as Parameters<typeof hookFunction.handler>[1],
-        context as unknown as Parameters<typeof hookFunction.handler>[2],
-      );
-    });
-    await assert.rejects(async () => {
-      await unhookFunction.handler(
-        {params: {hookId: 'missing'}},
-        response as unknown as Parameters<typeof unhookFunction.handler>[1],
-        context as unknown as Parameters<typeof unhookFunction.handler>[2],
-      );
-    });
-    await assert.rejects(async () => {
-      await listHooks.handler(
-        {params: {}} as EmptyRequestHarness,
-        response as unknown as Parameters<typeof listHooks.handler>[1],
-        context as unknown as Parameters<typeof listHooks.handler>[2],
       );
     });
     await assert.rejects(async () => {

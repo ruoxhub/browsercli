@@ -7,7 +7,7 @@
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
-import {checkScriptSyntaxBalance} from '../../../src/tools/script/validate-script-syntax.js';
+import {checkScriptSyntaxBalance} from '../../../src/tools/script.js';
 
 describe('checkScriptSyntaxBalance', () => {
   it('passes balanced arrow function', () => {

@@ -6,7 +6,9 @@
 
 import type {Locator, Page} from 'patchright';
 
+import {withCdpSession} from '../browser/cdpUtils.js';
 import {renderVom, type VomNode, type VomScene} from '../dom/vom/index.js';
+
 import type {
   AXNode,
   SnapshotNode,
@@ -18,6 +20,199 @@ interface AccessiblePage extends Page {
   accessibility?: {
     snapshot(options?: {interestingOnly?: boolean}): Promise<AXNode | null>;
   };
+}
+
+interface CdpAXValue {
+  type?: string;
+  value?: unknown;
+}
+
+interface CdpAXProperty {
+  name: string;
+  value?: CdpAXValue;
+}
+
+interface CdpAXNode {
+  nodeId: string;
+  ignored?: boolean;
+  role?: CdpAXValue;
+  name?: CdpAXValue;
+  description?: CdpAXValue;
+  value?: CdpAXValue;
+  properties?: CdpAXProperty[];
+  parentId?: string;
+  childIds?: string[];
+  backendDOMNodeId?: number;
+}
+
+const UNINTERESTING_ROLES = new Set([
+  'none',
+  'Ignored',
+  'InlineTextBox',
+  'LineBreak',
+  'LayoutTable',
+  'LayoutTableRow',
+  'LayoutTableCell',
+  'SectionFooter',
+  'SectionHeader',
+]);
+
+const STRUCTURAL_ROLES = new Set(['generic', 'GenericContainer', 'presentation']);
+
+function extractCdpString(val?: CdpAXValue): string | undefined {
+  if (val?.value === undefined || val.value === null) return undefined;
+  const s = String(val.value);
+  return s.length > 0 ? s : undefined;
+}
+
+function mapCdpProperties(raw: CdpAXNode): Partial<AXNode> {
+  const out: Partial<AXNode> = {};
+  if (!Array.isArray(raw.properties)) return out;
+
+  for (const prop of raw.properties) {
+    const v = prop.value?.value;
+    if (v === undefined || v === null) continue;
+    switch (prop.name) {
+      case 'level':
+        if (typeof v === 'number') out.level = v;
+        break;
+      case 'disabled':
+        if (v === true) out.disabled = true;
+        break;
+      case 'expanded':
+        if (typeof v === 'boolean') out.expanded = v;
+        break;
+      case 'focused':
+        if (v === true) out.focused = true;
+        break;
+      case 'modal':
+        if (v === true) out.modal = true;
+        break;
+      case 'multiline':
+        if (v === true) out.multiline = true;
+        break;
+      case 'multiselectable':
+        if (v === true) out.multiselectable = true;
+        break;
+      case 'readonly':
+        if (v === true) out.readonly = true;
+        break;
+      case 'required':
+        if (v === true) out.required = true;
+        break;
+      case 'selected':
+        if (v === true) out.selected = true;
+        break;
+      case 'checked':
+        if (v === 'mixed') out.checked = 'mixed';
+        else if (v === 'true' || v === true) out.checked = true;
+        else if (v === 'false' || v === false) out.checked = false;
+        break;
+      case 'pressed':
+        if (v === 'mixed') out.pressed = 'mixed';
+        else if (v === 'true' || v === true) out.pressed = true;
+        else if (v === 'false' || v === false) out.pressed = false;
+        break;
+      case 'keyshortcuts':
+        if (typeof v === 'string' && v) out.keyshortcuts = v;
+        break;
+      case 'roledescription':
+        if (typeof v === 'string' && v) out.roledescription = v;
+        break;
+      case 'valuemin':
+        if (typeof v === 'number') out.valuemin = v;
+        break;
+      case 'valuemax':
+        if (typeof v === 'number') out.valuemax = v;
+        break;
+      case 'valuetext':
+        if (typeof v === 'string' && v) out.valuetext = v;
+        break;
+    }
+  }
+  return out;
+}
+
+/**
+ * 将 CDP `Accessibility.getFullAXTree` 返回的扁平节点数组转换为分层 AXNode 树。
+ */
+export function buildAxTreeFromCdpNodes(
+  nodes: readonly CdpAXNode[],
+  interestingOnly: boolean,
+  maxDepth = 30,
+): AXNode | null {
+  if (!Array.isArray(nodes) || nodes.length === 0) return null;
+
+  const byId = new Map<string, CdpAXNode>();
+  for (const node of nodes) {
+    byId.set(node.nodeId, node);
+  }
+
+  const rootRaw = nodes.find(n => !n.parentId) ?? nodes[0];
+  if (!rootRaw) return null;
+
+  const visited = new Set<string>();
+
+  const convert = (
+    raw: CdpAXNode,
+    depth: number,
+    parentName?: string,
+  ): AXNode[] => {
+    if (visited.has(raw.nodeId) || depth > maxDepth) return [];
+    visited.add(raw.nodeId);
+
+    const role = extractCdpString(raw.role) ?? 'generic';
+    const name = extractCdpString(raw.name);
+    const valueRaw = raw.value?.value;
+    const value =
+      typeof valueRaw === 'string' || typeof valueRaw === 'number'
+        ? valueRaw
+        : undefined;
+    const description = extractCdpString(raw.description);
+    const props = mapCdpProperties(raw);
+
+    const childNodes: AXNode[] = [];
+    if (Array.isArray(raw.childIds) && depth < maxDepth) {
+      for (const childId of raw.childIds) {
+        const childRaw = byId.get(childId);
+        if (childRaw) {
+          childNodes.push(...convert(childRaw, depth + 1, name ?? parentName));
+        }
+      }
+    }
+
+    const isRoot = raw === rootRaw;
+    if (interestingOnly && !isRoot) {
+      if (raw.ignored || UNINTERESTING_ROLES.has(role)) {
+        return childNodes;
+      }
+      // StaticText 若仅重复父控件（如 button/link/heading）的 accessible name，折叠掉减少噪声
+      if (role === 'StaticText' && name && parentName && name === parentName) {
+        return childNodes;
+      }
+      const hasSemanticProps =
+        name !== undefined ||
+        value !== undefined ||
+        description !== undefined ||
+        Object.keys(props).length > 0;
+      if (STRUCTURAL_ROLES.has(role) && !hasSemanticProps) {
+        return childNodes;
+      }
+    }
+
+    const axNode: AXNode = {
+      role,
+      ...(name !== undefined ? {name} : {}),
+      ...(value !== undefined ? {value} : {}),
+      ...(description !== undefined ? {description} : {}),
+      ...props,
+      ...(childNodes.length > 0 ? {children: childNodes} : {}),
+    };
+    return [axNode];
+  };
+
+  const built = convert(rootRaw, 0);
+  return built[0] ?? null;
 }
 
 export type SnapshotMode = 'ax' | 'vom';
@@ -72,15 +267,45 @@ export class PageSnapshotManager {
     return this.captureAx(page, options);
   }
 
+  private async captureAxViaCdp(
+    page: Page,
+    interestingOnly: boolean,
+    maxDepth: number,
+  ): Promise<AXNode | null> {
+    if (typeof page.context !== 'function') {
+      return null;
+    }
+    const ctx = page.context();
+    if (!ctx || typeof ctx.newCDPSession !== 'function') {
+      return null;
+    }
+    return await withCdpSession(page, async client => {
+      const res = (await client.send('Accessibility.getFullAXTree')) as {
+        nodes?: CdpAXNode[];
+      };
+      return buildAxTreeFromCdpNodes(
+        res?.nodes ?? [],
+        interestingOnly,
+        maxDepth,
+      );
+    });
+  }
+
   private async captureAx(
     page: Page,
     options: SnapshotOptions = {},
   ): Promise<TextSnapshotResult> {
     const interestingOnly = options.interestingOnly ?? !options.verbose;
+    const maxDepth = options.maxDepth ?? 30;
     const accessiblePage = page as AccessiblePage;
-    const axRoot = (await accessiblePage.accessibility?.snapshot({
-      interestingOnly,
-    })) as AXNode | null;
+    let axRoot: AXNode | null = null;
+    if (typeof accessiblePage.accessibility?.snapshot === 'function') {
+      axRoot = (await accessiblePage.accessibility.snapshot({
+        interestingOnly,
+      })) as AXNode | null;
+    } else {
+      axRoot = await this.captureAxViaCdp(page, interestingOnly, maxDepth);
+    }
 
     const snapshotId = String(this.nextSnapshotId++);
     const idToNode = new Map<string, SnapshotNode>();
@@ -104,7 +329,6 @@ export class PageSnapshotManager {
 
       idToNode.set(uid, snapshotNode);
 
-      const maxDepth = options.maxDepth ?? 30;
       if (node.children && currentDepth < maxDepth) {
         for (const child of node.children) {
           children.push(assignIds(child, currentDepth + 1));

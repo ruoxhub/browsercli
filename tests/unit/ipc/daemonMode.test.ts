@@ -5,19 +5,24 @@
  */
 
 import assert from 'node:assert/strict';
-import {existsSync, rmSync} from 'node:fs';
+import {existsSync, mkdtempSync, rmSync, writeFileSync} from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import {afterEach, beforeEach, describe, it} from 'node:test';
 
-import {
-  getRuntimeConfigStore,
-  resetRuntimeConfigStore,
-} from '../../../src/config/RuntimeConfigStore.js';
 import {
   persistRuntimeConfig,
   RUNTIME_CONFIG_PATH,
 } from '../../../src/config/runtimeConfigPersistence.js';
+import {
+  getRuntimeConfigStore,
+  resetRuntimeConfigStore,
+} from '../../../src/config/RuntimeConfigStore.js';
 import {buildDaemonArgPlan} from '../../../src/ipc/daemonArgs.js';
-import {seedConfig} from '../../../src/worker/daemonMain.js';
+import {
+  seedConfig,
+  startDaemonConfigWatcher,
+} from '../../../src/worker/daemonMain.js';
 
 describe('buildDaemonArgPlan', () => {
   it('consumes daemon-only tokens and keeps the rest for parseWorkerArgs', () => {
@@ -124,6 +129,61 @@ describe('seedConfig priority', () => {
     const effective = getRuntimeConfigStore().get();
     assert.equal(effective.browserUrl, 'http://127.0.0.1:9555');
     assert.equal(effective.headless, true);
+  });
+
+  it('loads explicit --config file and hot-reloads reloadable options with --watch-config', async () => {
+    const tmpDir = mkdtempSync(path.join(os.tmpdir(), 'bcli-daemon-cfg-'));
+    const configPath = path.join(tmpDir, 'custom.config.json');
+    writeFileSync(
+      configPath,
+      JSON.stringify({
+        screenshotFormat: 'png',
+        redactNetworkHeaders: false,
+      }),
+      'utf-8',
+    );
+
+    const plan = buildDaemonArgPlan([
+      '--daemon',
+      `--config=${configPath}`,
+      '--watch-config',
+      '--screenshot-format=jpeg',
+    ]);
+
+    seedConfig(plan);
+    const serverConfig = getRuntimeConfigStore().getServerConfig();
+    assert.ok(serverConfig);
+    assert.equal(serverConfig.configPath, path.resolve(configPath));
+    assert.equal(getRuntimeConfigStore().get().screenshotFormat, 'jpeg');
+    assert.equal(getRuntimeConfigStore().get().redactNetworkHeaders, false);
+
+    const watcher = startDaemonConfigWatcher(serverConfig);
+    assert.ok(watcher);
+    try {
+      writeFileSync(
+        configPath,
+        JSON.stringify({
+          screenshotFormat: 'webp',
+          redactNetworkHeaders: true,
+        }),
+        'utf-8',
+      );
+
+      const deadline = Date.now() + 4000;
+      while (!getRuntimeConfigStore().get().redactNetworkHeaders) {
+        if (Date.now() >= deadline) {
+          throw new Error('Timed out waiting for daemon config hot-reload');
+        }
+        await new Promise(resolve => setTimeout(resolve, 30));
+      }
+
+      // CLI override (--screenshot-format=jpeg) survives hot-reload; file-only reloadable option updates
+      assert.equal(getRuntimeConfigStore().get().screenshotFormat, 'jpeg');
+      assert.equal(getRuntimeConfigStore().get().redactNetworkHeaders, true);
+    } finally {
+      watcher.dispose();
+      rmSync(tmpDir, {recursive: true, force: true});
+    }
   });
 });
 

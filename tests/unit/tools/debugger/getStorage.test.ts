@@ -7,7 +7,7 @@
 import assert from 'node:assert/strict';
 import {describe, it} from 'node:test';
 
-import {getStorage} from '../../../../src/tools/debugger/getStorage.js';
+import {getStorage} from '../../../../src/tools/debugger.js';
 
 interface StorageContent {
   success?: boolean;

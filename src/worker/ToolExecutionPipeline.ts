@@ -11,9 +11,14 @@ import {
   validateToolArgs,
   type ValidationFailure,
 } from '../tools/tool-arg-validator.js';
-import type {Response, ToolDefinition} from '../tools/ToolDefinition.js';
+import type {
+  Response,
+  ToolConcurrency,
+  ToolDefinition,
+} from '../tools/ToolDefinition.js';
 import type {ToolMeta} from '../tools/tools-meta.js';
 import {createToolError, ErrorCodes, ToolError} from '../utils/errors.js';
+import {Mutex} from '../utils/Mutex.js';
 
 import {
   globalPageHealthTracker,
@@ -35,7 +40,7 @@ import {
 export {wrapFrameWithTimeout, FRAME_EVALUATE_TIMEOUT} from './timeoutUtils.js';
 
 /**
- * 工具执行管线。负责参数校验、上下文注入、执行、响应构建的完整链路。
+ * 工具执行管线。负责参数校验、上下文注入、并发队列、执行、响应构建的完整链路。
  *
  * @see {@link src/worker/ToolAdapter.ts} — 适配层，调用 Pipeline 执行
  * @see {@link src/worker/ToolContext.ts} — 上下文提供者注入
@@ -52,6 +57,71 @@ export function isToolDefinition(value: unknown): value is ToolDefinition {
     value !== null &&
     typeof (value as ToolDefinition).handler === 'function'
   );
+}
+
+/**
+ * 按 ToolConcurrency ('exclusive' | 'page' | 'none') 协调工具执行顺序：
+ * - `'none'` 直接并发放行
+ * - `'page'` 对同一 pageId 串行，不同页面可并发
+ * - `'exclusive'` 等待并阻塞所有页面队列与独占队列
+ */
+class ConcurrencyQueue {
+  private readonly exclusiveMutex = new Mutex();
+  private readonly pageMutexes = new Map<string, Mutex>();
+  private activePageCount = 0;
+  private pageDrainWaiters: Array<() => void> = [];
+
+  private getPageMutex(pageKey: string): Mutex {
+    let mutex = this.pageMutexes.get(pageKey);
+    if (!mutex) {
+      mutex = new Mutex();
+      this.pageMutexes.set(pageKey, mutex);
+    }
+    return mutex;
+  }
+
+  async run<T>(
+    concurrency: ToolConcurrency | undefined,
+    pageKey: string,
+    fn: () => Promise<T>,
+  ): Promise<T> {
+    if (!concurrency || concurrency === 'none') {
+      return await fn();
+    }
+
+    if (concurrency === 'exclusive') {
+      const guard = await this.exclusiveMutex.acquire();
+      try {
+        if (this.activePageCount > 0) {
+          await new Promise<void>(resolve => {
+            this.pageDrainWaiters.push(resolve);
+          });
+        }
+        return await fn();
+      } finally {
+        guard.dispose();
+      }
+    }
+
+    // 'page': 需先确保当前没有 exclusive 任务持有独占锁
+    const exclusiveGuard = await this.exclusiveMutex.acquire();
+    exclusiveGuard.dispose();
+
+    const pageGuard = await this.getPageMutex(pageKey).acquire();
+    this.activePageCount += 1;
+    try {
+      return await fn();
+    } finally {
+      this.activePageCount -= 1;
+      if (this.activePageCount === 0 && this.pageDrainWaiters.length > 0) {
+        const waiters = this.pageDrainWaiters.splice(0);
+        for (const resolve of waiters) {
+          resolve();
+        }
+      }
+      pageGuard.dispose();
+    }
+  }
 }
 
 export class ToolHandlerLoader {
@@ -107,11 +177,16 @@ export class ToolExecutionRouter {
       }
 
       const accumulator = new ToolResponseAccumulator();
-      await handler.handler(
-        {params},
-        accumulator as Response,
-        this.defineToolContextFactory.create(),
-      );
+      try {
+        await handler.handler(
+          {params},
+          accumulator as Response,
+          this.defineToolContextFactory.create(),
+        );
+        await accumulator.materialize(this.contextProvider);
+      } finally {
+        accumulator.cleanupListeners();
+      }
       return accumulator.toJSON();
     }
 
@@ -160,6 +235,7 @@ export class ToolExecutionRouter {
 
 export class ToolExecutionPipeline {
   private readonly prerequisiteChecker?: ToolPrerequisiteChecker;
+  private readonly concurrencyQueue = new ConcurrencyQueue();
 
   constructor(
     private readonly loader: ToolHandlerLoader,
@@ -205,11 +281,18 @@ export class ToolExecutionPipeline {
       try {
         params = this.validateAndPrepare(toolName, rawParams, meta);
         const handler = await this.loadHandler(toolName, meta);
-        const response = await this.processRequest(
-          meta,
-          handler,
-          params,
-          toolName,
+        this.checkDialogBlock(toolName, handler);
+
+        const concurrency = isToolDefinition(handler)
+          ? handler.concurrency
+          : undefined;
+        const pageKey = this.resolvePageKey();
+
+        const response = await this.concurrencyQueue.run(
+          concurrency,
+          pageKey,
+          async () =>
+            await this.processRequest(meta, handler, params!, toolName),
         );
 
         this.recordSuccess(toolName, params, response, startedAt, traceId);
@@ -219,6 +302,42 @@ export class ToolExecutionPipeline {
         throw this.wrapError(error, toolName);
       }
     }, signal);
+  }
+
+  private resolvePageKey(): string {
+    if (!this.contextProvider) return 'default';
+    try {
+      const page = this.contextProvider.getSelectedPage();
+      if (!page) return 'default';
+      return this.contextProvider.getPageId(page);
+    } catch {
+      return 'default';
+    }
+  }
+
+  private checkDialogBlock(toolName: string, handler: LoadedHandler): void {
+    if (!isToolDefinition(handler) || handler.blockedByDialog !== true) {
+      return;
+    }
+    const dialog =
+      typeof this.contextProvider?.getDialog === 'function'
+        ? this.contextProvider.getDialog()
+        : undefined;
+    if (dialog) {
+      throw createToolError(
+        ErrorCodes.PREREQUISITE,
+        `Page has an open "${dialog.type()}" dialog ("${dialog.message()}"). Handle it with handle_dialog before calling "${toolName}".`,
+        {toolName, dialogType: dialog.type()},
+        {
+          retryable: false,
+          recovery: {
+            tool: 'handle_dialog',
+            command: 'browsercli handle_dialog --action accept',
+            reason: 'Accept or dismiss the open dialog before retrying.',
+          },
+        },
+      );
+    }
   }
 
   private generateTraceId(startedAt: number): string {

@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict';
 import {describe, it} from 'node:test';
 
-import {getCssStyles} from '../../../../src/tools/css/getCssStyles.js';
+import {getCssStyles} from '../../../../src/tools/css.js';
 
 interface Capture {
   content?: Record<string, unknown>;

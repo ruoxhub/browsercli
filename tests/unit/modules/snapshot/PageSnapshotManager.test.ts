@@ -139,6 +139,119 @@ describe('PageSnapshotManager', () => {
     });
   });
 
+  it('falls back to CDP Accessibility.getFullAXTree when page.accessibility is undefined (patchright v1.59+)', async () => {
+    const locatorsCalled: Array<{type: string; args: unknown[]}> = [];
+    let detached = false;
+    const mockCdpSession = {
+      send: async (method: string) => {
+        if (method === 'Accessibility.getFullAXTree') {
+          return {
+            nodes: [
+              {
+                nodeId: '1',
+                ignored: false,
+                role: {type: 'role', value: 'RootWebArea'},
+                name: {type: 'computedString', value: 'CDP Page'},
+                childIds: ['2'],
+              },
+              {
+                nodeId: '2',
+                parentId: '1',
+                ignored: true,
+                role: {type: 'internalRole', value: 'none'},
+                childIds: ['3', '4', '5'],
+              },
+              {
+                nodeId: '3',
+                parentId: '2',
+                ignored: false,
+                role: {type: 'role', value: 'heading'},
+                name: {type: 'computedString', value: 'Welcome'},
+                properties: [{name: 'level', value: {type: 'integer', value: 1}}],
+                childIds: ['6'],
+              },
+              {
+                nodeId: '6',
+                parentId: '3',
+                ignored: false,
+                role: {type: 'role', value: 'StaticText'},
+                name: {type: 'computedString', value: 'Welcome'},
+                childIds: [],
+              },
+              {
+                nodeId: '4',
+                parentId: '2',
+                ignored: false,
+                role: {type: 'role', value: 'button'},
+                name: {type: 'computedString', value: 'Submit'},
+                childIds: ['7'],
+              },
+              {
+                nodeId: '7',
+                parentId: '4',
+                ignored: false,
+                role: {type: 'role', value: 'StaticText'},
+                name: {type: 'computedString', value: 'Submit'},
+                childIds: [],
+              },
+              {
+                nodeId: '5',
+                parentId: '2',
+                ignored: false,
+                role: {type: 'role', value: 'textbox'},
+                name: {type: 'computedString', value: 'Email'},
+                value: {type: 'string', value: 'alice@example.com'},
+                properties: [
+                  {name: 'focused', value: {type: 'boolean', value: true}},
+                ],
+                childIds: [],
+              },
+            ],
+          };
+        }
+        return {};
+      },
+      detach: async () => {
+        detached = true;
+      },
+    };
+
+    const pageWithoutAccessibility = {
+      context: () => ({
+        newCDPSession: async () => mockCdpSession,
+      }),
+      getByRole: (role: string, options?: {name?: string | RegExp}) => {
+        locatorsCalled.push({type: 'getByRole', args: [role, options]});
+        return {role, options};
+      },
+      getByText: (text: string) => ({text}),
+      locator: (selector: string) => ({selector}),
+    };
+
+    const manager = new PageSnapshotManager();
+    const result = await manager.capture(pageWithoutAccessibility as any);
+
+    assert.equal(detached, true);
+    assert.equal(result.root.name, 'CDP Page');
+    assert.equal(result.nodeCount, 4);
+    assert.ok(result.formattedText.includes('heading "Welcome" (level=1)'));
+    assert.ok(result.formattedText.includes('button "Submit"'));
+    assert.ok(
+      result.formattedText.includes(
+        'textbox "Email" value="alice@example.com" (focused)',
+      ),
+    );
+    assert.equal(result.formattedText.includes('Empty Document'), false);
+
+    const buttonUid = Array.from(result.idToNode.entries()).find(
+      ([_, node]) => node.role === 'button',
+    )?.[0];
+    assert.ok(buttonUid);
+    manager.getLocatorByUid(pageWithoutAccessibility as any, buttonUid);
+    assert.equal(locatorsCalled[0]?.type, 'getByRole');
+    assert.equal(locatorsCalled[0]?.args[0], 'button');
+  });
+
   it('provides a singleton globalPageSnapshotManager', () => {
     assert.ok(globalPageSnapshotManager instanceof PageSnapshotManager);
   });

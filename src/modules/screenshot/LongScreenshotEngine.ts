@@ -22,7 +22,7 @@ export async function preparePageForLongScreenshot(page: Page): Promise<{
   try {
     const handle = await page.evaluateHandle(() => {
       const original = {x: window.scrollX, y: window.scrollY};
-      const changes: (() => void)[] = [];
+      const changes: Array<() => void> = [];
 
       // 禁用平滑滚动与过渡动画以保证截图稳定
       const style = document.createElement('style');
@@ -61,7 +61,11 @@ export async function preparePageForLongScreenshot(page: Page): Promise<{
         restore: () => {
           style.remove();
           for (const restore of changes.reverse()) restore();
-          window.scrollTo({left: original.x, top: original.y, behavior: 'instant'});
+          window.scrollTo({
+            left: original.x,
+            top: original.y,
+            behavior: 'instant',
+          });
         },
       };
     });

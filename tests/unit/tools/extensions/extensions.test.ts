@@ -18,7 +18,7 @@ import {
   reloadExtension,
   triggerExtensionAction,
   uninstallExtension,
-} from '../../../../src/tools/extensions/extensions.js';
+} from '../../../../src/tools/extensions.js';
 
 interface MockResponseCapture {
   lines: string[];

@@ -5,13 +5,12 @@
  */
 
 /**
- * Worker — 本地 daemon 进程入口
+ * Worker — 本地 daemon 进程入口（ADR-0006 / ADR-0008）
  *
  * 职责：
- * 1. 解析 CLI 参数并播种 RuntimeConfigStore
- * 2. 初始化 Runtime（创建 BrowserManager 实例但不自动连接）
- * 3. 初始化 ToolContextProvider（未连接状态）
- * 4. 启动 Web 控制台，以及供 CLI (browsercli) 通信的本机会话 IPC 命名管道
+ * 1. 解析 daemon CLI 参数并播种 RuntimeConfigStore
+ * 2. 直接构造 SessionContext + BrowserManager（零 getRuntime() 依赖）
+ * 3. 启动供 browsercli 通信的本机会话 IPC 命名管道并写入注册表
  */
 
 import {buildDaemonArgPlan} from './ipc/daemonArgs.js';

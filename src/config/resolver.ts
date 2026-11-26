@@ -4,30 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-/* eslint-disable import/no-cycle -- 已知例外：loadUserConfig() 播种 store 与 getRuntimeConfigStore() 读回 store 的初始化时序契约。见 spec §2.1 目标 2 与 §5.1 环 1 决议 A，Phase 4 复核。 */
-
-/**
- * 核心配置基础设施 — 配置文件读写、环境变量工具、CLI 配置解析、RuntimeConfigStore 播种
- *
- * 配置优先级（高 → 低）：
- * 1. CLI 参数（--browserUrl 等）
- * 2. 配置文件（~/.browsercli/config.json）
- * 3. 内置默认值
- *
- * 默认使用 ~/.browsercli/config.json 配置，不再支持 .env。
- * 配置载入后存入 RuntimeConfigStore 内存态，由前端控制面板管理。
- */
-
-import {existsSync, mkdirSync, readFileSync, writeFileSync} from 'node:fs';
+import {existsSync, mkdirSync, writeFileSync} from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
 import {parseEnvBoolean} from './browserInvariants.js';
-import {
-  RUNTIME_DIR_NAME,
-  USER_CONFIG_DIR_NAME,
-  USER_CONFIG_FILENAME,
-} from './constants.js';
+import {defaultConfigLocator} from './ConfigLocator.js';
+import {loadUserConfigFile} from './ConfigParser.js';
+import {RUNTIME_DIR_NAME} from './constants.js';
 import {getRuntimeConfigStore} from './RuntimeConfigStore.js';
 import {
   type GlobalConfig,
@@ -196,8 +180,10 @@ export function configFromEnv(): GlobalConfig {
       continue;
 
     if (BOOLEAN_CONFIG_KEYS.has(configKey)) {
-      (result as Record<string, unknown>)[configKey] =
-        value === 'true' || value === '1';
+      const parsedBool = parseEnvBoolean(value);
+      if (parsedBool !== undefined) {
+        (result as Record<string, unknown>)[configKey] = parsedBool;
+      }
     } else {
       (result as Record<string, unknown>)[configKey] = value;
     }
@@ -258,27 +244,12 @@ export function configFromEnv(): GlobalConfig {
 
 /** 获取用户级配置文件路径 (~/.browsercli/config.json，支持 BROWSERCLI_CONFIG_DIR 覆盖) */
 export function getUserConfigPath(): string {
-  const custom =
-    process.env.BROWSERCLI_CONFIG_DIR ?? process.env.PROXYCLI_CONFIG_DIR;
-  if (custom) return path.join(custom, USER_CONFIG_FILENAME);
-  return path.join(os.homedir(), USER_CONFIG_DIR_NAME, USER_CONFIG_FILENAME);
+  return defaultConfigLocator.getPrimaryConfigPath();
 }
 
-/** 加载用户级配置文件 (~/.browsercli/config.json) */
-export function loadUserConfig(filePath = getUserConfigPath()): GlobalConfig {
-  try {
-    if (!existsSync(filePath)) return {};
-    const content = readFileSync(filePath, 'utf-8')
-      .trim()
-      .replace(/^\uFEFF/, '');
-    if (!content) return {};
-    return validateGlobalConfig(JSON.parse(content));
-  } catch (error) {
-    console.warn(
-      `[Config] 读取配置文件失败: ${filePath} — ${error instanceof Error ? error.message : error}`,
-    );
-    return {};
-  }
+/** 加载用户级配置文件（未传路径时通过 ConfigLocator 自动发现首个存在的配置文件） */
+export function loadUserConfig(filePath?: string): GlobalConfig {
+  return loadUserConfigFile(filePath);
 }
 
 /** 写入用户级配置文件 (~/.browsercli/config.json) */

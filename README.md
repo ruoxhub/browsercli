@@ -162,50 +162,42 @@ browsercli stop --all
 
 ## 5. CLI 核心用法与工具调用
 
-### 5.1 工具调用规范：`browsercli call`
+### 5.1 工具调用规范
 
-在 Browser-CLI 中，Tool 是能力的唯一暴露单元（定义于 `src/tools/`），通过 `browsercli call <tool_name> [options]` 调用：
+在 Browser-CLI 中，Tool 是能力的唯一暴露单元（定义于 `src/tools/`），每个工具都注册为一级命令，直接 `browsercli <tool_name> [options]` 调用：
 
 ```bash
 # 1. 页面导航
-browsercli call navigate_page --url "https://example.com"
+browsercli navigate_page --url "https://example.com"
 
 # 2. 检索当前页面的所有网络请求
-browsercli call list_network_requests
+browsercli list_network_requests
 
 # 3. 追踪特定网络请求的发起调用栈 (Request Initiator)
-browsercli call get_request_initiator --requestId "<REQUEST_ID>"
+browsercli get_request_initiator --requestId "<REQUEST_ID>"
 
-# 4. 向页面注入加密算法拦截 Hook
-browsercli call inject_hook --code "window.__hooked = true;"
+# 4. 向页面注入自定义 Hook 脚本
+browsercli inject_hook my-hook --script "window.__hooked = true;"
 
 # 5. 读取 Hook 拦截并回传的结构化数据
-browsercli call get_hook_data --hookId "crypto-hook-1"
+browsercli get_hook_data --hookId "crypto-hook-1"
 
 # 6. 读取页面控制台捕获的日志
-browsercli call list_console_messages
+browsercli list_console_messages
 
 # 7. 在页面上下文中执行自定义 JS
-browsercli call evaluate_script --function "() => document.title"
+browsercli evaluate_script --function "() => document.title"
 ```
 
-### 5.2 工具发现与分类 (`browsercli list-tools`)
+工具名可用 snake_case 或 kebab-case（如 `evaluate-script`），全部工具清单见 [`docs/reference/tool-reference.md`](docs/reference/tool-reference.md) 与 [`skills/browsercli/SKILL.md`](skills/browsercli/SKILL.md)。
 
-```bash
-# 查看所有可用工具列表
-browsercli list-tools
-
-# 查看指定分类下的工具
-browsercli list-tools --category network
-```
-
-### 5.3 Tool Profiles（工具档位）
+### 5.2 Tool Profiles（工具档位）
 
 Browser-CLI 支持通过 `JS_REVERSE_TOOL_PROFILE` 环境变量在两档工具集合中切换，在 Token 成本与能力丰富度之间按需权衡：
 
 | Profile        | 工具数 | 适用场景                                                                                    |
 | -------------- | ------ | ------------------------------------------------------------------------------------------- |
-| `workflow`     | 53     | 浏览器自动化 + JS 逆向日常高频：页面导航、DOM 查询、输入交互、网络监听、基础 Hook、脚本抓取 |
+| `workflow`     | 54     | 浏览器自动化 + JS 逆向日常高频：页面导航、DOM 查询、输入交互、网络监听、基础 Hook、脚本抓取 |
 | `full`（默认） | 90     | 涵盖全部能力：CDP 断点单步调试、WASM 逆向分析、反反调试绕过、屏幕与视频录制等               |
 
 切换示例：
@@ -214,11 +206,10 @@ Browser-CLI 支持通过 `JS_REVERSE_TOOL_PROFILE` 环境变量在两档工具�
 JS_REVERSE_TOOL_PROFILE=workflow browsercli start --channel chrome
 ```
 
-### 5.4 其他辅助命令
+### 5.3 其他辅助命令
 
-- `browsercli jobs`：查看或取消异步长耗时逆向任务。
+- `browsercli screencast_start` / `browsercli screencast_stop`：页面录屏的启动与停止。
 - `browsercli config`：查看、设置或初始化全局与运行时配置。
-- `browsercli scaffold`：创建标准化的逆向分析任务目录骨架。
 
 ---
 
@@ -228,8 +219,9 @@ JS_REVERSE_TOOL_PROFILE=workflow browsercli start --channel chrome
 Browser-CLI/
 ├── src/
 │   ├── cli/                         # CLI 客户端实现 (browsercli 可执行程序)
-│   │   ├── bin/browsercli.ts        # CLI 二进制入口 (基于 axi-sdk-js)
-│   │   ├── commands/                # CLI 子命令 (start, stop, status, call, list-tools 等)
+│   │   ├── bin/browsercli.ts        # CLI 二进制入口 (基于 yargs)
+│   │   ├── cli.ts / cliCommands.ts  # 顶层命令与静态工具一级命令分发
+│   │   ├── toolInvoke.ts            # 工具调用管线与参数归一化
 │   │   └── daemonClient.ts          # IPC Socket 客户端与连接池
 │   ├── ipc/                         # 本地命名管道 / Unix Socket 通信层
 │   │   ├── socketConnection.ts      # NDJSON 帧编解码协议
@@ -237,23 +229,23 @@ Browser-CLI/
 │   │   └── registry.ts              # 会话注册表 (workspace-hash 隔离)
 │   ├── worker/                      # Daemon Worker 运行时
 │   │   ├── daemonMain.ts            # Worker 启动入口与就绪握手
-│   │   ├── ToolExecutionPipeline.ts # 工具执行管线 (校验 → 上下文装配 → 管道执行)
-│   │   └── ToolAdapter.ts           # defineTool 到管线适配层
-│   ├── tools/                       # 90 个核心能力工具 (按 20 个领域划分)
-│   │   ├── ToolDefinition.ts        # defineTool DSL 核心定义
+│   │   ├── ToolExecutor.ts          # 单一直线工具执行引擎 (校验 → 队列 → 响应物化)
+│   │   └── ToolAdapter.ts           # defineTool 到执行引擎适配层
+│   ├── tools/                       # 90 个核心能力工具 (扁平化按领域单文件组织)
+│   │   ├── ToolDefinition.ts        # definePageTool / defineBrowserTool / defineStatelessTool
 │   │   ├── generated-tools-index.ts # 自动生成的全量工具注册索引
-│   │   ├── hook/                    # JS Hook 注入与数据管理工具
-│   │   ├── network/                 # 网络请求与 WebSocket 抓包分析工具
-│   │   ├── debugger/                # CDP 断点与单步调试工具
-│   │   ├── collector/               # 页面所有 JS 脚本收集与依赖分析工具
-│   │   ├── wasm/                    # WebAssembly 逆向与探针工具
-│   │   ├── anti-debug/              # 反反调试与无限 debugger 绕过工具
-│   │   └── input/, dom/, page/...   # DOM 拟人化交互、截图、视频录制等工具
+│   │   ├── hook.ts                  # JS Hook 注入与数据管理工具
+│   │   ├── network.ts               # 网络请求与 WebSocket 抓包分析工具
+│   │   ├── debugger.ts              # CDP 断点与单步调试工具
+│   │   ├── collector.ts             # 页面所有 JS 脚本收集与依赖分析工具
+│   │   ├── wasm.ts                  # WebAssembly 逆向与探针工具
+│   │   ├── anti-debug.ts            # 反反调试与无限 debugger 绕过工具
+│   │   └── input.ts, dom.ts, ...    # DOM 交互、截图、录屏、扩展管理等工具
 │   ├── modules/                     # 底层逆向与浏览器核心引擎
-│   │   ├── browser/                 # BrowserManager (单例，连接管理与崩溃自愈)
+│   │   ├── browser/                 # BrowserManager (连接管理、仿真、WaitForHelper)
 │   │   ├── collector/               # CodeCollector (脚本拦截与缓存引擎)
 │   │   ├── hook/                    # HookManager (代码构建器与采样存储)
-│   │   ├── deobfuscator/            # 反混淆主管道 (AST 优化、Packer、JSVMP)
+│   │   ├── snapshot/                # PageSnapshotManager (CDP AX / VOM 快照引擎)
 │   │   └── wasm/                    # WASM 收集、二进制分析与反编译
 │   ├── utils/                       # EventBus、统一缓存、安全序列化与日志
 │   ├── config/                      # 配置解析管线 (CLI > Env > Config File > Defaults)
@@ -318,6 +310,9 @@ Browser-CLI/
   - 全量工具参考（自动同步）：[docs/reference/tool-reference.md](docs/reference/tool-reference.md)
   - 工具输入输出契约：[docs/reference/tool-io-contract.md](docs/reference/tool-io-contract.md)
   - 逆向任务索引：[docs/reference/reverse-task-index.md](docs/reference/reverse-task-index.md)
+  - 公开案例索引：[scripts/cases/README.md](scripts/cases/README.md)
+  - 逆向更新提示模板：[docs/reference/reverse-update-prompt-template.md](docs/reference/reverse-update-prompt-template.md)
+  - 逆向报告模板：[docs/reference/reverse-report-template.md](docs/reference/reverse-report-template.md)
   - 补环境规范手册：[docs/reference/env-patching.md](docs/reference/env-patching.md)
 
 ---

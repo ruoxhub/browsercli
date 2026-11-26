@@ -430,6 +430,7 @@ export class HookCodeBuilder {
     lines.push(
       `  try { Object.defineProperty(${target.expression}, 'name', { value: __original.name }); } catch(e) {}`,
     );
+    lines.push(...this.buildRestoreRegistration(target.expression, label, hookId));
     lines.push(``);
 
     lines.push(`  console.log('[${hookId}] ✅ Hooked: ${label}');`);
@@ -439,6 +440,23 @@ export class HookCodeBuilder {
   }
 
   // ==================== 内部构建方法 ====================
+
+  /**
+   * 登记页面侧 PageHook 还原句柄，供 remove_hook 卸载时恢复原始函数引用。
+   */
+  private buildRestoreRegistration(
+    targetExpr: string,
+    label: string,
+    hookId: string,
+  ): string[] {
+    return [
+      `  window.__mcp_hooks__ = window.__mcp_hooks__ || {};`,
+      `  window.__mcp_hooks__[${JSON.stringify(hookId)}] = {`,
+      `    target: ${JSON.stringify(label)},`,
+      `    restore: function() { ${targetExpr} = __original; },`,
+      `  };`,
+    ];
+  }
 
   /**
    * 生成栈帧截取 JS 表达式字符串。
@@ -474,6 +492,7 @@ export class HookCodeBuilder {
         `  try { Object.defineProperty(${target.expression}, 'length', { value: __original.length }); } catch(e) {}`,
         `  try { Object.defineProperty(${target.expression}, 'name', { value: __original.name }); } catch(e) {}`,
         `  try { Object.setPrototypeOf(${target.expression}, __original); } catch(e) {}`,
+        ...this.buildRestoreRegistration(target.expression, label, hookId),
         `  console.log('[${hookId}] ✅ Replaced: ${label}');`,
         `})();`,
       ].join('\n');
@@ -502,6 +521,7 @@ export class HookCodeBuilder {
       `  try { Object.defineProperty(${target.expression}, 'length', { value: __original.length }); } catch(e) {}`,
       `  try { Object.defineProperty(${target.expression}, 'name', { value: __original.name }); } catch(e) {}`,
       `  try { Object.setPrototypeOf(${target.expression}, __original); } catch(e) {}`,
+      ...this.buildRestoreRegistration(target.expression, label, hookId),
       `  console.log('[${hookId}] ✅ Replaced (async-aware): ${label}');`,
       `})();`,
     ].join('\n');

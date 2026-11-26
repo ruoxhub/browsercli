@@ -22,30 +22,6 @@ export interface WorkerContext {
   connect: () => Promise<DaemonLike>;
 }
 
-export interface ToolRecovery {
-  tool?: string;
-  command?: string;
-  reason: string;
-}
-
-export interface JobStatus {
-  jobId: string;
-  sessionId: string;
-  tool?: string;
-  status: 'pending' | 'running' | 'done' | 'failed' | 'timed_out' | 'cancelled';
-  result?: unknown;
-  error?: {
-    code: string;
-    message: string;
-    retryable?: boolean;
-    recovery?: ToolRecovery;
-    details?: Record<string, unknown>;
-  };
-  logs: string[];
-  createdAt: string;
-  finishedAt?: string;
-}
-
 export type BrowserConnectionMode =
   | 'attach'
   | 'ws-endpoint'

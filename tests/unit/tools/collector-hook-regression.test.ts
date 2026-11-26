@@ -7,7 +7,7 @@ import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
 import {setRuntime} from '../../../src/runtime.js';
-import {collectCode as toolCollectCode} from '../../../src/tools/collector/collectCode.js';
+import {collectCode as toolCollectCode} from '../../../src/tools/collector.js';
 import {
   buildRequestBindings,
   getHookData as toolGetHookData,
@@ -17,11 +17,10 @@ import {
   removeHook as toolRemoveHook,
   summarizeHookRecords,
   toHookRecordArray,
-} from '../../../src/tools/hook/index.js';
+} from '../../../src/tools/hook.js';
 import {ToolError} from '../../../src/utils/errors.js';
 
 async function collectCode(runtime: any, params?: any) {
-  setRuntime(runtime);
   const request = {params: params || {}};
   const response = {
     structuredContent: null as any,
@@ -31,17 +30,15 @@ async function collectCode(runtime: any, params?: any) {
   };
   const context = {
     getSelectedFrame: () => null,
+    getCodeCollector: () => runtime.collector,
+    syncPageContext: () => undefined,
   };
-  try {
-    await toolCollectCode.handler(
-      request as any,
-      response as any,
-      context as any,
-    );
-    return response.structuredContent;
-  } finally {
-    setRuntime(undefined);
-  }
+  await toolCollectCode.handler(
+    request as any,
+    response as any,
+    context as any,
+  );
+  return response.structuredContent;
 }
 
 async function getHookData(frame: any, params?: any) {
@@ -82,7 +79,7 @@ async function syncHookRecords(frame: any, params?: any) {
   return response.structuredContent;
 }
 
-async function removeHook(frame: any, params?: any) {
+async function removeHook(frame: any, params?: any, hookManager?: any) {
   const request = {params: params || {}};
   const response = {
     structuredContent: null as any,
@@ -92,6 +89,7 @@ async function removeHook(frame: any, params?: any) {
   };
   const context = {
     getSelectedFrame: () => frame,
+    ...(hookManager ? {getHookManager: () => hookManager} : {}),
   };
   await toolRemoveHook.handler(request as any, response as any, context as any);
   return response.structuredContent;
@@ -463,19 +461,11 @@ describe('collector/hook regressions', () => {
       hookId: 'hook_from_params',
     });
 
-    setRuntime({
-      hookManager: {
-        remove: () => true,
-      },
-    } as never);
-    let removeResult;
-    try {
-      removeResult = await removeHook(frame as never, {
-        hookId: 'hook_from_params',
-      });
-    } finally {
-      setRuntime(undefined);
-    }
+    const removeResult = await removeHook(
+      frame as never,
+      {hookId: 'hook_from_params'},
+      {remove: () => true},
+    );
 
     assert.strictEqual(getResult.success, true);
     assert.match(getResult.message, /hook_from_params/);

@@ -139,6 +139,30 @@ export class ExtensionManager {
     return list.get(id);
   }
 
+  private async readManifestActionPopup(
+    extensionDir: string,
+  ): Promise<string | undefined> {
+    if (!extensionDir) return undefined;
+    const manifestPath = path.join(extensionDir, 'manifest.json');
+    try {
+      const raw = await fs.readFile(manifestPath, 'utf8');
+      const manifest = JSON.parse(raw) as {
+        action?: {default_popup?: string};
+        browser_action?: {default_popup?: string};
+        page_action?: {default_popup?: string};
+      };
+      const popup =
+        manifest.action?.default_popup ??
+        manifest.browser_action?.default_popup ??
+        manifest.page_action?.default_popup;
+      return typeof popup === 'string' && popup.trim().length > 0
+        ? popup.trim().replace(/^\.?\//, '')
+        : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
   async triggerExtensionAction(id: string): Promise<void> {
     const extension = await this.getExtension(id);
     if (!extension) {
@@ -165,35 +189,65 @@ export class ExtensionManager {
     const session = await this.createBrowserCDPSession();
     if (session) {
       try {
-        const targetsRes = await session.send('Target.getTargets');
+        // CDP Target.getTargets 默认排除 type="tab" 目标（见 CDP TargetFilter 规范），
+        // 必须显式传入 filter 包含 tab，否则 Extensions.triggerAction 拿不到合法的 tab targetId。
+        let targetsRes: {targetInfos?: Array<Record<string, unknown>>};
+        try {
+          targetsRes = await session.send('Target.getTargets', {
+            filter: [{type: 'tab', exclude: false}, {}],
+          });
+        } catch {
+          targetsRes = await session.send('Target.getTargets');
+        }
         const targetInfos = targetsRes?.targetInfos ?? [];
         const pageUrl =
           page && typeof page.url === 'function' ? page.url() : undefined;
-        // Find tab target
+        // Find matching tab target for the selected page
         const tabTarget =
           targetInfos.find(
             (t: any) =>
               t.type === 'tab' && (pageUrl ? t.url === pageUrl : true),
           ) || targetInfos.find((t: any) => t.type === 'tab');
 
-        const effectiveTargetId = tabTarget?.targetId ?? targetId;
+        const effectiveTargetId =
+          (tabTarget?.targetId as string | undefined) ?? targetId;
 
-        await session.send('Extensions.triggerAction', {
-          id,
-          ...(effectiveTargetId ? {targetId: effectiveTargetId} : {}),
-        });
-      } catch (err: any) {
-        const targetsRes = await session
-          .send('Target.getTargets')
-          .catch(() => ({}));
-        const summary = (targetsRes?.targetInfos ?? []).map((t: any) => ({
-          id: t.targetId,
-          type: t.type,
-          url: t.url,
-        }));
-        throw new Error(
-          `${err?.message || err}. Targets: ${JSON.stringify(summary)}`,
-        );
+        try {
+          await session.send('Extensions.triggerAction', {
+            id,
+            ...(effectiveTargetId ? {targetId: effectiveTargetId} : {}),
+          });
+        } catch (triggerErr: any) {
+          const errMsg = triggerErr?.message || String(triggerErr);
+          const popupPath = await this.readManifestActionPopup(extension.path);
+          if (popupPath) {
+            const popupUrl = `chrome-extension://${id}/${popupPath}`;
+            if (page && typeof page.context === 'function') {
+              const ctx = page.context();
+              if (ctx && typeof ctx.newPage === 'function') {
+                const popupPage = await ctx.newPage();
+                await popupPage.goto(popupUrl, {
+                  waitUntil: 'domcontentloaded',
+                });
+                return;
+              }
+            }
+            await session.send('Target.createTarget', {url: popupUrl});
+            return;
+          }
+          if (/wasn't found|not found|unknown command/i.test(errMsg)) {
+            throw new Error(
+              `Connected Chromium does not expose CDP Extensions.triggerAction (${errMsg}). ` +
+                `Upgrade to Chrome 145+ with --enable-unsafe-extension-debugging, or declare action.default_popup in manifest.json for popup fallback.`,
+            );
+          }
+          const summary = targetInfos.map((t: any) => ({
+            id: t.targetId,
+            type: t.type,
+            url: t.url,
+          }));
+          throw new Error(`${errMsg}. Targets: ${JSON.stringify(summary)}`);
+        }
       } finally {
         await session.detach().catch(() => {});
       }

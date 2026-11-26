@@ -50,7 +50,11 @@ export class ToolCallContextGuard {
     return this.consecutiveCount;
   }
 
-  enrichResponse<T>(toolName: string, response: T): T {
+  enrichResponse<T>(
+    toolName: string,
+    response: T,
+    overrideMeta?: ToolTabContext,
+  ): T {
     if (typeof response !== 'object' || response === null) return response;
 
     const target = response as Record<string, unknown>;
@@ -69,10 +73,8 @@ export class ToolCallContextGuard {
 
     if (!this.isContextSensitive(toolName)) return response;
 
-    const provider = this.getProvider();
-    if (!provider) return response;
-
-    const meta = provider.getContextMeta();
+    const meta = overrideMeta ?? this.getProvider()?.getContextMeta();
+    if (!meta) return response;
     if (!meta.pageId && meta.tabIndex === null) return response;
 
     if (!('_tabContext' in structured)) {

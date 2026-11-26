@@ -16,7 +16,7 @@ import {chromium, type Browser, type Page} from 'patchright';
 
 import type {DebuggerManager} from '../../src/modules/debugger/DebuggerManager.js';
 import type {ScriptInfo} from '../../src/modules/debugger/ScriptManager.js';
-import {getScriptSource} from '../../src/tools/debugger/index.js';
+import {getScriptSource} from '../../src/tools/debugger.js';
 import {DebuggerContextProvider} from '../../src/worker/context/DebuggerContextProvider.js';
 
 const runBrowserTests = process.env.RUN_BROWSER_TESTS === 'true';

@@ -11,14 +11,17 @@
  * name / description / schema 从对应 defineTool 的导出自动提取。
  */
 
-import {GENERATED_DOMAIN_MANIFESTS} from '../tools/generated-tools-index.js';
+import {
+  GENERATED_DOMAIN_MANIFESTS,
+  STATIC_TOOL_HANDLERS,
+} from '../tools/generated-tools-index.js';
 import type {ToolProfile} from '../tools/manifest.js';
 import {
   ToolRegistry,
   type RegisteredToolEntry,
 } from '../tools/registry/ToolRegistry.js';
 import type {
-  ToolDefinition,
+  AnyToolDefinition,
   ToolRuntimeRequirements,
 } from '../tools/ToolDefinition.js';
 
@@ -52,6 +55,7 @@ export interface ToolRegistryEntry {
  */
 export interface ToolMeta {
   name: string;
+  aliases?: string[];
   description: string;
   /** 简化类型映射 (key → 'string'|'number'|'boolean'|'string[]') */
   schema: Record<string, string>;
@@ -128,15 +132,20 @@ export function areRequirementsEqual(
 }
 
 /**
- * 从 defineTool 模块中提取 ToolMeta
+ * 从静态工具注册表（优先，O(1) 无动态 import）或动态模块中提取 ToolMeta（ADR-0009）。
  */
 export async function loadToolMeta(
   entry: ToolRegistryEntry,
 ): Promise<ToolMeta | null> {
   try {
-    const modulePath = `../tools${entry.modulePath.replace(/^\./, '')}`;
-    const module = await import(modulePath);
-    const handler = module[entry.handlerName];
+    const staticKey = `${entry.modulePath}:${entry.handlerName}`;
+    let handler: unknown = STATIC_TOOL_HANDLERS[staticKey];
+
+    if (!handler) {
+      const modulePath = `../tools${entry.modulePath.replace(/^\./, '')}`;
+      const module = await import(modulePath);
+      handler = module[entry.handlerName];
+    }
 
     if (!handler) {
       console.warn(
@@ -145,13 +154,13 @@ export async function loadToolMeta(
       return null;
     }
 
-    // defineTool 返回 ToolDefinition 对象
+    // defineTool / definePageTool / defineBrowserTool / defineStatelessTool 返回对象
     if (
       typeof handler === 'object' &&
       handler !== null &&
-      typeof handler.handler === 'function'
+      typeof (handler as AnyToolDefinition).handler === 'function'
     ) {
-      const def = handler as ToolDefinition;
+      const def = handler as AnyToolDefinition;
 
       if (
         entry.requirements &&
@@ -172,6 +181,7 @@ export async function loadToolMeta(
 
       return {
         name: def.name,
+        ...(def.aliases?.length ? {aliases: def.aliases} : {}),
         description: def.description,
         schema: schemaTypeMap,
         argSpecs,
@@ -210,7 +220,15 @@ async function getToolsMeta(): Promise<ToolMeta[]> {
   const results = await Promise.all(TOOL_REGISTRY.map(loadToolMeta));
   toolsMetaCache = results.filter((m): m is ToolMeta => m !== null);
 
-  toolsByNameCache = new Map(toolsMetaCache.map(t => [t.name, t]));
+  toolsByNameCache = new Map<string, ToolMeta>();
+  for (const t of toolsMetaCache) {
+    toolsByNameCache.set(t.name, t);
+    for (const alias of t.aliases ?? []) {
+      if (!toolsByNameCache.has(alias)) {
+        toolsByNameCache.set(alias, t);
+      }
+    }
+  }
 
   return toolsMetaCache;
 }
@@ -265,7 +283,7 @@ export async function getToolMetaAsync(
   name: string,
 ): Promise<ToolMeta | undefined> {
   const meta = await getToolsMeta();
-  return meta.find(t => t.name === name);
+  return meta.find(t => t.name === name || t.aliases?.includes(name));
 }
 
 /**

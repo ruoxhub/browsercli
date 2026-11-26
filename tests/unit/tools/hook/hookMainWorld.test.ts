@@ -11,9 +11,9 @@ import vm from 'node:vm';
 import type {Frame} from 'patchright';
 
 import {setRuntime} from '../../../../src/runtime.js';
-import {injectHook} from '../../../../src/tools/hook/InjectHook.js';
-import {removeHook} from '../../../../src/tools/hook/RemoveHook.js';
-import {HOOK_STORE_KEY} from '../../../../src/tools/hook/store-utils.js';
+import {injectHook} from '../../../../src/tools/hook.js';
+import {removeHook} from '../../../../src/tools/hook.js';
+import {HOOK_STORE_KEY} from '../../../../src/tools/hook.js';
 import type {Context} from '../../../../src/tools/ToolDefinition.js';
 import {ToolError} from '../../../../src/utils/errors.js';
 

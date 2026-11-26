@@ -121,6 +121,11 @@ export class HookManager {
 
   // ==================== Registry 代理 ====================
 
+  /** 获取底层插件注册表（供 SessionContext 共享模板表使用，ADR-0008） */
+  getRegistry(): HookTypeRegistry {
+    return this.registry;
+  }
+
   /** 注册自定义 hook 类型 */
   registerType(plugin: HookTypePlugin): void {
     this.registry.register(plugin);
@@ -149,8 +154,9 @@ export class HookManager {
   } {
     const {type, params = {}, hookId: customId} = options;
 
-    // 查找插件
-    const plugin = this.registry.get(type);
+    // 查找插件（兼容大小写，如 localStorage -> localstorage）
+    const plugin =
+      this.registry.get(type) ?? this.registry.get(type.toLowerCase());
     if (!plugin) {
       throw new Error(
         `Unknown hook type: "${type}". Available types: ${this.registry
@@ -159,11 +165,12 @@ export class HookManager {
           .join(', ')}`,
       );
     }
+    const resolvedType = plugin.name;
 
     // 创建 builder 并应用基础配置
     const hookId =
       customId ||
-      `${type}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+      `${resolvedType}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
     const builder = new HookCodeBuilder(hookId);
 
     // 应用通用配置
@@ -184,8 +191,8 @@ export class HookManager {
     // 保存元数据
     const meta: HookMeta = {
       hookId,
-      type,
-      description: options.description || `${type} hook`,
+      type: resolvedType,
+      description: options.description || `${resolvedType} hook`,
       enabled: true,
       createdAt: Date.now(),
       callCount: 0,

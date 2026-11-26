@@ -29,8 +29,7 @@ export function validateOutputPath(userPath: string): string {
   }
 
   // Relative paths: check for traversal outside allowed directory
-  const allowedBase =
-    process.env.BROWSER_OUTPUT_DIR?.trim() || process.cwd();
+  const allowedBase = process.env.BROWSER_OUTPUT_DIR?.trim() || process.cwd();
   const normalizedBase = path.resolve(allowedBase) + path.sep;
   const resolvedWithTrailingSep = resolved + path.sep;
 

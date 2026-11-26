@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict';
 import {describe, it} from 'node:test';
 
-import {injectHook} from '../../../../src/tools/hook/InjectHook.js';
+import {injectHook} from '../../../../src/tools/hook.js';
 
 describe('inject_hook world compatibility', () => {
   it('reports isolated requests as effective main world', async () => {

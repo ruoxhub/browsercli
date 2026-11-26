@@ -335,7 +335,9 @@ export function analyzeWebSocketFramesV2(
     durationMs = lastTimestamp - firstTimestamp;
   }
 
-  // Group by (direction, head4B, sizeCategory)
+  // Group by (direction, opcode, sizeCategory). head4B is display-only:
+  // including it in the key splits one binary message type into a group per
+  // payload value (auto-increment ids, timestamps) instead of one group.
   const groupMap = new Map<
     string,
     {
@@ -352,7 +354,7 @@ export function analyzeWebSocketFramesV2(
     const head4B = getHead4B(frame.payloadData, frame.opcode);
     const size = frame.payloadData.length;
     const sizeCategory = getSizeCategory(size);
-    const key = `${frame.direction}:${head4B}:${sizeCategory}`;
+    const key = `${frame.direction}:${frame.opcode}:${sizeCategory}`;
 
     if (!groupMap.has(key)) {
       groupMap.set(key, {

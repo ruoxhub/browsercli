@@ -6,7 +6,7 @@
 
 /**
  * Daemon 端 socket 服务：在本地命名管道（POSIX 为 unix socket）上提供
- * NDJSON 方法分发（tools/browser/jobs/events），替代原 /api/v1 HTTP 传输。
+ * NDJSON 方法分发（tools/browser/events），替代原 /api/v1 HTTP 传输。
  * 客户端见 browsercli/src/daemonClient.ts，帧协议见 ./socketConnection.ts。
  */
 
@@ -265,10 +265,6 @@ export async function startDaemonServer(
         return await handleBrowserConnect(params);
       case 'browser.disconnect':
         return await handleBrowserDisconnect(params);
-      case 'jobs.list':
-        return {jobs: deps.jobStore.list()};
-      case 'jobs.cancel':
-        return await handleJobsCancel(params);
       case 'subscribe': {
         const channels = Array.isArray(params.channels)
           ? (params.channels as string[])
@@ -417,36 +413,6 @@ export async function startDaemonServer(
         },
       );
     }
-  }
-
-  async function handleJobsCancel(
-    params: Record<string, unknown>,
-  ): Promise<unknown> {
-    const jobId = String(params.jobId ?? '');
-    let job;
-    try {
-      job = deps.jobStore.get(jobId);
-    } catch {
-      throw Object.assign(new Error(`job not found: ${jobId}`), {
-        code: 'JOB_NOT_FOUND',
-      });
-    }
-    if (!['pending', 'running'].includes(job.status)) return job;
-    const current = getActiveJob();
-    if (!current || current.jobId !== jobId) {
-      throw Object.assign(new Error(`job is not active: ${jobId}`), {
-        code: 'JOB_NOT_CANCELLABLE',
-      });
-    }
-    const force = params.force === true;
-    await abortActiveJob(
-      getActiveJob,
-      clearActiveJob,
-      deps.jobStore,
-      force,
-      'job cancelled by client',
-    );
-    return deps.jobStore.get(jobId);
   }
 
   await new Promise<void>((resolve, reject) => {

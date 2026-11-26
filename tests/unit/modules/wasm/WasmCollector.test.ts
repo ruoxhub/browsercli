@@ -115,4 +115,84 @@ describe('WasmCollector', () => {
     assert.ok(commands.includes('Page.removeScriptToEvaluateOnNewDocument'));
     assert.equal(result.totalRuntimeEvents, 1);
   });
+
+  it('supports clearPrevious on collect and deduplicated refreshFromPage', async () => {
+    let runtimeEvents = [{id: 'evt_1', type: 'instantiate', timestamp: 1}];
+    const contextListeners = new Set<(event: unknown) => void>();
+    const client = {
+      on: (event: string, listener: (event: unknown) => void) => {
+        if (event === 'Runtime.executionContextCreated') {
+          contextListeners.add(listener);
+        }
+      },
+      off: (_event: string, listener: (event: unknown) => void) => {
+        contextListeners.delete(listener);
+      },
+      send: async (method: string) => {
+        if (method === 'Page.addScriptToEvaluateOnNewDocument') {
+          return {identifier: 'wasm-preload-2'};
+        }
+        if (method === 'Runtime.enable') {
+          for (const listener of contextListeners) {
+            listener({
+              context: {
+                id: 11,
+                auxData: {isDefault: true, type: 'default'},
+              },
+            });
+          }
+          return {};
+        }
+        if (method === 'Runtime.evaluate') {
+          return {
+            result: {
+              value: {modules: [], events: runtimeEvents},
+            },
+          };
+        }
+        return {};
+      },
+      detach: async () => undefined,
+    };
+    const frame = {page: () => page} as never;
+    const page = {
+      context: () => ({newCDPSession: async () => client}),
+      goto: async () => undefined,
+      mainFrame: () => frame,
+      off: () => undefined,
+      on: () => undefined,
+    } as unknown as Page;
+    const collector = new WasmCollector(
+      {getPage: async () => page} as never,
+      {} as never,
+      {} as never,
+    );
+
+    const first = await collector.collect({
+      url: 'https://example.test/a',
+      waitAfterLoadMs: 0,
+      includeRuntimeEvents: true,
+    });
+    assert.equal(first.totalRuntimeEvents, 1);
+
+    // Live incremental refresh deduplicates evt_1 and appends evt_2
+    runtimeEvents = [
+      {id: 'evt_1', type: 'instantiate', timestamp: 1},
+      {id: 'evt_2', type: 'export_call', timestamp: 2},
+    ];
+    const refresh = await collector.refreshFromPage(page);
+    assert.equal(refresh.addedEvents, 1);
+    assert.equal(collector.getRuntimeEvents().length, 2);
+
+    // Second collect with clearPrevious resets accumulated events
+    runtimeEvents = [{id: 'evt_3', type: 'instantiate', timestamp: 3}];
+    const second = await collector.collect({
+      url: 'https://example.test/b',
+      waitAfterLoadMs: 0,
+      includeRuntimeEvents: true,
+      clearPrevious: true,
+    });
+    assert.equal(second.totalRuntimeEvents, 1);
+    assert.equal(collector.getRuntimeEvents()[0]?.id, 'evt_3');
+  });
 });

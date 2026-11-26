@@ -44,14 +44,3 @@ export type {
   RegisterPersistentHookRequest,
   RegisterPersistentHookResult,
 } from './PersistentHookRegistry.js';
-
-// AI Hook 生成器
-export {AIHookGenerator} from './AIHookGenerator.js';
-export type {
-  AIHookRequest,
-  AIHookTarget,
-  AIHookBehavior,
-  AIHookCondition,
-  AIHookCustomCode,
-  AIHookResult,
-} from './AIHookGenerator.js';

@@ -6,17 +6,20 @@
 
 /**
  * Daemon socket 客户端：连接/发现/自动拉起/停止 detached worker daemon。
- * 协议与 worker 侧 src/ipc/socketConnection.ts 配对：NDJSON 行协议
- * `{id, method, params}` 请求 / `{id, result}` | `{id, error}` 响应 /
- * 无 id 的推送事件。两包零耦合，下方 ~40 行帧类是有意重复，改动须两侧同步
- * （PROTOCOL_VERSION、帧格式、就绪行文本）。
+ * 直接复用 src/ipc/socketConnection.ts 的 SocketConnection 与 PROTOCOL_VERSION，
+ * 与 src/cli/sessionPaths.ts 共享路径、PID 与版本号单源实现。
  */
 
 import {execFileSync, spawn} from 'node:child_process';
 import fs from 'node:fs';
 import net from 'node:net';
 import path from 'node:path';
-import {fileURLToPath} from 'node:url';
+
+import {
+  PROTOCOL_VERSION,
+  SocketConnection,
+  type DaemonMessage,
+} from '../ipc/socketConnection.js';
 
 import {
   cliConfigPath,
@@ -24,39 +27,15 @@ import {
   deleteSession,
   isPidAlive,
   killPidForce,
+  listSessions,
   loadCliConfig,
   loadSession,
+  readPackageVersion,
   type CliConfig,
   type SessionConfig,
 } from './sessionPaths.js';
 
-/** 与 src/ipc/socketConnection.ts 的 PROTOCOL_VERSION 同步修改 */
-export const PROTOCOL_VERSION = 1;
-
-export function readPackageVersion(): string {
-  try {
-    let dir = path.dirname(fileURLToPath(import.meta.url));
-    for (let i = 0; i < 10; i++) {
-      const candidate = path.join(dir, 'package.json');
-      if (fs.existsSync(candidate)) {
-        try {
-          const parsed = JSON.parse(fs.readFileSync(candidate, 'utf-8')) as {
-            version?: string;
-          };
-          if (typeof parsed.version === 'string') return parsed.version;
-        } catch {
-          // ignore
-        }
-      }
-      const parent = path.dirname(dir);
-      if (parent === dir) break;
-      dir = parent;
-    }
-  } catch {
-    // ignore
-  }
-  return '2.0.3';
-}
+export {PROTOCOL_VERSION, readPackageVersion};
 
 export const CLI_VERSION = readPackageVersion();
 
@@ -97,67 +76,13 @@ interface Pending {
   timer: NodeJS.Timeout;
 }
 
-/** NDJSON 帧连接。等价于 worker 侧 src/ipc/socketConnection.ts 的 SocketConnection。 */
-class FrameConnection {
-  private readonly socket: net.Socket;
-  private readonly pendingBuffers: Buffer[] = [];
-
-  onmessage?: (message: Record<string, unknown>) => void;
-  onclose?: () => void;
-
-  constructor(socket: net.Socket) {
-    this.socket = socket;
-    socket.on('data', buffer => this.onData(buffer));
-    socket.on('close', () => this.onclose?.());
-    socket.on('error', () => {
-      /* close 事件会随后触发；此处保持不抛出，行为对齐 worker 侧 */
-    });
-  }
-
-  send(message: Record<string, unknown>): void {
-    this.socket.write(`${JSON.stringify(message)}\n`);
-  }
-
-  close(): void {
-    this.socket.destroy();
-  }
-
-  private onData(buffer: Buffer): void {
-    let end = buffer.indexOf('\n');
-    if (end === -1) {
-      this.pendingBuffers.push(buffer);
-      return;
-    }
-    this.pendingBuffers.push(buffer.subarray(0, end));
-    this.dispatch(Buffer.concat(this.pendingBuffers).toString());
-    let start = end + 1;
-    end = buffer.indexOf('\n', start);
-    while (end !== -1) {
-      this.dispatch(buffer.toString(undefined, start, end));
-      start = end + 1;
-      end = buffer.indexOf('\n', start);
-    }
-    this.pendingBuffers.length = 0;
-    if (start < buffer.length) this.pendingBuffers.push(buffer.subarray(start));
-  }
-
-  private dispatch(line: string): void {
-    if (!line) return;
-    try {
-      this.onmessage?.(JSON.parse(line) as Record<string, unknown>);
-    } catch {
-      // 非法行直接丢弃：协议双方都是本仓库产物，脏数据时静默比崩溃好
-    }
-  }
-}
-
 export class DaemonConnection {
   private nextId = 1;
   private readonly pending = new Map<number, Pending>();
   private readonly eventCbs = new Set<(event: DaemonEvent) => void>();
   private closed = false;
 
-  private constructor(private readonly frame: FrameConnection) {
+  private constructor(private readonly frame: SocketConnection) {
     frame.onmessage = message => this.onMessage(message);
     frame.onclose = () => this.onFrameClose();
   }
@@ -182,7 +107,7 @@ export class DaemonConnection {
       });
     });
     socket.setTimeout(0);
-    return new DaemonConnection(new FrameConnection(socket));
+    return new DaemonConnection(new SocketConnection(socket));
   }
 
   request<T = unknown>(
@@ -202,7 +127,16 @@ export class DaemonConnection {
         reject,
         timer,
       });
-      this.frame.send({id, method, ...(params ? {params} : {})});
+      void this.frame
+        .send({id, method, ...(params ? {params} : {})})
+        .catch(err => {
+          const pending = this.pending.get(id);
+          if (pending) {
+            this.pending.delete(id);
+            clearTimeout(pending.timer);
+            pending.reject(err instanceof Error ? err : new Error(String(err)));
+          }
+        });
     });
   }
 
@@ -216,26 +150,27 @@ export class DaemonConnection {
     this.frame.close();
   }
 
-  private onMessage(message: Record<string, unknown>): void {
-    const id = typeof message.id === 'number' ? message.id : undefined;
+  private onMessage(message: DaemonMessage): void {
+    const record = message as Record<string, unknown>;
+    const id = typeof record.id === 'number' ? record.id : undefined;
     if (id !== undefined && this.pending.has(id)) {
       const entry = this.pending.get(id)!;
       this.pending.delete(id);
       clearTimeout(entry.timer);
-      if (message.error) {
-        const err = message.error as {code?: string; message?: string};
+      if (record.error) {
+        const err = record.error as {code?: string; message?: string};
         entry.reject(
           new Error(
             `[${err.code ?? 'UNKNOWN'}] ${err.message ?? 'daemon 错误'}`,
           ),
         );
       } else {
-        entry.resolve(message.result);
+        entry.resolve(record.result);
       }
       return;
     }
-    if (message.type) {
-      const event = message as DaemonEvent;
+    if (record.type) {
+      const event = record as DaemonEvent;
       for (const cb of this.eventCbs) cb(event);
     }
   }
@@ -303,7 +238,40 @@ export function resolveEntryPath(): string {
   throw error;
 }
 
-/** spawn detached daemon 并等待 stdout 就绪行 `Daemon listening on <socketPath>`。 */
+async function probeSocket(socketPath: string, timeoutMs = 500): Promise<boolean> {
+  try {
+    const conn = await DaemonConnection.connect(socketPath, timeoutMs);
+    conn.close();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** 检查已存在的 session 是否可连接；若陈旧则强杀残留进程并清理注册文件。 */
+async function resolveLiveSession(
+  daemonDir: string,
+  session: string,
+  cleanupStale: boolean,
+): Promise<SessionConfig | undefined> {
+  const cfg = await loadSession(daemonDir, session);
+  if (!cfg) return undefined;
+  if (await probeSocket(cfg.socketPath, 3000)) {
+    return cfg;
+  }
+  if (cleanupStale) {
+    if (cfg.pid && cfg.pid !== process.pid && isPidAlive(cfg.pid)) {
+      killPidForce(cfg.pid);
+    }
+    await deleteSession(daemonDir, session);
+  }
+  return undefined;
+}
+
+/**
+ * 拉起 detached daemon 并等待就绪：
+ * 优先通过确定性 socket 探活（对齐 chrome-devtools-cli），同时兼容轻量测试夹具的 stdout 就绪行。
+ */
 export async function spawnDaemon(
   opts: EnsureDaemonOptions,
 ): Promise<SessionConfig> {
@@ -326,46 +294,43 @@ export async function spawnDaemon(
     ],
     {detached: true, stdio: ['ignore', 'pipe', err], cwd, windowsHide: true},
   );
+
   let outLog = '';
-  let pollTimer: NodeJS.Timeout | undefined;
-  const pollSession = new Promise<'ok'>(resolvePoll => {
-    pollTimer = setInterval(async () => {
-      const c = await loadSession(daemonDir, opts.session);
-      if (c && isPidAlive(c.pid)) {
-        try {
-          const conn = await DaemonConnection.connect(c.socketPath, 300);
-          conn.close();
-          clearInterval(pollTimer);
-          resolvePoll('ok');
-        } catch {
-          // 正在启动中
-        }
-      }
-    }, 100);
+  let exited = false;
+  let stdoutReady = false;
+  child.stdout?.on('data', chunk => {
+    outLog += chunk.toString();
+    if (outLog.includes('Daemon listening on')) {
+      stdoutReady = true;
+    }
+  });
+  child.once('close', () => {
+    exited = true;
   });
 
-  const ready = await Promise.race([
-    new Promise<'ok' | 'exit'>(resolveP => {
-      const timer = setTimeout(() => resolveP('exit'), 30_000);
-      child.stdout!.on('data', d => {
-        outLog += d.toString();
-        if (outLog.includes('Daemon listening on')) {
-          clearTimeout(timer);
-          resolveP('ok');
+  const deadline = Date.now() + 30_000;
+  let cfg: SessionConfig | undefined;
+  try {
+    while (Date.now() < deadline) {
+      if (exited && !stdoutReady) {
+        break;
+      }
+      const loaded = await loadSession(daemonDir, opts.session);
+      if (loaded) {
+        if (stdoutReady || (isPidAlive(loaded.pid) && (await probeSocket(loaded.socketPath, 300)))) {
+          cfg = loaded;
+          break;
         }
-      });
-      child.once('close', () => {
-        clearTimeout(timer);
-        resolveP('exit');
-      });
-    }),
-    pollSession,
-  ]);
-  if (pollTimer) clearInterval(pollTimer);
-  child.stdout!.destroy();
-  child.unref();
-  fs.closeSync(err);
-  if (ready !== 'ok') {
+      }
+      await new Promise(r => setTimeout(r, 100));
+    }
+  } finally {
+    child.stdout?.destroy();
+    child.unref();
+    fs.closeSync(err);
+  }
+
+  if (!cfg) {
     if (child.pid) killPidForce(child.pid);
     const errText = fs.existsSync(errLog)
       ? fs.readFileSync(errLog, 'utf-8')
@@ -374,13 +339,6 @@ export async function spawnDaemon(
       `daemon 启动失败 (pid=${child.pid}):${outLog ? `\n${outLog}` : ''}${errText ? `\n${errText}` : ''}`,
     );
   }
-  // 就绪行先于 session 文件写入（worker 侧顺序）：短暂轮询等待文件出现
-  let cfg = await loadSession(daemonDir, opts.session);
-  for (let i = 0; !cfg && i < 20; i++) {
-    await new Promise(r => setTimeout(r, 100));
-    cfg = await loadSession(daemonDir, opts.session);
-  }
-  if (!cfg) throw new Error('daemon 就绪但 session 文件缺失');
   if (cfg.protocol !== PROTOCOL_VERSION) {
     throw new Error(
       `协议不匹配: daemon v${cfg.protocol} vs cli v${PROTOCOL_VERSION}，运行 browsercli -s=${opts.session} stop 后重新 start`,
@@ -398,125 +356,57 @@ export async function ensureDaemon(
   const info = computeClientInfo(opts.cwd);
   const daemonDir = opts.daemonDir ?? info.daemonDir;
 
-  // 1. 尝试直接复用已有正常会话
-  const cfg = await loadSession(daemonDir, opts.session);
-  if (cfg) {
-    try {
-      const conn = await DaemonConnection.connect(cfg.socketPath, 3000);
-      conn.close();
-      return cfg;
-    } catch {
-      // 陈旧注册：探活失败。若旧进程仍然存活，强杀它避免变成孤儿 daemon
-      if (cfg.pid && cfg.pid !== process.pid && isPidAlive(cfg.pid)) {
-        killPidForce(cfg.pid);
-      }
-      await deleteSession(daemonDir, opts.session);
-    }
-  }
+  const existing = await resolveLiveSession(daemonDir, opts.session, true);
+  if (existing) return existing;
 
-  // 2. 避免并发命令同时拉起多个 daemon：基于 session 的启动锁
   await fs.promises.mkdir(daemonDir, {recursive: true, mode: 0o700});
   const lockFile = path.join(daemonDir, `${opts.session}.spawn.lock`);
 
-  const acquireLock = async (): Promise<() => void> => {
-    const start = Date.now();
-    while (Date.now() - start < 30_000) {
+  const deadline = Date.now() + 30_000;
+  let lockAcquired = false;
+  while (Date.now() < deadline) {
+    try {
+      const fd = fs.openSync(lockFile, 'wx');
+      fs.writeFileSync(fd, `${process.pid}\n${Date.now()}`);
+      fs.closeSync(fd);
+      lockAcquired = true;
+      break;
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err;
+
+      // 清理死锁或超时锁（>35s）
       try {
-        const fd = fs.openSync(lockFile, 'wx');
-        fs.writeFileSync(fd, `${process.pid}\n${Date.now()}`);
-        fs.closeSync(fd);
-        return () => {
-          try {
-            fs.unlinkSync(lockFile);
-          } catch {
-            // ignore
-          }
-        };
-      } catch (err) {
-        if ((err as NodeJS.ErrnoException).code === 'EEXIST') {
-          // 检查锁是否过期（持有者已死，或超时 35s）
-          try {
-            const content = fs.readFileSync(lockFile, 'utf-8');
-            const [pidStr, tsStr] = content.split('\n');
-            const lockPid = Number(pidStr);
-            const lockTs = Number(tsStr);
-            if (
-              (lockPid && !isPidAlive(lockPid)) ||
-              (lockTs && Date.now() - lockTs > 35_000)
-            ) {
-              try {
-                fs.unlinkSync(lockFile);
-              } catch {
-                // ignore
-              }
-              continue;
-            }
-          } catch {
-            // ignore
-          }
-
-          // 等待期间检查是否有其他并发 CLI 已经成功启动了 daemon
-          const existing = await loadSession(daemonDir, opts.session);
-          if (existing) {
-            try {
-              const conn = await DaemonConnection.connect(
-                existing.socketPath,
-                3000,
-              );
-              conn.close();
-              throw {reusedConfig: existing};
-            } catch (probeErr) {
-              if ((probeErr as {reusedConfig?: SessionConfig}).reusedConfig) {
-                throw probeErr;
-              }
-            }
-          }
-
-          await new Promise(r => setTimeout(r, 200));
+        const [pidStr, tsStr] = fs.readFileSync(lockFile, 'utf-8').split('\n');
+        const lockPid = Number(pidStr);
+        const lockTs = Number(tsStr);
+        if (
+          (lockPid && !isPidAlive(lockPid)) ||
+          (lockTs && Date.now() - lockTs > 35_000)
+        ) {
+          fs.rmSync(lockFile, {force: true});
           continue;
         }
-        throw err;
+      } catch {
+        // ignore
       }
-    }
-    throw new Error(`等待 daemon 启动锁超时 (${lockFile})`);
-  };
 
-  let releaseLock: (() => void) | undefined;
-  try {
-    releaseLock = await acquireLock();
-  } catch (lockErr) {
-    if ((lockErr as {reusedConfig?: SessionConfig}).reusedConfig) {
-      return (lockErr as {reusedConfig: SessionConfig}).reusedConfig;
+      // 等待期间其他并发 CLI 已完成启动则直接复用
+      const peer = await resolveLiveSession(daemonDir, opts.session, false);
+      if (peer) return peer;
+      await new Promise(r => setTimeout(r, 200));
     }
-    throw lockErr;
+  }
+
+  if (!lockAcquired) {
+    throw new Error(`等待 daemon 启动锁超时 (${lockFile})`);
   }
 
   try {
-    // 抢到锁后二次检查，防止在此期间已有可用会话
-    const doubleCheck = await loadSession(daemonDir, opts.session);
-    if (doubleCheck) {
-      try {
-        const conn = await DaemonConnection.connect(
-          doubleCheck.socketPath,
-          3000,
-        );
-        conn.close();
-        return doubleCheck;
-      } catch {
-        if (
-          doubleCheck.pid &&
-          doubleCheck.pid !== process.pid &&
-          isPidAlive(doubleCheck.pid)
-        ) {
-          killPidForce(doubleCheck.pid);
-        }
-        await deleteSession(daemonDir, opts.session);
-      }
-    }
-
+    const doubleCheck = await resolveLiveSession(daemonDir, opts.session, true);
+    if (doubleCheck) return doubleCheck;
     return await spawnDaemon({...opts, daemonDir});
   } finally {
-    releaseLock?.();
+    fs.rmSync(lockFile, {force: true});
   }
 }
 
@@ -558,7 +448,6 @@ export function collectDaemonPids(lines: string[]): number[] {
       !line.includes('--proxycli-daemon')
     )
       continue;
-    // 排除查询进程自身（grep/powershell/taskkill 命令行里也含该字符串）
     if (/\b(grep|powershell|taskkill)\b/i.test(line)) continue;
     const first = line.trim().split(/\s+/)[0];
     const pid = Number(first);
@@ -571,8 +460,6 @@ export function collectDaemonPids(lines: string[]): number[] {
 export async function killAllDaemons(): Promise<number[]> {
   let pids: number[];
   if (process.platform === 'win32') {
-    // 用 SystemRoot 全路径解析 powershell.exe：WindowsPowerShell\v1.0 不在某些
-    // 精简环境的 PATH 里时，裸命令名会 spawnSync ENOENT（SystemRoot 必存在）。
     const powershellExe = path.join(
       process.env.SystemRoot ?? 'C:\\Windows',
       'System32',
@@ -591,44 +478,28 @@ export async function killAllDaemons(): Promise<number[]> {
       {encoding: 'utf-8'},
     );
     pids = collectDaemonPids(out.split(/\r?\n/));
-    for (const pid of pids) {
-      killPidForce(pid);
-    }
   } else {
     const out = execFileSync('ps', ['-eo', 'pid=,args='], {encoding: 'utf-8'});
     pids = collectDaemonPids(out.split('\n'));
-    for (const pid of pids) {
-      killPidForce(pid);
-    }
+  }
+  for (const pid of pids) {
+    killPidForce(pid);
   }
   return pids;
 }
 
-/**
- * 检查指定会话的 daemon 是否正在运行并存活（结合 session 注册与 socket 探活）。
- * 对齐 chrome-devtools-mcp 的 isDaemonRunning。
- */
+/** 检查指定会话的 daemon 是否正在运行并存活（对齐 chrome-devtools-mcp 的 isDaemonRunning）。 */
 export async function isDaemonRunning(
   session: string,
   daemonDir?: string,
 ): Promise<boolean> {
   const dir = daemonDir ?? computeClientInfo().daemonDir;
   const cfg = await loadSession(dir, session);
-  if (!cfg) return false;
-  if (!isPidAlive(cfg.pid)) return false;
-  try {
-    const conn = await DaemonConnection.connect(cfg.socketPath, 500);
-    conn.close();
-    return true;
-  } catch {
-    return false;
-  }
+  if (!cfg || !isPidAlive(cfg.pid)) return false;
+  return await probeSocket(cfg.socketPath, 500);
 }
 
-/**
- * 轮询等待 daemon 就绪（基于 session 文件生成与 socket 探活响应）。
- * 对齐 chrome-devtools-mcp 的 waitForDaemonReady。
- */
+/** 轮询等待 daemon 就绪（基于 session 文件生成与 socket 探活响应）。 */
 export async function waitForDaemonReady(
   session: string,
   daemonDir?: string,
@@ -670,11 +541,7 @@ export async function waitForDaemonReady(
   );
 }
 
-/**
- * 核验后台运行中 daemon 的版本与当前 CLI 版本是否一致。
- * 对齐 chrome-devtools-mcp 的 verifyDaemonVersion。
- * 若不一致返回警告提示，否则返回 undefined。
- */
+/** 核验后台运行中 daemon 的版本与当前 CLI 版本是否一致。 */
 export async function verifyDaemonVersion(
   session: string,
   cliVersion: string,
@@ -695,7 +562,90 @@ export async function verifyDaemonVersion(
       return `Warning: Daemon server version (${status.version}) does not match CLI version (${cliVersion}). Run 'browsercli -s=${session} stop' to update and restart the daemon.`;
     }
   } catch {
-    // 忽略探活时的偶发通讯错误，由命令自身处理错误
+    // 忽略探活时的偶发通讯错误
   }
   return undefined;
+}
+
+export interface SessionRow {
+  session: string;
+  pid: number;
+  console: string;
+  status: string;
+  version?: string;
+  uptimeMs?: number;
+  startDate?: string;
+  socketPath?: string;
+}
+
+export interface ProbeResult extends DaemonLike {
+  statusResult?: DaemonStatusResult;
+}
+
+/** 对单个会话探活（connect + status/hello）：成功返回连接对象，附带 statusResult。 */
+export async function probeSession(
+  cfg: SessionConfig,
+): Promise<ProbeResult | undefined> {
+  try {
+    const conn = await DaemonConnection.connect(cfg.socketPath, 500);
+    let statusResult: DaemonStatusResult | undefined;
+    try {
+      statusResult = await conn.request<DaemonStatusResult>(
+        'status',
+        undefined,
+        1000,
+      );
+    } catch {
+      try {
+        statusResult = await conn.request<DaemonStatusResult>(
+          'hello',
+          undefined,
+          1000,
+        );
+      } catch {
+        // 兼容旧接口
+      }
+    }
+    const result = conn as ProbeResult;
+    result.statusResult = statusResult;
+    return result;
+  } catch {
+    return undefined;
+  }
+}
+
+/** 读注册表并逐会话探活：连不上的清理陈旧 session 文件并标记 closed-stale。 */
+export async function collectSessionRows(
+  daemonDir?: string,
+): Promise<SessionRow[]> {
+  const dir = daemonDir ?? computeClientInfo().daemonDir;
+  const sessions = await listSessions(dir);
+  const rows: SessionRow[] = [];
+  for (const cfg of sessions) {
+    const conn = await probeSession(cfg);
+    if (conn) {
+      const st = conn.statusResult;
+      conn.close();
+      rows.push({
+        session: cfg.name,
+        pid: cfg.pid,
+        console:
+          cfg.consolePort === undefined ? '-' : `127.0.0.1:${cfg.consolePort}`,
+        status: 'open',
+        version: st?.version ?? cfg.version,
+        uptimeMs: st?.uptimeMs,
+        startDate: st?.startDate,
+        socketPath: cfg.socketPath,
+      });
+    } else {
+      await deleteSession(dir, cfg.name);
+      rows.push({
+        session: cfg.name,
+        pid: cfg.pid,
+        console: '-',
+        status: 'closed-stale',
+      });
+    }
+  }
+  return rows;
 }

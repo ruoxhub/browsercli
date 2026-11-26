@@ -87,7 +87,7 @@ describe('BrowserContextProvider', () => {
 
     assert.equal(provider.getPageId(first.page as never), firstId);
     assert.equal(provider.getPageId(second.page as never), secondId);
-    assert.deepStrictEqual([firstId, secondId], ['page-1', 'page-2']);
+    assert.deepStrictEqual([firstId, secondId], ['1', '2']);
   });
 
   it('invalidates a closed page ID and never reuses it', () => {
@@ -102,10 +102,14 @@ describe('BrowserContextProvider', () => {
       () => provider.resolvePage({pageId: retiredId}),
       /已失效.*list_pages/,
     );
+    assert.throws(
+      () => provider.resolvePage({pageId: `page-${retiredId}`}),
+      /已失效.*list_pages/,
+    );
 
     const replacement = createPage('replacement');
     provider.setPages([replacement.page] as never[]);
-    assert.equal(provider.getPageId(replacement.page as never), 'page-2');
+    assert.equal(provider.getPageId(replacement.page as never), '2');
   });
 
   it('invalidates old IDs when switching or clearing BrowserContext', () => {
@@ -120,12 +124,12 @@ describe('BrowserContextProvider', () => {
     provider.setContext(secondContext as never);
 
     assert.throws(() => provider.resolvePage({pageId: firstId}), /已失效/);
-    assert.equal(provider.getPageId(second.page as never), 'page-2');
+    assert.equal(provider.getPageId(second.page as never), '2');
 
     provider.clearContext();
     assert.deepStrictEqual(provider.getPages(), []);
     assert.equal(provider.getSelectedPage(), null);
-    assert.throws(() => provider.resolvePage({pageId: 'page-2'}), /已失效/);
+    assert.throws(() => provider.resolvePage({pageId: '2'}), /已失效/);
   });
 
   it('invalidates IDs on dispose without resetting the counter', () => {
@@ -139,7 +143,7 @@ describe('BrowserContextProvider', () => {
 
     const second = createPage('second');
     provider.setPages([second.page] as never[]);
-    assert.equal(provider.getPageId(second.page as never), 'page-2');
+    assert.equal(provider.getPageId(second.page as never), '2');
   });
 
   it('resolves page selectors and rejects conflicting identities', () => {
@@ -152,6 +156,11 @@ describe('BrowserContextProvider', () => {
     const secondId = provider.getPageId(second.page as never);
 
     assert.equal(provider.resolvePage({pageId: firstId}).page, first.page);
+    // Backward compatibility with legacy "page-N" prefix
+    assert.equal(
+      provider.resolvePage({pageId: `page-${secondId}`}).page,
+      second.page,
+    );
     assert.equal(provider.resolvePage({pageIdx: 1}).pageId, secondId);
     assert.equal(
       provider.resolvePage({pageId: secondId, pageIdx: 1}).page,
@@ -162,7 +171,7 @@ describe('BrowserContextProvider', () => {
       new RegExp(`pageId ${firstId}.*pageIdx 1`),
     );
     assert.throws(
-      () => provider.resolvePage({pageId: 'page-999'}),
+      () => provider.resolvePage({pageId: '999'}),
       /未知页面 ID.*list_pages/,
     );
     assert.throws(() => provider.resolvePage({pageIdx: -1}), /非负整数/);

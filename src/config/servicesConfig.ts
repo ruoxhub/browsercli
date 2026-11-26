@@ -13,7 +13,6 @@
  */
 
 import type {BrowserManagerConfig} from '../types/browser.js';
-import {type SourceMapConfig, SourceMapError} from '../types/sourcemap.js';
 
 import {getEnvBoolean, getEnvNumber, getEnvValue} from './resolver.js';
 import {getRuntimeConfigStore} from './RuntimeConfigStore.js';
@@ -26,69 +25,6 @@ import {
 // ==========================================================================
 // Browser / System 配置
 // ==========================================================================
-
-function getBoundedPositiveInteger(
-  key: string,
-  defaultValue: number,
-  maximum: number,
-): number {
-  const value = getEnvNumber(key, defaultValue);
-  if (
-    value === undefined ||
-    !Number.isFinite(value) ||
-    !Number.isInteger(value) ||
-    value <= 0 ||
-    value > maximum
-  ) {
-    throw new SourceMapError(
-      'SOURCEMAP_CONFIG_INVALID',
-      `${key} must be a positive integer no greater than ${maximum}`,
-    );
-  }
-  return value;
-}
-
-export function getSourceMapConfig(): SourceMapConfig {
-  const maxBytes = getBoundedPositiveInteger(
-    'SOURCEMAP_MAX_BYTES',
-    20 * 1024 * 1024,
-    100 * 1024 * 1024,
-  );
-  const cacheMaxBytes = getBoundedPositiveInteger(
-    'SOURCEMAP_CACHE_MAX_BYTES',
-    64 * 1024 * 1024,
-    256 * 1024 * 1024,
-  );
-  if (cacheMaxBytes < maxBytes) {
-    throw new SourceMapError(
-      'SOURCEMAP_CONFIG_INVALID',
-      'SOURCEMAP_CACHE_MAX_BYTES must be at least SOURCEMAP_MAX_BYTES',
-    );
-  }
-  return {
-    maxBytes,
-    cacheMaxBytes,
-    cacheMaxEntries: getBoundedPositiveInteger(
-      'SOURCEMAP_CACHE_MAX_ENTRIES',
-      16,
-      64,
-    ),
-    cacheTtlMs: getBoundedPositiveInteger(
-      'SOURCEMAP_CACHE_TTL_MS',
-      30 * 60 * 1000,
-      24 * 60 * 60 * 1000,
-    ),
-    fetchTimeoutMs: getBoundedPositiveInteger(
-      'SOURCEMAP_FETCH_TIMEOUT_MS',
-      15_000,
-      60_000,
-    ),
-    maxRedirects: 3,
-    maxIndexedDepth: 8,
-    maxIndexedSections: 1000,
-    maxDiffChanges: 2000,
-  };
-}
 
 /**
  * 环境变量 + 配置文件（RuntimeConfigStore 的 browser 字段）合并出来的浏览器配置。
@@ -123,6 +59,7 @@ export function buildBrowserManagerConfig(): BrowserManagerConfig {
       envKey: 'BROWSER_ISOLATED',
       kind: 'boolean',
       default: true,
+      extraFallback: 'isolated',
     },
     {
       key: 'useStealthScripts',
@@ -168,6 +105,7 @@ export function buildBrowserManagerConfig(): BrowserManagerConfig {
       key: 'channel',
       envKey: 'BROWSER_CHANNEL',
       kind: 'value',
+      extraFallback: 'channel',
       cast: v => v as BrowserManagerConfig['channel'],
     },
     {
@@ -194,13 +132,25 @@ export function buildBrowserManagerConfig(): BrowserManagerConfig {
       envKey: 'REMOTE_DEBUGGING_PORT',
       kind: 'number',
     },
-    {key: 'userDataDir', envKey: 'BROWSER_USER_DATA_DIR', kind: 'value'},
+    {
+      key: 'userDataDir',
+      envKey: 'BROWSER_USER_DATA_DIR',
+      kind: 'value',
+      extraFallback: 'userDataDir',
+    },
+    {
+      key: 'proxyServer',
+      envKey: 'BROWSER_PROXY_SERVER',
+      kind: 'value',
+      extraFallback: 'proxyServer',
+    },
     {key: 'browserPath', envKey: 'BROWSER_PATH', kind: 'value'},
     {key: 'userAgent', envKey: 'BROWSER_USER_AGENT', kind: 'value'},
     {
       key: 'acceptInsecureCerts',
       envKey: 'BROWSER_ACCEPT_INSECURE_CERTS',
       kind: 'boolean',
+      extraFallback: 'acceptInsecureCerts',
     },
     {key: 'devtools', envKey: 'BROWSER_DEVTOOLS', kind: 'boolean'},
     {key: 'autoLaunch', envKey: 'BROWSER_AUTO_LAUNCH', kind: 'boolean'},
@@ -289,6 +239,8 @@ export function buildBrowserManagerConfig(): BrowserManagerConfig {
     }
   } else if (fileBrowser?.wsHeaders) {
     config.wsHeaders = fileBrowser.wsHeaders;
+  } else if (fileConfig.wsHeaders) {
+    config.wsHeaders = fileConfig.wsHeaders;
   }
 
   const envArgs = getEnvValue('BROWSER_ARGS');
@@ -299,6 +251,17 @@ export function buildBrowserManagerConfig(): BrowserManagerConfig {
       .filter(Boolean);
   } else if (fileBrowser?.args) {
     config.args = fileBrowser.args;
+  }
+
+  const chromeArg = fileBrowser?.chromeArg ?? fileConfig.chromeArg;
+  if (chromeArg) {
+    config.chromeArg = chromeArg;
+  }
+
+  const ignoreDefaultChromeArg =
+    fileBrowser?.ignoreDefaultChromeArg ?? fileConfig.ignoreDefaultChromeArg;
+  if (ignoreDefaultChromeArg) {
+    config.ignoreDefaultChromeArg = ignoreDefaultChromeArg;
   }
 
   if (fileBrowser?.viewport) {

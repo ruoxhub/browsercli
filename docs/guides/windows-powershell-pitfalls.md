@@ -9,19 +9,19 @@
 
 ### 问题描述
 
-通过 `js-reverse call <tool> --function "JS_CODE"` 传递 JavaScript 代码时，PowerShell 对引号、括号、大括号的转义规则极其复杂，导致大部分包含复杂表达式的参数无法正确传递。
+通过 `browsercli call <tool> --function "JS_CODE"` 传递 JavaScript 代码时，PowerShell 对引号、括号、大括号的转义规则极其复杂，导致大部分包含复杂表达式的参数无法正确传递。
 
 ### 常见失败模式
 
 ```powershell
 # 失败：内嵌引号被 PowerShell 吞掉
-js-reverse call hook_function --function "document.querySelector('#btn').click()"
+browsercli call hook_function --function "document.querySelector('#btn').click()"
 
 # 失败：大括号被 PowerShell 解析为脚本块
-js-reverse call evaluate_script --expression "(() => { return window.__hookStore })()"
+browsercli call evaluate_script --expression "(() => { return window.__hookStore })()"
 
 # 失败：管道传递仍有转义问题
-Get-Content script.js | js-reverse call evaluate_script --expression -
+Get-Content script.js | browsercli call evaluate_script --expression -
 ```
 
 ### 解决方案
@@ -29,7 +29,7 @@ Get-Content script.js | js-reverse call evaluate_script --expression -
 1. **优先使用 `--data` JSON 格式传参**：
 
    ```powershell
-   js-reverse call evaluate_script --data '{"expression":"document.title"}'
+   browsercli call evaluate_script --data '{"expression":"document.title"}'
    ```
 
 2. **将复杂 JS 写入文件，用简单调用引用**：
@@ -38,7 +38,7 @@ Get-Content script.js | js-reverse call evaluate_script --expression -
    # 先写入脚本文件
    Set-Content -Path hook.js -Value 'document.querySelectorAll("script").length'
    # 再用简单调用读取
-   js-reverse call evaluate_script --data '{"expression":"document.querySelectorAll(\"script\").length"}'
+   browsercli call evaluate_script --data '{"expression":"document.querySelectorAll(\"script\").length"}'
    ```
 
 3. **建议 CLI 增加 `--file` 参数**（见改进建议）
@@ -55,11 +55,11 @@ Get-Content script.js | js-reverse call evaluate_script --expression -
 
 ```powershell
 # auto_hook 成功注入
-js-reverse call auto_hook --data '{"preset":"network-core"}'
+browsercli call auto_hook --data '{"preset":"network-core"}'
 # OK: Hook network-core injected
 
 # 尝试读取 Hook 数据 — 失败
-js-reverse call evaluate_script --data '{"expression":"window.__hookStore"}'
+browsercli call evaluate_script --data '{"expression":"window.__hookStore"}'
 # 返回 undefined 或空对象
 ```
 
@@ -71,8 +71,8 @@ js-reverse call evaluate_script --data '{"expression":"window.__hookStore"}'
 
 ```powershell
 # 从服务侧获取 Hook 数据
-js-reverse call get_hook_data --data '{"hookId":"network-core-fetch"}'
-js-reverse call list_hooks
+browsercli call get_hook_data --data '{"hookId":"network-core-fetch"}'
+browsercli call list_hooks
 ```
 
 ---
@@ -207,20 +207,20 @@ python script.py
 '@ | Set-Content -Path params.json -Encoding UTF8
 
 # 2. 使用 --file 读取
-js-reverse call auto_hook --file params.json
+browsercli call auto_hook --file params.json
 
 # 命令行参数优先级高于文件参数
-js-reverse call auto_hook --file params.json --preset api-signature
+browsercli call auto_hook --file params.json --preset api-signature
 ```
 
 #### `auto_hook --export-results`
 
 ```powershell
 # 注入 Hook 并自动导出数据
-js-reverse call auto_hook --data '{"preset":"network-core","autoInject":true,"exportResults":true}'
+browsercli call auto_hook --data '{"preset":"network-core","autoInject":true,"exportResults":true}'
 
 # 自定义等待时间（默认 3000ms）
-js-reverse call auto_hook --data '{"preset":"network-core","autoInject":true,"exportResults":true,"exportWaitMs":5000}'
+browsercli call auto_hook --data '{"preset":"network-core","autoInject":true,"exportResults":true,"exportWaitMs":5000}'
 ```
 
 导出路径：`artifacts/tasks/auto-hook-<timestamp>/hook-data.json`
@@ -229,7 +229,7 @@ js-reverse call auto_hook --data '{"preset":"network-core","autoInject":true,"ex
 
 ```powershell
 # 等待匹配请求，超时后返回已有请求而非空列表
-js-reverse call list_network_requests --data '{"waitForRequest":"playurl","waitTimeoutMs":10000}'
+browsercli call list_network_requests --data '{"waitForRequest":"playurl","waitTimeoutMs":10000}'
 
 # 超时后返回：
 # - success=false 如果没有任何匹配请求

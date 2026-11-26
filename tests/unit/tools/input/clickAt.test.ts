@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict';
 import {describe, it} from 'node:test';
 
-import {clickAt} from '../../../../src/tools/input/clickAt.js';
+import {clickAt} from '../../../../src/tools/input.js';
 
 function makeResponse() {
   let structuredContent: Record<string, unknown> | undefined;

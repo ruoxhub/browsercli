@@ -12,7 +12,7 @@ import {PersistentHookRegistry} from '../../../../src/modules/hook/PersistentHoo
 import {
   injectHook,
   listPersistentHooks,
-} from '../../../../src/tools/hook/InjectHook.js';
+} from '../../../../src/tools/hook.js';
 import type {Context} from '../../../../src/tools/ToolDefinition.js';
 import {ToolError} from '../../../../src/utils/errors.js';
 

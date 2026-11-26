@@ -7,19 +7,20 @@
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
+import {NetworkModule} from '../../../src/modules/network/NetworkModule.js';
 import {getRuntime} from '../../../src/runtime.js';
 import {
   listPages,
   navigatePage,
   newPage,
   selectPage,
-} from '../../../src/tools/navigation/index.js';
+} from '../../../src/tools/navigation.js';
 import {
   getNetworkRequest,
   listNetworkRequests,
-} from '../../../src/tools/network/index.js';
-import {takeScreenshot as screenshot} from '../../../src/tools/screenshot/takeScreenshot.js';
-import {evaluateScript} from '../../../src/tools/script/script.js';
+} from '../../../src/tools/network.js';
+import {takeScreenshot as screenshot} from '../../../src/tools/screenshot.js';
+import {evaluateScript} from '../../../src/tools/script.js';
 
 interface BasicResponseState {
   includePages: boolean;
@@ -181,7 +182,12 @@ describe('tools extended coverage', () => {
 
     const context = {
       getPages: () => [page],
+      getPageId: () => 'page-1',
       getPageByIdx: () => page,
+      resolvePage: ({pageIdx}: {pageId?: string; pageIdx?: number}) => ({
+        page,
+        pageId: pageIdx !== undefined ? String(pageIdx + 1) : 'page-1',
+      }),
       selectPage: (p: TestPageHarness) => {
         selected.idx = p === page ? 2 : -2;
       },
@@ -252,46 +258,73 @@ describe('tools extended coverage', () => {
       page.goto = async () => {
         throw new Error('goto failed');
       };
-      await navigatePage.handler(
-        {params: {type: 'url', url: 'https://c.com'}},
-        response as unknown as Parameters<typeof navigatePage.handler>[1],
-        context as unknown as Parameters<typeof navigatePage.handler>[2],
-        runtime as unknown as Parameters<typeof navigatePage.handler>[3],
+      await assert.rejects(
+        () =>
+          navigatePage.handler(
+            {params: {type: 'url', url: 'https://c.com'}},
+            response as unknown as Parameters<typeof navigatePage.handler>[1],
+            context as unknown as Parameters<typeof navigatePage.handler>[2],
+            runtime as unknown as Parameters<typeof navigatePage.handler>[3],
+          ),
+        /goto failed/,
       );
-      assert.strictEqual(parseLastJsonResult(response).success, false);
 
       page.goBack = async () => {
         throw new Error('back failed');
       };
-      await navigatePage.handler(
-        {params: {type: 'back'}},
-        response as unknown as Parameters<typeof navigatePage.handler>[1],
-        context as unknown as Parameters<typeof navigatePage.handler>[2],
-        runtime as unknown as Parameters<typeof navigatePage.handler>[3],
+      await assert.rejects(
+        () =>
+          navigatePage.handler(
+            {params: {type: 'back'}},
+            response as unknown as Parameters<typeof navigatePage.handler>[1],
+            context as unknown as Parameters<typeof navigatePage.handler>[2],
+            runtime as unknown as Parameters<typeof navigatePage.handler>[3],
+          ),
+        /back failed/,
       );
-      assert.strictEqual(parseLastJsonResult(response).success, false);
 
       page.goForward = async () => {
         throw new Error('forward failed');
       };
-      await navigatePage.handler(
-        {params: {type: 'forward'}},
-        response as unknown as Parameters<typeof navigatePage.handler>[1],
-        context as unknown as Parameters<typeof navigatePage.handler>[2],
-        runtime as unknown as Parameters<typeof navigatePage.handler>[3],
+      await assert.rejects(
+        () =>
+          navigatePage.handler(
+            {params: {type: 'forward'}},
+            response as unknown as Parameters<typeof navigatePage.handler>[1],
+            context as unknown as Parameters<typeof navigatePage.handler>[2],
+            runtime as unknown as Parameters<typeof navigatePage.handler>[3],
+          ),
+        /forward failed/,
       );
-      assert.strictEqual(parseLastJsonResult(response).success, false);
 
-      page.reload = async () => {
-        throw new Error('reload failed');
-      };
+      // ignoreCache=true 走 CDP Page.reload，不调用 page.reload
+      page.context = () => ({
+        newCDPSession: async () => ({
+          send: async () => undefined,
+          detach: async () => undefined,
+        }),
+      });
       await navigatePage.handler(
         {params: {type: 'reload', ignoreCache: true}},
         response as unknown as Parameters<typeof navigatePage.handler>[1],
         context as unknown as Parameters<typeof navigatePage.handler>[2],
         runtime as unknown as Parameters<typeof navigatePage.handler>[3],
       );
-      assert.strictEqual(parseLastJsonResult(response).success, false);
+      assert.strictEqual(parseLastJsonResult(response).success, true);
+
+      page.reload = async () => {
+        throw new Error('reload failed');
+      };
+      await assert.rejects(
+        () =>
+          navigatePage.handler(
+            {params: {type: 'reload'}},
+            response as unknown as Parameters<typeof navigatePage.handler>[1],
+            context as unknown as Parameters<typeof navigatePage.handler>[2],
+            runtime as unknown as Parameters<typeof navigatePage.handler>[3],
+          ),
+        /reload failed/,
+      );
     } finally {
       runtime.contextProvider = originalProvider;
     }
@@ -315,10 +348,21 @@ describe('tools extended coverage', () => {
       }),
     };
 
-    const context = {
+    const networkModule = new NetworkModule();
+    const context: any = {
       getPages: () => [],
       getSelectedPage: () => ({}),
       getSelectedPageIndex: () => 12,
+      resolvePage: (selector: any) => ({
+        page: {} as any,
+        pageId: 'page-1',
+        pageIdx: selector?.targetPageIdx ?? 12,
+      }),
+      getNetworkRequestsForPage: () => [mockRequest as any],
+      clearNetworkRequests: () => undefined,
+      clearNetworkRequestsForPage: () => undefined,
+      getNetworkModule: () => networkModule,
+      getNetworkServices: () => context,
       getNetworkRequests: () => [mockRequest as any],
       getNetworkRequestById: (_id: number) => mockRequest as any,
       getNetworkRequestStableId: (_request: any) => 12,
@@ -356,6 +400,7 @@ describe('tools extended coverage', () => {
         response as unknown as Parameters<
           typeof listNetworkRequests.handler
         >[1],
+        context,
       );
 
       const listResult = parseLastJsonResult(response);
@@ -366,6 +411,7 @@ describe('tools extended coverage', () => {
       await getNetworkRequest.handler(
         {params: {reqid: 33}},
         response as unknown as Parameters<typeof getNetworkRequest.handler>[1],
+        context,
       );
       const getResult33 = parseLastJsonResult(response);
       assert.strictEqual(getResult33.success, true);
@@ -379,6 +425,7 @@ describe('tools extended coverage', () => {
       await getNetworkRequest.handler(
         {params: {}},
         response as unknown as Parameters<typeof getNetworkRequest.handler>[1],
+        context,
       );
       const getResultDefault = parseLastJsonResult(response);
       assert.strictEqual(getResultDefault.success, true);
@@ -388,6 +435,7 @@ describe('tools extended coverage', () => {
       await getNetworkRequest.handler(
         {params: {}},
         response as unknown as Parameters<typeof getNetworkRequest.handler>[1],
+        context,
       );
       const getResultNone = parseLastJsonResult(response);
       assert.strictEqual(getResultNone.success, false);
@@ -513,6 +561,7 @@ describe('tools extended coverage', () => {
       await evaluateScript.handler(
         {params: {function: '() => ({ ok: true })'}},
         response as unknown as Parameters<typeof evaluateScript.handler>[1],
+        contextSuccess,
       );
     } finally {
       runtime.contextProvider = originalProvider;
@@ -554,12 +603,15 @@ describe('tools extended coverage', () => {
 
     runtime.contextProvider = contextError as any;
     try {
-      await evaluateScript.handler(
-        {params: {function: '() => { throw new Error("x") }'}},
-        response as unknown as Parameters<typeof evaluateScript.handler>[1],
+      await assert.rejects(
+        () =>
+          evaluateScript.handler(
+            {params: {function: '() => { throw new Error("x") }'}},
+            response as unknown as Parameters<typeof evaluateScript.handler>[1],
+            contextError,
+          ),
+        /eval failed/,
       );
-      const evalErrResult = parseLastJsonResult(response);
-      assert.strictEqual(evalErrResult.success, false);
     } finally {
       runtime.contextProvider = originalProvider;
     }

@@ -7,7 +7,7 @@
 import assert from 'node:assert/strict';
 import {describe, it} from 'node:test';
 
-import {uploadFile} from '../../../../src/tools/input/uploadFile.js';
+import {uploadFile} from '../../../../src/tools/input.js';
 import {NO_ACTIVE_PAGE_MESSAGE} from '../../../../src/tools/shared/activePageResolver.js';
 import {ErrorCodes, ToolError} from '../../../../src/utils/errors.js';
 

@@ -133,11 +133,11 @@ describe('all-tools contract (Layer 1)', () => {
     }
   });
 
-  it('full profile exposes exactly 95 tools', () => {
+  it('full profile exposes exactly 90 tools', () => {
     assert.equal(
       fullEntries.length,
-      95,
-      `expected exactly 95 tools in full profile, got ${fullEntries.length}`,
+      90,
+      `expected exactly 90 tools in full profile, got ${fullEntries.length}`,
     );
   });
 
@@ -163,7 +163,7 @@ describe('all-tools contract (Layer 1)', () => {
     );
   });
 
-  it('does not expose any of the 16 pruned tools in workflow or full profile', async () => {
+  it('does not expose any of the 26 pruned tools in workflow or full profile', async () => {
     const PRUNED_TOOLS = [
       'get_devtools_comments',
       'resolve_devtools_comment',
@@ -181,6 +181,18 @@ describe('all-tools contract (Layer 1)', () => {
       'emulate_cpu',
       'update_extensions',
       'get_ai_debug_status',
+      // ADR-0011 retired duplicate tools
+      'step_into',
+      'step_over',
+      'step_out',
+      'hook_function',
+      'list_hooks',
+      'unhook_function',
+      'search_in_scripts',
+      'find_in_script',
+      'inspect_locals',
+      // Replaced by screencast_start / screencast_stop
+      'video',
     ] as const;
 
     for (const profile of ['workflow', 'full'] as const) {

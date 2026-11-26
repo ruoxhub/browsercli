@@ -9,13 +9,19 @@ import {after, before, describe, it} from 'node:test';
 
 import {chromium, type Browser, type Page} from 'patchright';
 
-import {monitorEvents} from '../../../src/tools/debugger/monitorEvents.js';
-import {queryDom} from '../../../src/tools/dom/queryDom.js';
-import {click} from '../../../src/tools/input/click.js';
-import {waitForElement} from '../../../src/tools/page/waitForElement.js';
+import {monitorEvents} from '../../../src/tools/debugger.js';
+import {queryDom} from '../../../src/tools/dom.js';
+import {click} from '../../../src/tools/input.js';
+import {waitForElement} from '../../../src/tools/page.js';
 import {ErrorCodes, ToolError} from '../../../src/utils/errors.js';
 
-describe('locator layer and element error classification e2e', () => {
+// 真实浏览器依赖：与 BrowserManager.test.ts 一致，需显式开启 RUN_BROWSER_TESTS=true
+const runBrowserTests = process.env.RUN_BROWSER_TESTS === 'true';
+
+describe(
+  'locator layer and element error classification e2e',
+  {skip: !runBrowserTests},
+  () => {
   let browser: Browser;
   let page: Page;
 

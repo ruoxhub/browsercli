@@ -1,8 +1,8 @@
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
-import {dumpTargetScripts} from '../../../../src/tools/collector/dumpTargetScripts.js';
-import {listTargets} from '../../../../src/tools/collector/listTargets.js';
+import {dumpTargetScripts} from '../../../../src/tools/collector.js';
+import {listTargets} from '../../../../src/tools/collector.js';
 import {ToolError} from '../../../../src/utils/errors.js';
 
 function responseCapture(): {

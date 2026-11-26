@@ -10,7 +10,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {after, before, describe, it} from 'node:test';
 
-import {searchInSources} from '../../../../src/tools/debugger/index.js';
+import {searchInSources} from '../../../../src/tools/debugger.js';
 
 interface CapturedResponse {
   lines: string[];

@@ -127,7 +127,7 @@ describe('ToolDefinition extended', () => {
   describe('loadToolMeta conflict rejection', () => {
     it('rejects conflicting entry and annotation requirements', async () => {
       const entry = {
-        modulePath: './input/click.js',
+        modulePath: './input.js',
         handlerName: 'click',
         domain: 'input',
         profile: 'workflow' as const,
@@ -143,7 +143,7 @@ describe('ToolDefinition extended', () => {
 
     it('loads matching representative tools with requirements', async () => {
       const clickMeta = await loadToolMeta({
-        modulePath: './input/click.js',
+        modulePath: './input.js',
         handlerName: 'click',
         domain: 'input',
         profile: 'workflow',
@@ -163,7 +163,7 @@ describe('ToolDefinition extended', () => {
       });
 
       const listScriptsMeta = await loadToolMeta({
-        modulePath: './debugger/index.js',
+        modulePath: './debugger.js',
         handlerName: 'listScripts',
         domain: 'debugger',
         profile: 'full',
@@ -181,7 +181,7 @@ describe('ToolDefinition extended', () => {
       });
 
       const resumeMeta = await loadToolMeta({
-        modulePath: './debugger/index.js',
+        modulePath: './debugger.js',
         handlerName: 'resume',
         domain: 'debugger',
         profile: 'full',
@@ -201,7 +201,7 @@ describe('ToolDefinition extended', () => {
       });
 
       const evalMeta = await loadToolMeta({
-        modulePath: './debugger/index.js',
+        modulePath: './debugger.js',
         handlerName: 'evaluateOnCallframe',
         domain: 'debugger',
         profile: 'full',
@@ -219,7 +219,7 @@ describe('ToolDefinition extended', () => {
       });
 
       const healthMeta = await loadToolMeta({
-        modulePath: './page/checkBrowserHealth.js',
+        modulePath: './page.js',
         handlerName: 'checkBrowserHealth',
         domain: 'page',
         profile: 'workflow',
@@ -235,7 +235,7 @@ describe('ToolDefinition extended', () => {
       });
 
       const wasmDumpMeta = await loadToolMeta({
-        modulePath: './wasm/index.js',
+        modulePath: './wasm.js',
         handlerName: 'wasmDump',
         domain: 'wasm',
         profile: 'full',

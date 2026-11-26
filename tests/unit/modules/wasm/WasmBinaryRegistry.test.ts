@@ -246,4 +246,20 @@ describe('WasmBinaryRegistry', () => {
     assert.strictEqual(registry.getModuleBytes('nope'), undefined);
     assert.deepStrictEqual(registry.getModules(), []);
   });
+
+  it('clears all registered modules, hashes and bytes', () => {
+    const registry = new WasmBinaryRegistry(makeAnalyzerStub());
+    const record = registry.registerBinary(makeWasmBytes(), {
+      loadMethod: 'network',
+      timestamp: 1,
+      source: 'network',
+    });
+    assert.strictEqual(registry.getModules().length, 1);
+
+    registry.clear();
+
+    assert.deepStrictEqual(registry.getModules(), []);
+    assert.strictEqual(registry.getModuleById(record.id), undefined);
+    assert.strictEqual(registry.getModuleBytes(record.id), undefined);
+  });
 });

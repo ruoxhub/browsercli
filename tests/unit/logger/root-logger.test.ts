@@ -42,7 +42,7 @@ describe('root logger', {concurrency: false}, () => {
       );
       await imported.closeLogs();
 
-      const logDir = path.join(dir, '.jsreverse', 'log');
+      const logDir = path.join(dir, '.browsercli', 'log');
       assert.ok(!fs.existsSync(logDir));
     } finally {
       if (originalHome === undefined) {
@@ -64,7 +64,7 @@ describe('root logger', {concurrency: false}, () => {
     }
   });
 
-  it('creates the default log file under ~/.jsreverse/log with a datetime name', async () => {
+  it('creates the default log file under ~/.browsercli/log with a datetime name', async () => {
     const originalHome = process.env.HOME;
     const originalUserProfile = process.env.USERPROFILE;
     const originalNodeEnv = process.env.NODE_ENV;
@@ -83,7 +83,7 @@ describe('root logger', {concurrency: false}, () => {
       await imported.flushLogs();
       await imported.closeLogs();
 
-      const logDir = path.join(dir, '.jsreverse', 'log');
+      const logDir = path.join(dir, '.browsercli', 'log');
       const files = fs.readdirSync(logDir);
       assert.strictEqual(files.length, 1);
       assert.match(
@@ -136,7 +136,7 @@ describe('root logger', {concurrency: false}, () => {
       await second.flushLogs();
       await second.closeLogs();
 
-      const logDir = path.join(dir, '.jsreverse', 'log');
+      const logDir = path.join(dir, '.browsercli', 'log');
       const files = fs.readdirSync(logDir);
       assert.strictEqual(files.length, 1);
       assert.match(
@@ -185,7 +185,7 @@ describe('root logger', {concurrency: false}, () => {
       await imported.flushLogs();
       await imported.closeLogs();
 
-      const logDir = path.join(dir, '.jsreverse', 'log');
+      const logDir = path.join(dir, '.browsercli', 'log');
       const [file] = fs.readdirSync(logDir);
       const content = fs.readFileSync(path.join(logDir, file), 'utf-8');
       assert.ok(content.includes('plain console message'));

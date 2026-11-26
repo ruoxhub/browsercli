@@ -15,11 +15,24 @@
 
 import type {Browser, BrowserContext, Dialog, Frame, Page} from 'patchright';
 
+import {
+  applyPageEmulation,
+  type EmulateOptions,
+} from '../../modules/browser/EmulationManager.js';
 import type {BrowserManager} from '../../modules/browser/index.js';
-import type {
-  PageSelector,
-  ResolvedPage,
+import {
+  normalizePageId,
+  type PageSelector,
+  type ResolvedPage,
 } from '../../modules/browser/PageIdentity.js';
+import {
+  WaitForHelper,
+  type WaitForEventsOptions,
+  type WaitForEventsResult,
+} from '../../modules/browser/WaitForHelper.js';
+import {LogpointManager} from '../../modules/debugger/LogpointManager.js';
+import {NetworkMockManager} from '../../modules/network/NetworkMockManager.js';
+import type {NewPageOptions} from '../../tools/ToolDefinition.js';
 
 const DEFAULT_TIMEOUT = 5_000;
 const NAVIGATION_TIMEOUT = 10_000;
@@ -54,6 +67,12 @@ export class BrowserContextProvider {
   private _dialog?: Dialog;
   private _networkConditionsMap = new WeakMap<Page, string>();
   private _cpuThrottlingRateMap = new WeakMap<Page, number>();
+  private readonly _networkMockManagers = new WeakMap<
+    Page,
+    NetworkMockManager
+  >();
+  private readonly _logpointManagers = new WeakMap<Page, LogpointManager>();
+  private readonly _isolatedContexts = new Map<string, BrowserContext>();
 
   /**
    * context 被替换（重连/重启后拿到新 BrowserContext）时回调。
@@ -178,7 +197,23 @@ export class BrowserContextProvider {
 
   getPages(): Page[] {
     if (this._context) {
-      return this.reconcilePages(this._context.pages());
+      const seen = new Set<Page>();
+      const collected: Page[] = [];
+      for (const page of this._context.pages()) {
+        if (!seen.has(page)) {
+          seen.add(page);
+          collected.push(page);
+        }
+      }
+      for (const isoCtx of this._isolatedContexts.values()) {
+        for (const page of isoCtx.pages()) {
+          if (!seen.has(page)) {
+            seen.add(page);
+            collected.push(page);
+          }
+        }
+      }
+      return this.reconcilePages(collected);
     }
     return this.reconcilePages(this.pagesList);
   }
@@ -201,9 +236,10 @@ export class BrowserContextProvider {
     let pageByIdx: Page | undefined;
 
     if (selector.pageId !== undefined) {
-      pageById = this.pagesById.get(selector.pageId);
+      const normalizedId = normalizePageId(selector.pageId);
+      pageById = this.pagesById.get(normalizedId);
       if (!pageById) {
-        const state = this.wasIssuedPageId(selector.pageId) ? '已失效' : '未知';
+        const state = this.wasIssuedPageId(normalizedId) ? '已失效' : '未知';
         throw new Error(
           `${state}页面 ID ${selector.pageId}，请重新调用 list_pages`,
         );
@@ -250,12 +286,172 @@ export class BrowserContextProvider {
     return this.resolvePage({pageIdx: idx}).page;
   }
 
-  async newPage(): Promise<Page> {
+  async newPage(options?: NewPageOptions): Promise<Page> {
     if (!this._context) throw new Error('BrowserContext 未初始化');
-    const page = await this._context.newPage();
-    this.reconcilePages(this._context.pages());
-    this.selectPage(page);
+
+    let targetContext = this._context;
+    if (options?.isolatedContext) {
+      let isoCtx = this._isolatedContexts.get(options.isolatedContext);
+      if (!isoCtx) {
+        const browser = this.getBrowser();
+        if (!browser || typeof browser.newContext !== 'function') {
+          throw new Error(
+            '当前浏览器实例不支持创建隔离上下文 (isolatedContext)',
+          );
+        }
+        isoCtx = await browser.newContext();
+        this._isolatedContexts.set(options.isolatedContext, isoCtx);
+      }
+      targetContext = isoCtx;
+    }
+
+    const page = await targetContext.newPage();
+    this.getPages();
+    if (!options?.background) {
+      this.selectPage(page);
+    } else if (!this.selectedPage) {
+      this.selectPage(page);
+    }
     return page;
+  }
+
+  async closePage(pageIdxOrSelector: number | PageSelector): Promise<void> {
+    const pages = this.getPages();
+    if (pages.length <= 1) {
+      throw new Error(
+        'The last open page cannot be closed. It is fine to keep it open.',
+      );
+    }
+    const resolved =
+      typeof pageIdxOrSelector === 'number'
+        ? this.resolvePage({pageIdx: pageIdxOrSelector})
+        : this.resolvePage(pageIdxOrSelector);
+    const mockMgr = this._networkMockManagers.get(resolved.page);
+    if (mockMgr) {
+      await mockMgr.dispose().catch(() => undefined);
+      this._networkMockManagers.delete(resolved.page);
+    }
+    this._logpointManagers.get(resolved.page)?.clear();
+    this._logpointManagers.delete(resolved.page);
+
+    if (this.selectedPage === resolved.page) {
+      this.clearDialog();
+    }
+    await resolved.page.close();
+    await this.syncPages();
+  }
+
+  getNetworkMockManager(page: Page): NetworkMockManager {
+    let mgr = this._networkMockManagers.get(page);
+    if (!mgr) {
+      mgr = new NetworkMockManager(page);
+      this._networkMockManagers.set(page, mgr);
+    }
+    return mgr;
+  }
+
+  getLogpointManager(page: Page): LogpointManager {
+    let mgr = this._logpointManagers.get(page);
+    if (!mgr) {
+      mgr = new LogpointManager();
+      this._logpointManagers.set(page, mgr);
+    }
+    return mgr;
+  }
+
+  async emulate(page: Page, options: EmulateOptions): Promise<void> {
+    await applyPageEmulation(page, options, {
+      setNetworkConditions: c => this.setNetworkConditions(c),
+      setCpuThrottlingRate: r => this.setCpuThrottlingRate(r),
+    });
+  }
+
+  async waitForEventsAfterAction(
+    page: Page,
+    action: (signal: AbortSignal) => Promise<unknown>,
+    options?: WaitForEventsOptions,
+  ): Promise<WaitForEventsResult> {
+    const cpuMultiplier = this.getCpuThrottlingRate();
+    const networkMultiplier = getNetworkMultiplierFromString(
+      this.getNetworkConditions(),
+    );
+    const helper = new WaitForHelper(page, cpuMultiplier, networkMultiplier);
+    return await helper.waitForEventsAfterAction(action, options);
+  }
+
+  async waitForTextOnPage(
+    page: Page,
+    params: {text: string | string[]; timeout?: number; visible?: boolean},
+  ): Promise<void> {
+    const texts = Array.isArray(params.text) ? params.text : [params.text];
+    if (texts.length === 0) {
+      throw new Error('At least one text string is required.');
+    }
+    const timeout = params.timeout ?? 5_000;
+    const visibleOnly = params.visible ?? false;
+    await page.waitForFunction(
+      ({
+        targets,
+        requireVisible,
+      }: {
+        targets: string[];
+        requireVisible: boolean;
+      }) => {
+        const isVisible = (el: Element): boolean => {
+          const style = window.getComputedStyle(el);
+          if (
+            style.display === 'none' ||
+            style.visibility === 'hidden' ||
+            style.opacity === '0'
+          ) {
+            return false;
+          }
+          const rect = el.getBoundingClientRect();
+          return rect.width > 0 && rect.height > 0;
+        };
+
+        const checkNodeText = (node: Element): boolean => {
+          const ariaLabel = node.getAttribute('aria-label');
+          const title = node.getAttribute('title');
+          const alt = node.getAttribute('alt');
+          const rawText = requireVisible
+            ? ((node as HTMLElement).innerText ?? node.textContent ?? '')
+            : (node.textContent ?? '');
+          for (const target of targets) {
+            if (
+              ariaLabel === target ||
+              title === target ||
+              alt === target ||
+              rawText.includes(target)
+            ) {
+              if (!requireVisible || isVisible(node)) {
+                return true;
+              }
+            }
+          }
+          return false;
+        };
+
+        if (!document.body) {
+          return false;
+        }
+        if (!requireVisible) {
+          const bodyText = document.body.textContent ?? '';
+          if (targets.some(t => bodyText.includes(t))) {
+            return true;
+          }
+        }
+        const elements = document.body.querySelectorAll('*');
+        for (const el of Array.from(elements)) {
+          if (checkNodeText(el)) {
+            return true;
+          }
+        }
+        return checkNodeText(document.body);
+      },
+      {targets: texts, requireVisible: visibleOnly},
+      {timeout},
+    );
   }
 
   /**
@@ -430,6 +626,10 @@ export class BrowserContextProvider {
     this.clearContext();
     this._networkConditionsMap = new WeakMap();
     this._cpuThrottlingRateMap = new WeakMap();
+    for (const isoCtx of this._isolatedContexts.values()) {
+      void isoCtx.close().catch(() => undefined);
+    }
+    this._isolatedContexts.clear();
   }
 
   /**
@@ -447,7 +647,7 @@ export class BrowserContextProvider {
   private ensurePageId(page: Page): string {
     let pageId = this.pageIds.get(page);
     if (!pageId) {
-      pageId = `page-${this.nextPageId++}`;
+      pageId = String(this.nextPageId++);
       this.pageIds.set(page, pageId);
     }
     this.pagesById.set(pageId, page);
@@ -479,9 +679,9 @@ export class BrowserContextProvider {
   }
 
   private wasIssuedPageId(pageId: string): boolean {
-    const match = /^page-(\d+)$/.exec(pageId);
-    if (!match) return false;
-    const value = Number(match[1]);
+    const normalized = normalizePageId(pageId);
+    if (!/^\d+$/.test(normalized)) return false;
+    const value = Number(normalized);
     return value >= 1 && value < this.nextPageId;
   }
 

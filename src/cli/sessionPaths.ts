@@ -13,6 +13,35 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import {fileURLToPath} from 'node:url';
+
+import {defaultConfigLocator} from '../config/ConfigLocator.js';
+
+/** 向上查找最近的 package.json 读取版本号（CLI 与 Daemon 共享单一实现）。 */
+export function readPackageVersion(fallback = '2.0.3'): string {
+  try {
+    let dir = path.dirname(fileURLToPath(import.meta.url));
+    for (let i = 0; i < 10; i++) {
+      const candidate = path.join(dir, 'package.json');
+      if (fs.existsSync(candidate)) {
+        try {
+          const parsed = JSON.parse(fs.readFileSync(candidate, 'utf-8')) as {
+            version?: string;
+          };
+          if (typeof parsed.version === 'string') return parsed.version;
+        } catch {
+          // ignore
+        }
+      }
+      const parent = path.dirname(dir);
+      if (parent === dir) break;
+      dir = parent;
+    }
+  } catch {
+    // ignore
+  }
+  return fallback;
+}
 
 export interface SessionConfig {
   name: string;
@@ -74,16 +103,9 @@ export function computeBaseDaemonDir(): string {
 }
 
 export function cliConfigPath(): string {
-  const custom =
-    process.env.BROWSERCLI_CONFIG_DIR ?? process.env.PROXYCLI_CONFIG_DIR;
-  if (custom) return path.join(custom, 'config.json');
-  // 按配置文件是否存在来选路径，而不是按目录：~/.browsercli 会因日志等副作用被创建，
-  // 若以目录存在为判据，新目录建好但还没 config.json 时会静默丢弃旧目录里的配置。
-  const browserConfig = path.join(os.homedir(), '.browsercli', 'config.json');
-  if (fs.existsSync(browserConfig)) return browserConfig;
-  const proxyConfig = path.join(os.homedir(), '.proxycli', 'config.json');
-  if (fs.existsSync(proxyConfig)) return proxyConfig;
-  return browserConfig;
+  return (
+    defaultConfigLocator.locate() ?? defaultConfigLocator.getPrimaryConfigPath()
+  );
 }
 
 export interface CliConfig {
@@ -97,11 +119,15 @@ export interface CliConfig {
   wsEndpoint?: string;
   executablePath?: string;
   isolate_workspace?: string;
+  outputFormat?: string;
 }
 
 export function loadCliConfig(): CliConfig {
+  const located = defaultConfigLocator.locate();
+  if (!located) return {};
   try {
-    const parsed = JSON.parse(fs.readFileSync(cliConfigPath(), 'utf-8'));
+    const content = fs.readFileSync(located, 'utf-8').replace(/^\uFEFF/, '');
+    const parsed = JSON.parse(content);
     if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
       return parsed as CliConfig;
     }
